@@ -22,6 +22,15 @@ defmodule SchedulerApi.Catalog do
   end
 
   @doc """
+  Returns services with their service prices and vehicle sizes loaded.
+  """
+  def list_services_with_prices do
+    Service
+    |> Repo.all()
+    |> Repo.preload(service_prices: :vehicle_size)
+  end
+
+  @doc """
   Gets a single service.
 
   Raises `Ecto.NoResultsError` if the Service does not exist.
