@@ -10,14 +10,15 @@ basic =
 mid =
   Repo.insert!(%Service{
     name: "Mid Detail",
-    description: "Exterior wash, clay bar, and spray detail. Interior surface cleaning included."
+    description:
+      "Exterior wash, clay bar, and spray wax. Interior surface cleaning included and vacuuming."
   })
 
 supreme =
   Repo.insert!(%Service{
     name: "Supreme Detail",
     description:
-      "Exterior wash, clay bar, tire shine, and wax. Interior surface cleaning, shampooing, and choice of fragrance included."
+      "Exterior wash, clay bar, tire shine, 2-step polish, and hand wax. Interior surface cleaning, vacuum, shampooing, and choice of fragrance included."
   })
 
 small =
@@ -39,21 +40,22 @@ large =
   })
 
 prices = [
-  {basic, small, 5999},
-  {basic, medium, 8999},
-  {basic, large, 10_999},
-  {mid, small, 8999},
-  {mid, medium, 11_999},
-  {mid, large, 13_999},
-  {supreme, small, 12_999},
-  {supreme, medium, 15_999},
-  {supreme, large, 17_999}
+  {basic, small, 5999, 60},
+  {basic, medium, 8999, 90},
+  {basic, large, 10_999, 120},
+  {mid, small, 8999, 90},
+  {mid, medium, 11_999, 120},
+  {mid, large, 13_999, 150},
+  {supreme, small, 12_999, 150},
+  {supreme, medium, 15_999, 180},
+  {supreme, large, 17_999, 230}
 ]
 
-Enum.each(prices, fn {service, vehicle_size, price_cents} ->
+Enum.each(prices, fn {service, vehicle_size, price_cents, duration_minutes} ->
   Repo.insert!(%ServicePrice{
     service_id: service.id,
     vehicle_size_id: vehicle_size.id,
-    price_cents: price_cents
+    price_cents: price_cents,
+    duration_minutes: duration_minutes
   })
 end)

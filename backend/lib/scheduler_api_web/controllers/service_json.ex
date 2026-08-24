@@ -15,6 +15,7 @@ defmodule SchedulerApiWeb.ServiceJSON do
         Enum.map(service.service_prices, fn price ->
           %{
             price_cents: price.price_cents,
+            duration_minutes: price.duration_minutes,
             vehicle_size: price.vehicle_size.name
           }
         end)

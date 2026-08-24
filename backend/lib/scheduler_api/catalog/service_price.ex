@@ -6,6 +6,7 @@ defmodule SchedulerApi.Catalog.ServicePrice do
 
   schema "service_prices" do
     field :price_cents, :integer
+    field :duration_minutes, :integer
 
     belongs_to :service, Service
     belongs_to :vehicle_size, VehicleSize
@@ -16,8 +17,8 @@ defmodule SchedulerApi.Catalog.ServicePrice do
   @doc false
   def changeset(service_price, attrs) do
     service_price
-    |> cast(attrs, [:price_cents, :service_id, :vehicle_size_id])
-    |> validate_required([:price_cents, :service_id, :vehicle_size_id])
+    |> cast(attrs, [:price_cents, :duration_minutes, :service_id, :vehicle_size_id])
+    |> validate_required([:price_cents, :duration_minutes, :service_id, :vehicle_size_id])
     |> validate_number(:price_cents, greater_than: 0)
     |> foreign_key_constraint(:service_id)
     |> foreign_key_constraint(:vehicle_size_id)
