@@ -16,7 +16,8 @@ defmodule SchedulerApiWeb.ServiceJSON do
           %{
             price_cents: price.price_cents,
             duration_minutes: price.duration_minutes,
-            vehicle_size: price.vehicle_size.name
+            vehicle_size: price.vehicle_size.name,
+            vehicle_size_id: price.vehicle_size.id
           }
         end)
     }
