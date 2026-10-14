@@ -5,11 +5,10 @@ import {
   Routes,
   Route,
   Link,
+  NavLink,
   useSearchParams,
 } from 'react-router-dom'
 import heroImage from './assets/v3-magnum-hero.png'
-// import heroImage from './assets/v3-magnum-hero-busty-babe-2.png'
-// import heroImage from './assets/v6-magnum-hero-busty-7.png'
 import magnumLogo from './assets/magnum-logo.png'
 import magnumIcon from './assets/magnum-icon.png'
 
@@ -156,6 +155,7 @@ function ServicesPage() {
 function ContactPage() {
   const [searchParams] = useSearchParams()
   const [services, setServices] = useState<Service[]>([])
+  const [selectedDate, setSelectedDate] = useState('')
 
   const serviceParam = searchParams.get('service')
   const sizeParam = searchParams.get('size')
@@ -205,6 +205,19 @@ function ContactPage() {
                 {selectedPrice.duration_minutes} min
               </strong>
             </div>
+            
+            <div className="booking-date">
+              <label htmlFor="booking-date">
+                Choose a Date
+              </label>
+
+              <input
+                id="booking-date"
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+              />
+            </div>
           </div>
 
           <Link className="change-selection" to="/services">
@@ -244,9 +257,9 @@ const App = () => {
         </Link>
 
         <div className="nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/services">Services</Link>
-          <Link to="/contact">Contact</Link>
+          <NavLink to="/">Home</NavLink>
+          <NavLink to="/services">Services</NavLink>
+          <NavLink to="/contact">Contact</NavLink>
         </div>
 
         <div className="nav-neon-line" />

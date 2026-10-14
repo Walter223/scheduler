@@ -38,10 +38,16 @@ defmodule SchedulerApi.CatalogFixtures do
   Generate a service_price.
   """
   def service_price_fixture(attrs \\ %{}) do
+    service = service_fixture()
+    vehicle_size = vehicle_size_fixture()
+
     {:ok, service_price} =
       attrs
       |> Enum.into(%{
-        price_cents: 42
+        price_cents: 42,
+        duration_minutes: 60,
+        service_id: service.id,
+        vehicle_size_id: vehicle_size.id
       })
       |> SchedulerApi.Catalog.create_service_price()
 

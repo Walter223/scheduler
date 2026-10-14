@@ -116,6 +116,17 @@ body {
     text-shadow 0.2s ease;
 }
 
+.nav-links a.active {
+  color: #00eaff;
+
+  text-shadow:
+    0 0 8px rgba(0, 234, 255, 0.8),
+    0 0 16px rgba(255, 42, 161, 0.35);
+}
+
+.nav-links a.active::after {
+  width: 100%;
+}
 
 .nav-links a::after {
   content: "";
@@ -182,7 +193,7 @@ body {
   right: 3%;
   bottom: 0.45rem;
 
-  height: 1px;
+  height: 2px;
 
   background: linear-gradient(
     90deg,
@@ -196,6 +207,44 @@ body {
   box-shadow:
     0 0 8px rgba(0, 234, 255, 0.8),
     0 0 14px rgba(255, 42, 161, 0.5);
+
+  overflow: hidden;
+  contain: paint;
+}
+
+.nav-neon-line::after {
+  content: "";
+
+  position: absolute;
+  top: 50%;
+  left: 0;
+
+  width: 18%;
+  height: 4px;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.95),
+    #00eaff,
+    transparent
+  );
+
+  filter: blur(1px);
+
+  transform: translate3d(-110%, -50%, 0);
+
+  animation: neon-scan 5s linear infinite;
+}
+
+@keyframes neon-scan {
+  from {
+    transform: translate3d(-110%, -50%, 0);
+  }
+
+  to {
+    transform: translate3d(660%, -50%, 0);
+  }
 }
 
 /* Default pages */
@@ -640,3 +689,44 @@ main {
   color: #00eaff;
   text-decoration: none;
 }
+
+.booking-date {
+  margin: 2rem 0;
+}
+
+.booking-date label {
+  display: block;
+  margin-bottom: 0.75rem;
+
+  color: #ff2aa1;
+  font-size: 0.8rem;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.booking-date input {
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 0.9rem 1rem;
+
+  color: white;
+  font: inherit;
+
+  background: rgba(255, 255, 255, 0.05);
+
+  border: 1px solid rgba(0, 234, 255, 0.35);
+  border-radius: 10px;
+
+  color-scheme: dark;
+}
+
+.booking-date input:focus {
+  outline: none;
+
+  border-color: #00eaff;
+
+  box-shadow:
+    0 0 16px rgba(0, 234, 255, 0.2);

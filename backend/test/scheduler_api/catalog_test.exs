@@ -8,7 +8,7 @@ defmodule SchedulerApi.CatalogTest do
 
     import SchedulerApi.CatalogFixtures
 
-    @invalid_attrs %{" name": nil, " description": nil}
+    @invalid_attrs %{name: nil, description: nil}
 
     test "list_services/0 returns all services" do
       service = service_fixture()
@@ -21,7 +21,7 @@ defmodule SchedulerApi.CatalogTest do
     end
 
     test "create_service/1 with valid data creates a service" do
-      valid_attrs = %{" name": "some  name", " description": "some  description"}
+      valid_attrs = %{name: "some  name", description: "some  description"}
 
       assert {:ok, %Service{} = service} = Catalog.create_service(valid_attrs)
       assert service.name == "some  name"
@@ -34,7 +34,7 @@ defmodule SchedulerApi.CatalogTest do
 
     test "update_service/2 with valid data updates the service" do
       service = service_fixture()
-      update_attrs = %{" name": "some updated  name", " description": "some updated  description"}
+      update_attrs = %{name: "some updated  name", description: "some updated  description"}
 
       assert {:ok, %Service{} = service} = Catalog.update_service(service, update_attrs)
       assert service.name == "some updated  name"
@@ -64,7 +64,7 @@ defmodule SchedulerApi.CatalogTest do
 
     import SchedulerApi.CatalogFixtures
 
-    @invalid_attrs %{" name": nil, " sort_order": nil}
+    @invalid_attrs %{name: nil, sort_order: nil}
 
     test "list_vehicle_sizes/0 returns all vehicle_sizes" do
       vehicle_size = vehicle_size_fixture()
@@ -77,7 +77,7 @@ defmodule SchedulerApi.CatalogTest do
     end
 
     test "create_vehicle_size/1 with valid data creates a vehicle_size" do
-      valid_attrs = %{" name": "some  name", " sort_order": 42}
+      valid_attrs = %{name: "some  name", sort_order: 42}
 
       assert {:ok, %VehicleSize{} = vehicle_size} = Catalog.create_vehicle_size(valid_attrs)
       assert vehicle_size.name == "some  name"
@@ -90,7 +90,7 @@ defmodule SchedulerApi.CatalogTest do
 
     test "update_vehicle_size/2 with valid data updates the vehicle_size" do
       vehicle_size = vehicle_size_fixture()
-      update_attrs = %{" name": "some updated  name", " sort_order": 43}
+      update_attrs = %{name: "some updated  name", sort_order: 43}
 
       assert {:ok, %VehicleSize{} = vehicle_size} =
                Catalog.update_vehicle_size(vehicle_size, update_attrs)
@@ -125,7 +125,7 @@ defmodule SchedulerApi.CatalogTest do
 
     import SchedulerApi.CatalogFixtures
 
-    @invalid_attrs %{" price_cents": nil}
+    @invalid_attrs %{price_cents: nil}
 
     test "list_service_prices/0 returns all service_prices" do
       service_price = service_price_fixture()
@@ -138,7 +138,15 @@ defmodule SchedulerApi.CatalogTest do
     end
 
     test "create_service_price/1 with valid data creates a service_price" do
-      valid_attrs = %{" price_cents": 42}
+      service = service_fixture()
+      vehicle_size = vehicle_size_fixture()
+
+      valid_attrs = %{
+        price_cents: 42,
+        duration_minutes: 60,
+        service_id: service.id,
+        vehicle_size_id: vehicle_size.id
+      }
 
       assert {:ok, %ServicePrice{} = service_price} = Catalog.create_service_price(valid_attrs)
       assert service_price.price_cents == 42
@@ -150,7 +158,7 @@ defmodule SchedulerApi.CatalogTest do
 
     test "update_service_price/2 with valid data updates the service_price" do
       service_price = service_price_fixture()
-      update_attrs = %{" price_cents": 43}
+      update_attrs = %{price_cents: 43}
 
       assert {:ok, %ServicePrice{} = service_price} =
                Catalog.update_service_price(service_price, update_attrs)
