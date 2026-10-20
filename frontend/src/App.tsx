@@ -331,6 +331,17 @@ function ContactPage() {
 
   const servicePriceId = selectedPrice?.service_price_id
 
+  const isBookingFormValid =
+    isValidName(bookingForm.firstName) &&
+    isValidName(bookingForm.lastName) &&
+    isValidEmail(bookingForm.customerEmail) &&
+    isValidPhoneNumber(bookingForm.customerPhone) &&
+    bookingForm.vehicleMake.trim().length > 0 &&
+    bookingForm.vehicleModel.trim().length > 0 &&
+    Boolean(selectedDate) &&
+    Boolean(selectedTime) &&
+    Boolean(servicePriceId)
+
   useEffect(() => {
     if (!selectedDate || !servicePriceId) {
       setAvailableTimes([])
@@ -684,6 +695,16 @@ function ContactPage() {
                 />
               </div>
             </div>
+          )}
+          
+          {selectedTime && (
+            <button
+              type="button"
+              className="book-appointment-button"
+              disabled={!isBookingFormValid}
+            >
+              Book Appointment
+            </button>
           )}
 
           <Link className="change-selection" to="/services">

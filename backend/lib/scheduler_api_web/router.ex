@@ -10,6 +10,7 @@ defmodule SchedulerApiWeb.Router do
 
     get "/services", ServiceController, :index
     get "/availability", AvailabilityController, :index
+    post "/appointments", AppointmentController, :create
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
