@@ -7,7 +7,7 @@ defmodule SchedulerApi.Appointments do
 
   alias SchedulerApi.Repo
   alias SchedulerApi.Catalog.ServicePrice
-  alias SchedulerApi.Appointments.Appointment
+  alias SchedulerApi.Appointments.{Appointment, Availability}
 
   @doc """
   Returns appointments ordered by start time and ID.
@@ -37,6 +37,10 @@ defmodule SchedulerApi.Appointments do
   Creates a pending appointment.
 
   Customer-supplied price, duration, and status are ignored.
+
+  Availability is rechecked immediately before insertion. A PostgreSQL exclusion
+  constraint rejects concurrent overlapping pending/confirmed appointments,
+  including their buffers, even when their service prices differ.
 
   Price and duration are copied from the selected service price and stored
   on the appointment as historical snapshots.
@@ -95,6 +99,20 @@ defmodule SchedulerApi.Appointments do
         attrs
       )
 
+    starts_at = Ecto.Changeset.get_field(changeset, :starts_at)
+
+    case Availability.validate_slot(starts_at, service_price.duration_minutes) do
+      :ok ->
+        :ok
+
+      {:error, error} ->
+        changeset
+        |> Ecto.Changeset.add_error(:starts_at, error.message)
+        |> Repo.rollback()
+    end
+
+    # The exclusion constraint is the final authority if another transaction
+    # books a conflicting slot after the availability query above.
     case Repo.insert(changeset) do
       {:ok, appointment} ->
         appointment

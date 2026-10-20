@@ -4,19 +4,12 @@ defmodule SchedulerApi.AppointmentsTest do
   alias SchedulerApi.{Appointments, Catalog}
   alias SchedulerApi.Appointments.Appointment
   import SchedulerApi.CatalogFixtures
+  import SchedulerApi.AppointmentsFixtures
 
   setup do
     price = service_price_fixture()
 
-    attrs = %{
-      service_price_id: price.id,
-      starts_at: ~U[2026-11-01 16:00:00Z],
-      customer_name: "Alex Driver",
-      customer_email: "alex@example.com",
-      customer_phone: "+1 303 555 0100",
-      vehicle_make: "Toyota",
-      vehicle_model: "Camry"
-    }
+    attrs = booking_attrs(price)
 
     %{price: price, attrs: attrs}
   end
@@ -65,16 +58,20 @@ defmodule SchedulerApi.AppointmentsTest do
     stored = Appointments.get_appointment!(appointment.id)
     assert stored.price_cents == price.price_cents
     assert stored.duration_minutes == price.duration_minutes
-    assert {:ok, next} = Appointments.create_appointment(attrs)
+    next_attrs = %{attrs | starts_at: DateTime.add(attrs.starts_at, 180 * 60, :second)}
+    assert {:ok, next} = Appointments.create_appointment(next_attrs)
     assert next.price_cents == 9999
     assert next.duration_minutes == 120
   end
 
   test "retrieves appointments in chronological order and handles missing IDs", %{attrs: attrs} do
-    assert {:ok, later} = Appointments.create_appointment(attrs)
+    assert {:ok, later} =
+             Appointments.create_appointment(%{
+               attrs
+               | starts_at: DateTime.add(attrs.starts_at, 180 * 60, :second)
+             })
 
-    assert {:ok, earlier} =
-             Appointments.create_appointment(%{attrs | starts_at: ~U[2026-10-31 16:00:00Z]})
+    assert {:ok, earlier} = Appointments.create_appointment(attrs)
 
     assert Appointments.list_appointments() == [earlier, later]
     assert Appointments.get_appointment(later.id) == later

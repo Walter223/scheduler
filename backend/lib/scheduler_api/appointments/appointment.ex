@@ -78,6 +78,10 @@ defmodule SchedulerApi.Appointments.Appointment do
     ])
     |> validate_number(:duration_minutes, greater_than: 0)
     |> validate_number(:price_cents, greater_than: 0)
+    |> exclusion_constraint(:starts_at,
+      name: :appointments_no_active_overlap,
+      message: "is no longer available"
+    )
     |> foreign_key_constraint(:service_price_id)
     |> check_constraint(
       :duration_minutes,

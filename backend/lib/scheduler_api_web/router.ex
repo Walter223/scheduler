@@ -9,6 +9,7 @@ defmodule SchedulerApiWeb.Router do
     pipe_through :api
 
     get "/services", ServiceController, :index
+    get "/availability", AvailabilityController, :index
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
