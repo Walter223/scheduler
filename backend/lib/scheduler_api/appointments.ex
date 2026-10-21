@@ -9,6 +9,9 @@ defmodule SchedulerApi.Appointments do
   alias SchedulerApi.Catalog.ServicePrice
   alias SchedulerApi.Appointments.{Appointment, Availability}
 
+  @schedule_lock_namespace 0x4D41474E
+  @shared_schedule_id 1
+
   @doc """
   Returns appointments ordered by start time and ID.
   """
@@ -38,9 +41,9 @@ defmodule SchedulerApi.Appointments do
 
   Customer-supplied price, duration, and status are ignored.
 
-  Availability is rechecked immediately before insertion. A PostgreSQL exclusion
-  constraint rejects concurrent overlapping pending/confirmed appointments,
-  including their buffers, even when their service prices differ.
+  A transaction-level advisory lock serializes creation for the shared schedule
+  before availability is rechecked and the appointment is inserted. The PostgreSQL
+  exclusion constraint remains the final overlap safety net, including buffers.
 
   Price and duration are copied from the selected service price and stored
   on the appointment as historical snapshots.
@@ -64,6 +67,17 @@ defmodule SchedulerApi.Appointments do
       )
 
     Repo.transaction(fn ->
+      # Concurrent GiST exclusion checks can deadlock after both requests pass
+      # availability. Serialize the one shared schedule before taking catalog
+      # locks, rechecking availability, or inserting. The lock is automatically
+      # released on commit/rollback and must not be keyed by service_price_id.
+      # With multiple detailers/bays, replace the shared ID with the resource/
+      # employee ID (and scope availability and exclusion protection accordingly).
+      Repo.query!(
+        "SELECT pg_advisory_xact_lock($1::integer, $2::integer)",
+        [@schedule_lock_namespace, @shared_schedule_id]
+      )
+
       service_price =
         Repo.one(
           from price in ServicePrice,
@@ -111,8 +125,8 @@ defmodule SchedulerApi.Appointments do
         |> Repo.rollback()
     end
 
-    # The exclusion constraint is the final authority if another transaction
-    # books a conflicting slot after the availability query above.
+    # Keep the exclusion constraint as defense in depth, including for writes
+    # that bypass this context and its shared scheduling lock.
     case Repo.insert(changeset) do
       {:ok, appointment} ->
         appointment

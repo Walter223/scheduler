@@ -55,9 +55,15 @@ Pending and confirmed appointments occupy `[starts_at, starts_at + duration +
 only touch at their endpoints are allowed. Existing appointments use their
 stored duration snapshots, even after catalog changes.
 
-The GET result is informational. `Appointments.create_appointment/1` locks the
-selected catalog row for consistent snapshots, revalidates the requested slot
-inside its transaction, then inserts. A partial GiST exclusion constraint rejects
+The GET result is informational. `Appointments.create_appointment/1` first takes
+an exclusive transaction-level advisory lock for the one shared schedule, then
+locks the selected catalog row for consistent snapshots, revalidates the requested
+slot, and inserts in the same transaction. The next creator waits until commit or
+rollback, then rechecks against the committed booking and returns a normal
+`starts_at` validation error for an unavailable slot. This avoids deadlocks between
+concurrent GiST exclusion checks. The advisory key can later use a resource/employee
+ID when availability and database constraints also support multiple detailers/bays.
+A partial GiST exclusion constraint remains the final safety net and rejects
 overlapping active intervals even across concurrent database connections or
 writes that bypass the context. Ecto maps conflicts to a `starts_at` changeset
 error. Client price, duration, and status remain ignored.

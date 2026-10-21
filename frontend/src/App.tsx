@@ -32,6 +32,52 @@ function formatTime(time: string) {
   return `${displayHour}:${minute} ${period}`
 }
 
+function businessDateTimeToUtc(
+  date: string,
+  time: string
+) {
+  const [year, month, day] = date.split('-').map(Number)
+  const [hour, minute] = time.split(':').map(Number)
+
+  const utcGuess = new Date(
+    Date.UTC(year, month - 1, day, hour, minute)
+  )
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+
+  const parts = formatter.formatToParts(utcGuess)
+
+  const getPart = (type: string) =>
+    Number(
+      parts.find((part) => part.type === type)?.value
+    )
+
+  const businessTimeAsUtc = Date.UTC(
+    getPart('year'),
+    getPart('month') - 1,
+    getPart('day'),
+    getPart('hour'),
+    getPart('minute'),
+    getPart('second')
+  )
+
+  const offset =
+    businessTimeAsUtc - utcGuess.getTime()
+
+  return new Date(
+    utcGuess.getTime() - offset
+  ).toISOString()
+}
+
 function formatPhoneNumber(value: string) {
   const trimmed = value.trimStart()
 
@@ -270,6 +316,10 @@ function ContactPage() {
   const [availabilityError, setAvailabilityError] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [slotClaimed, setSlotClaimed] = useState(false)
+
   const [bookingForm, setBookingForm] = useState<BookingForm>({
     firstName: '',
     lastName: '',
@@ -343,35 +393,124 @@ function ContactPage() {
     Boolean(servicePriceId)
 
   useEffect(() => {
-    if (!selectedDate || !servicePriceId) {
-      setAvailableTimes([])
+  if (!selectedDate || !servicePriceId) {
+    return
+  }
+
+  fetch(
+    `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`
+  )
+    .then(async (response) => {
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error?.message ?? 'Could not load availability'
+        )
+      }
+
+      return data as AvailabilityResponse
+    })
+    .then((data) => {
+      setAvailableTimes(data.available_times)
       setAvailabilityError('')
-      return
-    }
+    })
+    .catch((error) => {
+      setAvailableTimes([])
+      setAvailabilityError(error.message)
+    })
+}, [selectedDate, servicePriceId])
 
-    fetch(
-      `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`
+async function handleBookAppointment() {
+  if (!isBookingFormValid || !servicePriceId) {
+    return
+  }
+
+  setIsSubmitting(true)
+  setSubmitError('')
+  setSlotClaimed(false)
+
+  try {
+    const startsAt = businessDateTimeToUtc(
+      selectedDate,
+      selectedTime
     )
-      .then(async (response) => {
-        const data = await response.json()
 
-        if (!response.ok) {
-          throw new Error(
-            data.error?.message ?? 'Could not load availability'
-          )
+    const response = await fetch(
+      'http://localhost:4000/api/appointments',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          service_price_id: servicePriceId,
+          starts_at: startsAt,
+          customer_name:
+            `${bookingForm.firstName.trim()} ${bookingForm.lastName.trim()}`,
+          customer_email:
+            bookingForm.customerEmail.trim(),
+          customer_phone:
+            bookingForm.customerPhone.trim(),
+          vehicle_make:
+            bookingForm.vehicleMake.trim(),
+          vehicle_model:
+            bookingForm.vehicleModel.trim(),
+          notes: bookingForm.notes.trim(),
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      const slotUnavailable = data.errors?.starts_at?.some(
+        (message: string) =>
+          message === 'is not an available start time' ||
+          message === 'is no longer available'
+      )
+
+      if (slotUnavailable) {
+        setSelectedTime('')
+        setAvailableTimes([])
+
+        const availabilityResponse = await fetch(
+          `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`
+        )
+        const availability = await availabilityResponse.json()
+
+        if (!availabilityResponse.ok) {
+          setAvailabilityError('Could not refresh available times. Please choose the date again.')
+          throw new Error('That slot is no longer available. Please choose the date again to refresh available times.')
         }
 
-        return data as AvailabilityResponse
-      })
-      .then((data) => {
-        setAvailableTimes(data.available_times)
+        setAvailableTimes(availability.available_times)
         setAvailabilityError('')
-      })
-      .catch((error) => {
-        setAvailableTimes([])
-        setAvailabilityError(error.message)
-      })
-  }, [selectedDate, servicePriceId])
+        setSlotClaimed(true)
+        return
+      }
+
+      const message =
+        data.errors?.starts_at?.[0] ??
+        'Could not book appointment'
+
+      throw new Error(message)
+    }
+
+    console.log(
+      'Appointment created:',
+      data.appointment
+    )
+  } catch (error) {
+    setSubmitError(
+      error instanceof Error
+        ? error.message
+        : 'Could not book appointment'
+    )
+  } finally {
+    setIsSubmitting(false)
+  }
+}
 
   const firstNameInvalid =
     touchedFields.firstName && !isValidName(bookingForm.firstName)
@@ -437,10 +576,22 @@ function ContactPage() {
 
                   setSelectedDate(value >= today ? value : '')
                   setSelectedTime('')
+                  setAvailableTimes([])
+                  setAvailabilityError('')
+                  setSlotClaimed(false)
+                  setSubmitError('')
                 }}
               />
             </div>
           </div>
+
+          {slotClaimed && (
+            <p className="form-error" role="alert">
+              We apologize, but that slot was just claimed.
+              <br />
+              Another customer booked this time while you were completing your appointment. We've refreshed the available times below.
+            </p>
+          )}
 
           {selectedDate && (
             <div className="availability-times">
@@ -696,15 +847,68 @@ function ContactPage() {
               </div>
             </div>
           )}
+
+          {selectedService && selectedPrice && selectedDate && selectedTime && (
+            <section className="selected-appointment-card">
+              <p className="selected-appointment-kicker">
+                Appointment Selected
+              </p>
+
+              <h3 className="selected-appointment-title">
+                {selectedService.name}
+              </h3>
+
+              <div className="selected-appointment-grid">
+                <div className="selected-appointment-item">
+                  <span>Vehicle</span>
+                  <strong>{selectedPrice.vehicle_size}</strong>
+                </div>
+
+                <div className="selected-appointment-item">
+                  <span>Date</span>
+                  <strong>{selectedDate}</strong>
+                </div>
+
+                <div className="selected-appointment-item">
+                  <span>Time</span>
+                  <strong>{formatTime(selectedTime)}</strong>
+                </div>
+
+                <div className="selected-appointment-item">
+                  <span>Price</span>
+                  <strong>
+                    ${(selectedPrice.price_cents / 100).toFixed(2)}
+                  </strong>
+                </div>
+
+                <div className="selected-appointment-item">
+                  <span>Estimated Time</span>
+                  <strong>{selectedPrice.duration_minutes} min</strong>
+                </div>
+              </div>
+            </section>
+          )}
           
           {selectedTime && (
-            <button
-              type="button"
-              className="book-appointment-button"
-              disabled={!isBookingFormValid}
-            >
-              Book Appointment
-            </button>
+            <>
+              <button
+                type="button"
+                className="book-appointment-button"
+                disabled={!isBookingFormValid || isSubmitting}
+                onClick={handleBookAppointment}
+              >
+                {isSubmitting
+                  ? 'Booking...'
+                  : 'Book Appointment'}
+              </button>
+
+            </>
+          )}
+
+          {submitError && (
+            <p className="form-error" role="alert">
+              {submitError}
+            </p>
           )}
 
           <Link className="change-selection" to="/services">
