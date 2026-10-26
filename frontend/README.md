@@ -73,3 +73,48 @@ export default defineConfig([
 ])
 
 ```
+
+## Booking E2E tests
+
+The permanent Playwright suite covers successful booking/confirmation and the
+slot-claimed recovery flow against the real React app, Phoenix API, and PostgreSQL.
+The race test uses a second API client to book the visible slot before the browser
+submits; it does not mock an error response.
+
+Prerequisites: the runtimes in root `mise.toml`, local PostgreSQL running with the
+credentials in `backend/config/test.exs`, and backend dependencies installed
+(`cd backend && mix deps.get` from the repository root).
+
+From `frontend/`:
+
+```sh
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+For a visible browser, use `npm run test:e2e:headed`. To check repeatability, run
+`npm run test:e2e -- --repeat-each=3`. The E2E command also type-checks its test files.
+
+Playwright starts and stops its own Phoenix server on port **4002** and Vite on
+**5174**. Both ports must be free; existing servers are never reused. Your regular
+development servers may continue on 4000/5173.
+
+The Phoenix server uses `MIX_ENV=test` and `MIX_TEST_PARTITION=_e2e`, creating and
+migrating **scheduler_api_test_e2e** using the existing test configuration. Browser
+API requests are forwarded by the test harness from the app's fixed port 4000 URL
+to this test server. Responses and status codes come from Phoenix; the harness
+only supplies the test frontend's CORS origin. Production CORS and booking rules
+are unchanged, and no browser API request reaches the development database.
+
+Each test creates its own named E2E service, vehicle size, and price, and chooses
+the next open date using Denver time. Cleanup deletes only those fixtures and their
+appointments, even after an assertion failure. Setup removes leftovers from an
+interrupted run. Tests run with one worker because the schedule is a shared resource;
+reserve this database partition for one E2E run at a time. The ordinary backend
+test database and development data are untouched.
+
+Failed runs retain screenshots and traces under ignored `test-results/`. Inspect
+a trace with `npx playwright show-trace test-results/<test-folder>/trace.zip`.
+The backend test helper is `backend/scripts/e2e.exs`; it refuses to run outside
+the dedicated test partition and adds no production routes or test bypasses.

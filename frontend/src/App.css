@@ -1053,3 +1053,202 @@ main {
     grid-template-columns: 1fr;
   }
 }
+
+.booking-confirmation {
+  width: min(760px, 100%);
+  margin: 2rem auto;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  box-sizing: border-box;
+
+  text-align: center;
+
+  background:
+    radial-gradient(
+      circle at top,
+      rgba(0, 234, 255, 0.12),
+      transparent 45%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(255, 42, 161, 0.07),
+      rgba(0, 234, 255, 0.07)
+    ),
+    rgba(10, 10, 15, 0.94);
+
+  border: 1px solid rgba(0, 234, 255, 0.45);
+  border-radius: 22px;
+
+  box-shadow:
+    0 0 30px rgba(0, 234, 255, 0.15),
+    0 0 55px rgba(255, 42, 161, 0.08);
+}
+
+.confirmation-icon {
+  display: grid;
+  place-items: center;
+
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1.25rem;
+
+  color: #050505;
+  font-size: 2rem;
+  font-weight: 900;
+
+  background: #00eaff;
+  border-radius: 50%;
+
+  box-shadow:
+    0 0 18px rgba(0, 234, 255, 0.65),
+    0 0 40px rgba(0, 234, 255, 0.3);
+}
+
+.confirmation-kicker {
+  margin: 0 0 0.5rem;
+
+  color: #ff2aa1;
+
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.booking-confirmation h1 {
+  margin: 0;
+
+  color: #ffffff;
+
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1;
+  text-transform: uppercase;
+
+  text-shadow:
+    0 0 16px rgba(0, 234, 255, 0.25);
+}
+
+.confirmation-message {
+  max-width: 580px;
+  margin: 1rem auto 2rem;
+
+  color: rgba(255, 255, 255, 0.72);
+
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.confirmation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 0.9rem;
+
+  margin-top: 1.5rem;
+
+  text-align: left;
+}
+
+.confirmation-item {
+  min-width: 0;
+  padding: 1rem;
+
+  background: rgba(255, 255, 255, 0.04);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.confirmation-item span {
+  display: block;
+
+  margin-bottom: 0.35rem;
+
+  color: rgba(255, 255, 255, 0.5);
+
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.confirmation-item strong {
+  display: block;
+
+  color: #ffffff;
+
+  font-size: 1rem;
+  line-height: 1.35;
+
+  overflow-wrap: anywhere;
+}
+
+.confirmation-status {
+  color: #00eaff !important;
+  text-transform: uppercase;
+}
+
+.confirmation-number {
+  margin: 1.75rem 0 1.25rem;
+
+  color: rgba(255, 255, 255, 0.5);
+
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.confirmation-button {
+  width: 100%;
+
+  padding: 1rem 1.25rem;
+
+  color: #050505;
+
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+
+  background: #00eaff;
+
+  border: 1px solid #00eaff;
+  border-radius: 12px;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 0 18px rgba(0, 234, 255, 0.35),
+    0 0 34px rgba(0, 234, 255, 0.14);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.confirmation-button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 0 24px rgba(0, 234, 255, 0.55),
+    0 0 42px rgba(255, 42, 161, 0.12);
+}
+
+.confirmation-button:active {
+  transform: translateY(0);
+}
+
+.confirmation-button:focus-visible {
+  outline: 2px solid #ff2aa1;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .confirmation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-confirmation {
+    margin-top: 1rem;
+  }
+}

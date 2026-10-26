@@ -13,6 +13,7 @@ import {
 import heroImage from './assets/v3-magnum-hero.png'
 import magnumLogo from './assets/magnum-logo.png'
 import magnumIcon from './assets/magnum-icon.png'
+import BookingConfirmation from './components/BookingConfirmation'
 
 type ServicePrice = {
   service_price_id: number
@@ -20,6 +21,21 @@ type ServicePrice = {
   duration_minutes: number
   vehicle_size: string
   vehicle_size_id: number
+}
+
+type Appointment = {
+  id: number
+  status: string
+  duration_minutes: number
+  price_cents: number
+  starts_at: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string
+  vehicle_make: string
+  vehicle_model: string
+  notes: string | null
+  service_price_id: number
 }
 
 function formatTime(time: string) {
@@ -187,9 +203,9 @@ function HomePage() {
           />
 
           <h2>
-            When regular detailing isn't enough,
+            The most beautiful name in auto detailing,
             <br />
-            you need{' '}
+            is{' '}
             <span className="tagline-accent">
               Magnum Detailing.
             </span>
@@ -392,6 +408,9 @@ function ContactPage() {
     Boolean(selectedTime) &&
     Boolean(servicePriceId)
 
+  const [createdAppointment, setCreatedAppointment] =
+    useState<Appointment | null>(null)
+
   useEffect(() => {
   if (!selectedDate || !servicePriceId) {
     return
@@ -497,10 +516,8 @@ async function handleBookAppointment() {
       throw new Error(message)
     }
 
-    console.log(
-      'Appointment created:',
-      data.appointment
-    )
+    setCreatedAppointment(data.appointment)
+    
   } catch (error) {
     setSubmitError(
       error instanceof Error
@@ -531,6 +548,49 @@ async function handleBookAppointment() {
 
   const modelInvalid =
     touchedFields.vehicleModel && !bookingForm.vehicleModel.trim()
+
+  if (
+    createdAppointment &&
+    selectedService &&
+    selectedPrice
+  ) {
+    return (
+      <main className="booking-page">
+        <BookingConfirmation
+          appointmentId={createdAppointment.id}
+          customerName={createdAppointment.customer_name}
+          serviceName={selectedService.name}
+          vehicleSize={selectedPrice.vehicle_size}
+          vehicleMake={createdAppointment.vehicle_make}
+          vehicleModel={createdAppointment.vehicle_model}
+          date={selectedDate}
+          time={formatTime(selectedTime)}
+          priceCents={createdAppointment.price_cents}
+          durationMinutes={createdAppointment.duration_minutes}
+          status={createdAppointment.status}
+          onBookAnother={() => {
+            setCreatedAppointment(null)
+            setSelectedDate('')
+            setSelectedTime('')
+            setAvailableTimes([])
+            setAvailabilityError('')
+            setSlotClaimed(false)
+            setSubmitError('')
+            setBookingForm({
+              firstName: '',
+              lastName: '',
+              customerEmail: '',
+              customerPhone: '',
+              vehicleMake: '',
+              vehicleModel: '',
+              notes: '',
+            })
+            setTouchedFields({})
+          }}
+        />
+      </main>
+    )
+  }
 
   return (
     <main className="booking-page">
