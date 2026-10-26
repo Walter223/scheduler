@@ -1,3 +1,4 @@
+import DetailItem from './DetailItem'
 import Button from './Button'
 
 type BookingConfirmationProps = {
@@ -60,51 +61,37 @@ function BookingConfirmation({
       </p>
 
       <div className="confirmation-grid">
-        <div className="confirmation-item">
-          <span>Service</span>
-          <strong>{serviceName}</strong>
-        </div>
+        <DetailItem variant="confirmation" label="Service">
+          {serviceName}
+        </DetailItem>
 
-        <div className="confirmation-item">
-          <span>Vehicle Size</span>
-          <strong>{vehicleSize}</strong>
-        </div>
+        <DetailItem variant="confirmation" label="Vehicle Size">
+          {vehicleSize}
+        </DetailItem>
 
-        <div className="confirmation-item">
-          <span>Date</span>
-          <strong>{formatConfirmationDate(date)}</strong>
-        </div>
+        <DetailItem variant="confirmation" label="Date">
+          {formatConfirmationDate(date)}
+        </DetailItem>
 
-        <div className="confirmation-item">
-          <span>Time</span>
-          <strong>{time}</strong>
-        </div>
+        <DetailItem variant="confirmation" label="Time">
+          {time}
+        </DetailItem>
 
-        <div className="confirmation-item">
-          <span>Vehicle</span>
-          <strong>
-            {vehicleMake} {vehicleModel}
-          </strong>
-        </div>
+        <DetailItem variant="confirmation" label="Vehicle">
+          {vehicleMake} {vehicleModel}
+        </DetailItem>
 
-        <div className="confirmation-item">
-          <span>Estimated Time</span>
-          <strong>{durationMinutes} min</strong>
-        </div>
+        <DetailItem variant="confirmation" label="Estimated Time">
+          {durationMinutes} min
+        </DetailItem>
 
-        <div className="confirmation-item">
-          <span>Price</span>
-          <strong>
-            ${(priceCents / 100).toFixed(2)}
-          </strong>
-        </div>
+        <DetailItem variant="confirmation" label="Price">
+          ${(priceCents / 100).toFixed(2)}
+        </DetailItem>
 
-        <div className="confirmation-item">
-          <span>Status</span>
-          <strong className="confirmation-status">
-            {status}
-          </strong>
-        </div>
+        <DetailItem variant="confirmation" label="Status" valueClassName="confirmation-status">
+          {status}
+        </DetailItem>
       </div>
 
       <p className="confirmation-number">

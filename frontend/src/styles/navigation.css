@@ -1,0 +1,239 @@
+/* Navigation */
+
+.main-nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+
+  display: flex;
+  align-items: center;
+
+  width: 100%;
+  box-sizing: border-box;
+
+  padding:
+    clamp(0.6rem, 1vw, 0.9rem)
+    clamp(1.25rem, 3vw, 3rem)
+    clamp(1rem, 1.5vw, 1.3rem);
+
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.65),
+    rgba(0, 0, 0, 0)
+  );
+}
+
+
+/* MAGNUM brand */
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  margin-right: auto;
+  text-decoration: none;
+}
+
+.nav-logo {
+  width: clamp(170px, 12vw, 240px);
+  height: auto;
+  display: block;
+
+  filter:
+    drop-shadow(0 0 6px rgba(0, 234, 255, 0.35))
+    drop-shadow(0 0 10px rgba(255, 42, 161, 0.2));
+}
+
+
+/* Brand name */
+
+.nav-brand-text {
+  font-size: clamp(0.85rem, 1.3vw, 1.15rem);
+
+  font-weight: 900;
+  font-style: italic;
+
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+
+  text-shadow:
+    0 0 8px rgba(0, 234, 255, 0.4);
+}
+
+
+/* Links */
+
+.nav-links {
+  display: flex;
+  align-items: center;
+
+  gap: clamp(1rem, 3vw, 3rem);
+}
+
+
+.nav-links a {
+  position: relative;
+
+  padding: 0.5rem 0;
+
+  color: rgba(255, 255, 255, 0.82);
+
+  text-decoration: none;
+  text-transform: uppercase;
+
+  font-size: clamp(0.7rem, 1vw, 0.9rem);
+  font-weight: 800;
+
+  letter-spacing: 0.14em;
+
+  transition:
+    color 0.2s ease,
+    text-shadow 0.2s ease;
+}
+
+.nav-links a.active {
+  color: #00eaff;
+
+  text-shadow:
+    0 0 8px rgba(0, 234, 255, 0.8),
+    0 0 16px rgba(255, 42, 161, 0.35);
+}
+
+.nav-links a.active::after {
+  width: 100%;
+}
+
+.nav-links a::after {
+  content: "";
+
+  position: absolute;
+
+  left: 50%;
+  bottom: 0;
+
+  width: 0;
+  height: 2px;
+
+  background: linear-gradient(
+    90deg,
+    #00eaff,
+    #ff2aa1
+  );
+
+  transform: translateX(-50%);
+
+  box-shadow:
+    0 0 8px #00eaff,
+    0 0 12px #ff2aa1;
+
+  transition: width 0.2s ease;
+}
+
+
+.nav-links a:hover {
+  color: white;
+
+  text-shadow:
+    0 0 10px rgba(0, 234, 255, 0.7);
+}
+
+
+.nav-links a:hover::after {
+  width: 100%;
+}
+
+
+@media (max-width: 650px) {
+  .nav-brand-text {
+    display: none;
+  }
+
+  .nav-links {
+    gap: 1rem;
+  }
+
+  .nav-links a {
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+  }
+}
+
+
+@media (max-width: 390px) {
+  .main-nav {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .nav-brand {
+    margin-right: 0;
+  }
+
+  .nav-links {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* Main neon laser underneath nav */
+
+.nav-neon-line {
+  position: absolute;
+
+  left: 3%;
+  right: 3%;
+  bottom: 0.45rem;
+
+  height: 2px;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #00eaff 20%,
+    #00eaff 45%,
+    #ff2aa1 70%,
+    transparent
+  );
+
+  box-shadow:
+    0 0 8px rgba(0, 234, 255, 0.8),
+    0 0 14px rgba(255, 42, 161, 0.5);
+
+  overflow: hidden;
+  contain: paint;
+}
+
+.nav-neon-line::after {
+  content: "";
+
+  position: absolute;
+  top: 50%;
+  left: 0;
+
+  width: 18%;
+  height: 4px;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.95),
+    #00eaff,
+    transparent
+  );
+
+  filter: blur(1px);
+
+  transform: translate3d(-110%, -50%, 0);
+
+  animation: neon-scan 5s linear infinite;
+}
+
+@keyframes neon-scan {
+  from {
+    transform: translate3d(-110%, -50%, 0);
+  }
+
+  to {
+    transform: translate3d(660%, -50%, 0);
+  }
+}

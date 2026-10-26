@@ -1,0 +1,131 @@
+.booking-date label,
+.booking-form-section label {
+  display: block;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.booking-date label {
+  margin-bottom: 0.75rem;
+
+  color: #ff2aa1;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+}
+
+.booking-date input,
+.booking-form-section input,
+.booking-form-section textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.booking-date input {
+  padding: 0.9rem 1rem;
+
+  color: white;
+  border: 1px solid rgba(0, 234, 255, 0.35);
+
+  color-scheme: dark;
+}
+
+.booking-date input:focus,
+.booking-form-section input:focus,
+.booking-form-section textarea:focus {
+  outline: none;
+  border-color: #00eaff;
+}
+
+.booking-date input:focus {
+  box-shadow:
+    0 0 16px rgba(0, 234, 255, 0.2);
+}
+
+.booking-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+
+  margin: 2rem 0;
+}
+
+.booking-form-section {
+  padding: clamp(1.25rem, 2vw, 1.75rem);
+
+  background: rgba(255, 255, 255, 0.035);
+
+  border: 1px solid rgba(0, 234, 255, 0.18);
+  border-radius: 14px;
+}
+
+.booking-form-section h3 {
+  margin: 0 0 1.25rem;
+
+  color: #ff2aa1;
+
+  font-size: 0.9rem;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.booking-form-section label {
+  margin: 1rem 0 0.45rem;
+
+  color: rgba(255, 255, 255, 0.7);
+
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.booking-form-section input,
+.booking-form-section textarea {
+  padding: 0.85rem 0.95rem;
+
+  color: #f5f5f5;
+  border: 1px solid rgba(0, 234, 255, 0.25);
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.booking-form-section input:focus,
+.booking-form-section textarea:focus {
+  background: rgba(0, 234, 255, 0.05);
+
+  box-shadow:
+    0 0 14px rgba(0, 234, 255, 0.18);
+}
+
+.booking-form-section textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.booking-form-section input::placeholder,
+.booking-form-section textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 700px) {
+  .booking-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-error {
+  margin: 0.4rem 0 0;
+
+  color: #ff4f9a;
+  font-size: 0.78rem;
+  font-weight: 700;
+
+  text-shadow:
+    0 0 8px rgba(255, 42, 161, 0.25);
+}

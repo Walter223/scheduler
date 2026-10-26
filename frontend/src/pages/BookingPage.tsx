@@ -1,3 +1,5 @@
+import DetailItem from '../components/DetailItem'
+import FormField from '../components/FormField'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -428,208 +430,196 @@ async function handleBookAppointment() {
               <div className="booking-form-section">
                 <h3>Customer Information</h3>
 
-                <label htmlFor="first-name">First Name</label>
-
-                <input
-                  id="first-name"
-                  type="text"
-                  value={bookingForm.firstName}
-                  aria-invalid={Boolean(firstNameInvalid)}
-                  aria-describedby={
-                    firstNameInvalid ? 'first-name-error' : undefined
+                <FormField
+                  htmlFor="first-name"
+                  label="First Name"
+                  errorId="first-name-error"
+                  error={
+                    firstNameInvalid ? 'Please enter a valid first name' : undefined
                   }
-                  onChange={(event) =>
-                    updateBookingForm(
-                      'firstName',
-                      event.target.value
-                    )
+                >
+                  <input
+                    id="first-name"
+                    type="text"
+                    value={bookingForm.firstName}
+                    aria-invalid={Boolean(firstNameInvalid)}
+                    aria-describedby={
+                      firstNameInvalid ? 'first-name-error' : undefined
+                    }
+                    onChange={(event) =>
+                      updateBookingForm(
+                        'firstName',
+                        event.target.value
+                      )
+                    }
+                    onBlur={() => {
+                      updateBookingForm(
+                        'firstName',
+                        bookingForm.firstName.trim()
+                      )
+                      markFieldTouched('firstName')
+                    }}
+                  />
+                </FormField>
+
+                <FormField
+                  htmlFor="last-name"
+                  label="Last Name"
+                  errorId="last-name-error"
+                  error={
+                    lastNameInvalid ? 'Please enter a valid last name' : undefined
                   }
-                  onBlur={() => {
-                    updateBookingForm(
-                      'firstName',
-                      bookingForm.firstName.trim()
-                    )
-                    markFieldTouched('firstName')
-                  }}
-                />
+                >
+                  <input
+                    id="last-name"
+                    type="text"
+                    value={bookingForm.lastName}
+                    aria-invalid={Boolean(lastNameInvalid)}
+                    aria-describedby={
+                      lastNameInvalid ? 'last-name-error' : undefined
+                    }
+                    onChange={(event) =>
+                      updateBookingForm(
+                        'lastName',
+                        event.target.value
+                      )
+                    }
+                    onBlur={() => {
+                      updateBookingForm(
+                        'lastName',
+                        bookingForm.lastName.trim()
+                      )
+                      markFieldTouched('lastName')
+                    }}
+                  />
+                </FormField>
 
-                {firstNameInvalid && (
-                  <p
-                    id="first-name-error"
-                    className="form-error"
-                  >
-                    Please enter a valid first name
-                  </p>
-                )}
-
-                <label htmlFor="last-name">Last Name</label>
-
-                <input
-                  id="last-name"
-                  type="text"
-                  value={bookingForm.lastName}
-                  aria-invalid={Boolean(lastNameInvalid)}
-                  aria-describedby={
-                    lastNameInvalid ? 'last-name-error' : undefined
+                <FormField
+                  htmlFor="customer-email"
+                  label="Email"
+                  errorId="customer-email-error"
+                  error={
+                    emailInvalid ? 'Please enter a valid email address' : undefined
                   }
-                  onChange={(event) =>
-                    updateBookingForm(
-                      'lastName',
-                      event.target.value
-                    )
+                >
+                  <input
+                    id="customer-email"
+                    type="email"
+                    value={bookingForm.customerEmail}
+                    aria-invalid={Boolean(emailInvalid)}
+                    aria-describedby={
+                      emailInvalid ? 'customer-email-error' : undefined
+                    }
+                    onChange={(event) =>
+                      updateBookingForm(
+                        'customerEmail',
+                        event.target.value
+                      )
+                    }
+                    onBlur={() => {
+                      updateBookingForm(
+                        'customerEmail',
+                        bookingForm.customerEmail.trim()
+                      )
+                      markFieldTouched('customerEmail')
+                    }}
+                  />
+                </FormField>
+
+                <FormField
+                  htmlFor="customer-phone"
+                  label="Phone"
+                  errorId="customer-phone-error"
+                  error={
+                    phoneInvalid ? 'A valid phone number is required in this field' : undefined
                   }
-                  onBlur={() => {
-                    updateBookingForm(
-                      'lastName',
-                      bookingForm.lastName.trim()
-                    )
-                    markFieldTouched('lastName')
-                  }}
-                />
-
-                {lastNameInvalid && (
-                  <p
-                    id="last-name-error"
-                    className="form-error"
-                  >
-                    Please enter a valid last name
-                  </p>
-                )}
-
-                <label htmlFor="customer-email">Email</label>
-
-                <input
-                  id="customer-email"
-                  type="email"
-                  value={bookingForm.customerEmail}
-                  aria-invalid={Boolean(emailInvalid)}
-                  aria-describedby={
-                    emailInvalid ? 'customer-email-error' : undefined
-                  }
-                  onChange={(event) =>
-                    updateBookingForm(
-                      'customerEmail',
-                      event.target.value
-                    )
-                  }
-                  onBlur={() => {
-                    updateBookingForm(
-                      'customerEmail',
-                      bookingForm.customerEmail.trim()
-                    )
-                    markFieldTouched('customerEmail')
-                  }}
-                />
-
-                {emailInvalid && (
-                  <p
-                    id="customer-email-error"
-                    className="form-error"
-                  >
-                    Please enter a valid email address
-                  </p>
-                )}
-
-                <label htmlFor="customer-phone">Phone</label>
-
-                <input
-                  id="customer-phone"
-                  type="tel"
-                  value={bookingForm.customerPhone}
-                  aria-invalid={Boolean(phoneInvalid)}
-                  aria-describedby={
-                    phoneInvalid ? 'customer-phone-error' : undefined
-                  }
-                  onChange={(event) =>
-                    updateBookingForm(
-                      'customerPhone',
-                      formatPhoneNumber(event.target.value)
-                    )
-                  }
-                  onBlur={() => markFieldTouched('customerPhone')}
-                  placeholder="801-555-1234 or +44..."
-                />
-
-                {phoneInvalid && (
-                  <p
-                    id="customer-phone-error"
-                    className="form-error"
-                  >
-                    A valid phone number is required in this field
-                  </p>
-                )}
+                >
+                  <input
+                    id="customer-phone"
+                    type="tel"
+                    value={bookingForm.customerPhone}
+                    aria-invalid={Boolean(phoneInvalid)}
+                    aria-describedby={
+                      phoneInvalid ? 'customer-phone-error' : undefined
+                    }
+                    onChange={(event) =>
+                      updateBookingForm(
+                        'customerPhone',
+                        formatPhoneNumber(event.target.value)
+                      )
+                    }
+                    onBlur={() => markFieldTouched('customerPhone')}
+                    placeholder="801-555-1234 or +44..."
+                  />
+                </FormField>
               </div>
 
               <div className="booking-form-section">
                 <h3>Vehicle Information</h3>
 
-                <label htmlFor="vehicle-make">Make</label>
-
-                <input
-                  id="vehicle-make"
-                  type="text"
-                  value={bookingForm.vehicleMake}
-                  aria-invalid={Boolean(makeInvalid)}
-                  aria-describedby={
-                    makeInvalid ? 'vehicle-make-error' : undefined
+                <FormField
+                  htmlFor="vehicle-make"
+                  label="Make"
+                  errorId="vehicle-make-error"
+                  error={
+                    makeInvalid ? 'Please enter the Make of your vehicle' : undefined
                   }
-                  onChange={(event) =>
-                    updateBookingForm(
-                      'vehicleMake',
-                      event.target.value
-                    )
+                >
+                  <input
+                    id="vehicle-make"
+                    type="text"
+                    value={bookingForm.vehicleMake}
+                    aria-invalid={Boolean(makeInvalid)}
+                    aria-describedby={
+                      makeInvalid ? 'vehicle-make-error' : undefined
+                    }
+                    onChange={(event) =>
+                      updateBookingForm(
+                        'vehicleMake',
+                        event.target.value
+                      )
+                    }
+                    onBlur={() => {
+                      updateBookingForm(
+                        'vehicleMake',
+                        bookingForm.vehicleMake.trim()
+                      )
+                      markFieldTouched('vehicleMake')
+                    }}
+                  />
+                </FormField>
+
+                <FormField
+                  htmlFor="vehicle-model"
+                  label="Model"
+                  errorId="vehicle-model-error"
+                  error={
+                    modelInvalid ? 'Please enter the model of your vehicle' : undefined
                   }
-                  onBlur={() => {
-                    updateBookingForm(
-                      'vehicleMake',
-                      bookingForm.vehicleMake.trim()
-                    )
-                    markFieldTouched('vehicleMake')
-                  }}
-                />
-
-                {makeInvalid && (
-                  <p
-                    id="vehicle-make-error"
-                    className="form-error"
-                  >
-                    Please enter the Make of your vehicle
-                  </p>
-                )}
-
-                <label htmlFor="vehicle-model">Model</label>
-
-                <input
-                  id="vehicle-model"
-                  type="text"
-                  value={bookingForm.vehicleModel}
-                  aria-invalid={Boolean(modelInvalid)}
-                  aria-describedby={
-                    modelInvalid ? 'vehicle-model-error' : undefined
-                  }
-                  onChange={(event) =>
-                    updateBookingForm(
-                      'vehicleModel',
-                      event.target.value
-                    )
-                  }
-                  onBlur={() => {
-                    updateBookingForm(
-                      'vehicleModel',
-                      bookingForm.vehicleModel.trim()
-                    )
-                    markFieldTouched('vehicleModel')
-                  }}
-                />
-
-                {modelInvalid && (
-                  <p
-                    id="vehicle-model-error"
-                    className="form-error"
-                  >
-                    Please enter the model of your vehicle
-                  </p>
-                )}
+                >
+                  <input
+                    id="vehicle-model"
+                    type="text"
+                    value={bookingForm.vehicleModel}
+                    aria-invalid={Boolean(modelInvalid)}
+                    aria-describedby={
+                      modelInvalid ? 'vehicle-model-error' : undefined
+                    }
+                    onChange={(event) =>
+                      updateBookingForm(
+                        'vehicleModel',
+                        event.target.value
+                      )
+                    }
+                    onBlur={() => {
+                      updateBookingForm(
+                        'vehicleModel',
+                        bookingForm.vehicleModel.trim()
+                      )
+                      markFieldTouched('vehicleModel')
+                    }}
+                  />
+                </FormField>
 
                 <label htmlFor="booking-notes">Notes</label>
 
@@ -656,32 +646,25 @@ async function handleBookAppointment() {
               </h3>
 
               <div className="selected-appointment-grid">
-                <div className="selected-appointment-item">
-                  <span>Vehicle</span>
-                  <strong>{selectedPrice.vehicle_size}</strong>
-                </div>
+                <DetailItem variant="selected" label="Vehicle">
+                  {selectedPrice.vehicle_size}
+                </DetailItem>
 
-                <div className="selected-appointment-item">
-                  <span>Date</span>
-                  <strong>{selectedDate}</strong>
-                </div>
+                <DetailItem variant="selected" label="Date">
+                  {selectedDate}
+                </DetailItem>
 
-                <div className="selected-appointment-item">
-                  <span>Time</span>
-                  <strong>{formatTime(selectedTime)}</strong>
-                </div>
+                <DetailItem variant="selected" label="Time">
+                  {formatTime(selectedTime)}
+                </DetailItem>
 
-                <div className="selected-appointment-item">
-                  <span>Price</span>
-                  <strong>
-                    ${(selectedPrice.price_cents / 100).toFixed(2)}
-                  </strong>
-                </div>
+                <DetailItem variant="selected" label="Price">
+                  ${(selectedPrice.price_cents / 100).toFixed(2)}
+                </DetailItem>
 
-                <div className="selected-appointment-item">
-                  <span>Estimated Time</span>
-                  <strong>{selectedPrice.duration_minutes} min</strong>
-                </div>
+                <DetailItem variant="selected" label="Estimated Time">
+                  {selectedPrice.duration_minutes} min
+                </DetailItem>
               </div>
             </section>
           )}

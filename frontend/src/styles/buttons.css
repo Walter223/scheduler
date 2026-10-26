@@ -1,0 +1,268 @@
+.primary-button,
+.secondary-button,
+.book-button {
+  border: 1px solid #00eaff;
+
+  text-decoration: none;
+  text-transform: uppercase;
+
+  font-weight: 800;
+  letter-spacing: 0.08em;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.primary-button,
+.secondary-button {
+  padding:
+    clamp(0.75rem, 1.2vw, 1rem)
+    clamp(1rem, 2vw, 1.75rem);
+
+  font-size: clamp(0.75rem, 1vw, 1rem);
+}
+
+.primary-button:hover,
+.secondary-button:hover {
+  background: #00eaff;
+  color: #050505;
+  box-shadow: 0 0 24px rgba(0, 234, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.price-option,
+.availability-time {
+  font: inherit;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.price-option {
+  width: 100%;
+  min-width: 0;
+
+  padding: 1rem 0.75rem;
+
+  text-align: center;
+  color: inherit;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.price-option:hover {
+  border-color: #00eaff;
+  transform: translateY(-2px);
+}
+
+.price-option.selected {
+  background: rgba(0, 234, 255, 0.12);
+  border-color: #00eaff;
+
+  box-shadow:
+    0 0 18px rgba(0, 234, 255, 0.25),
+    inset 0 0 12px rgba(0, 234, 255, 0.08);
+}
+
+.price-option strong {
+  display: block;
+
+  margin-bottom: 0.7rem;
+
+  color: #ff2aa1;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
+.price-option p {
+  margin: 0.3rem 0;
+}
+
+.price-option p:first-of-type {
+  font-size: clamp(1rem, 1.4vw, 1.35rem);
+  font-weight: 800;
+  color: white;
+}
+
+.price-option p:last-of-type {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 520px) {
+
+  .price-option {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 1rem;
+
+    text-align: left;
+  }
+
+  .price-option strong,
+  .price-option p {
+    margin: 0;
+  }
+}
+
+.book-button {
+  display: block;
+
+  margin-top: 1.5rem;
+  padding: 0.9rem 1rem;
+
+  text-align: center;
+  font-size: clamp(0.8rem, 1vw, 1rem);
+
+  color: #00eaff;
+
+  border-radius: 10px;
+  background: transparent;
+}
+
+.book-button:hover {
+  background: #00eaff;
+  color: #050505;
+
+  box-shadow: 0 0 24px rgba(0, 234, 255, 0.4);
+
+  transform: translateY(-2px);
+}
+
+.book-button.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+.availability-time {
+  margin: 0 0.6rem 0.6rem 0;
+  padding: 0.75rem 1rem;
+
+  color: white;
+  font-weight: 700;
+
+  border: 1px solid rgba(0, 234, 255, 0.3);
+  border-radius: 8px;
+}
+
+.availability-time:hover {
+  border-color: #00eaff;
+
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 0 14px rgba(0, 234, 255, 0.18);
+}
+
+.availability-time.selected {
+  color: #050505;
+  background: #00eaff;
+  border-color: #00eaff;
+
+  box-shadow:
+    0 0 18px rgba(0, 234, 255, 0.45);
+}
+
+.book-appointment-button,
+.confirmation-button {
+  width: 100%;
+  padding: 1rem 1.25rem;
+
+  color: #050505;
+  font: inherit;
+  font-weight: 900;
+
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+
+  background: #00eaff;
+
+  border: 1px solid #00eaff;
+  border-radius: 12px;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 0 18px rgba(0, 234, 255, 0.35),
+    0 0 34px rgba(0, 234, 255, 0.14);
+}
+
+.book-appointment-button {
+  margin: 1.5rem 0 1rem;
+  font-size: 0.95rem;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.book-appointment-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+
+  background: #38f0ff;
+  border-color: #38f0ff;
+
+  box-shadow:
+    0 0 22px rgba(0, 234, 255, 0.5),
+    0 0 44px rgba(0, 234, 255, 0.2);
+}
+
+.book-appointment-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.book-appointment-button:focus-visible,
+.confirmation-button:focus-visible {
+  outline: 2px solid #ff2aa1;
+  outline-offset: 3px;
+}
+
+.book-appointment-button:disabled {
+  color: rgba(255, 255, 255, 0.35);
+
+  background: rgba(255, 255, 255, 0.05);
+
+  border-color: rgba(255, 255, 255, 0.1);
+
+  cursor: not-allowed;
+
+  opacity: 0.75;
+
+  box-shadow: none;
+}
+
+.confirmation-button {
+  font-size: 0.9rem;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.confirmation-button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 0 24px rgba(0, 234, 255, 0.55),
+    0 0 42px rgba(255, 42, 161, 0.12);
+}
+
+.confirmation-button:active {
+  transform: translateY(0);
+}
