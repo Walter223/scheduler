@@ -1,3 +1,5 @@
+import Button from './Button'
+
 type BookingConfirmationProps = {
   appointmentId: number
   customerName: string
@@ -109,13 +111,13 @@ function BookingConfirmation({
         Confirmation #{appointmentId}
       </p>
 
-      <button
+      <Button
         type="button"
-        className="confirmation-button"
+        variant="confirmation"
         onClick={onBookAnother}
       >
         Book Another Detail
-      </button>
+      </Button>
     </section>
   )
 }

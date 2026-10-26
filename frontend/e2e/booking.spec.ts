@@ -14,14 +14,30 @@ const customer = {
 
 async function prepareBooking(page: Page, booking: BookingData) {
   await page.goto('/')
+  await expect(page.getByRole('link', { name: 'View Services', exact: true })).toHaveAttribute('href', '/services')
+  await expect(page.getByRole('link', { name: 'Check Availability', exact: true })).toHaveAttribute('href', '/contact')
   await page.getByRole('navigation').getByRole('link', { name: 'Services', exact: true }).click()
   const service = page.getByRole('heading', { name: booking.service_name, exact: true }).locator('..')
-  await service.getByRole('button', { name: new RegExp(booking.vehicle_size) }).click()
-  await service.getByRole('link', { name: 'Book This Detail' }).click()
+  const option = service.getByRole('button', { name: new RegExp(booking.vehicle_size) })
+  const book = service.getByRole('link', { name: 'Book This Detail' })
+  await expect(book).toHaveAttribute('aria-disabled', 'true')
+  await expect(book).toHaveAttribute('tabindex', '-1')
+  await expect(option).toHaveAttribute('aria-pressed', 'false')
+  await option.click()
+  await expect(option).toHaveAttribute('aria-pressed', 'true')
+  await expect(book).toHaveAttribute('aria-disabled', 'false')
+  await expect(book).toHaveAttribute('tabindex', '0')
+  await option.click()
+  await expect(option).toHaveAttribute('aria-pressed', 'false')
+  await expect(book).toHaveAttribute('aria-disabled', 'true')
+  await option.click()
+  await book.click()
   await expect(page).toHaveURL(new RegExp(`/contact\\?service=${booking.service_id}&size=\\d+$`))
   await page.getByLabel('Choose a Date').fill(booking.date)
   const slot = page.getByRole('button', { name: '9:00 AM', exact: true })
   await slot.click()
+  await expect(slot).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Book Appointment', exact: true })).toBeDisabled()
   for (const [label, value] of Object.entries(customer)) {
     await page.getByLabel(label, { exact: true }).fill(value)
   }
@@ -49,6 +65,9 @@ test('booking succeeds and displays the BookingConfirmation details', async ({ p
   await expect(confirmation.getByText('Thanks, Alex Driver!', { exact: false })).toBeVisible()
   expect(appointment.starts_at).toBe(booking.starts_at)
   expect(appointment.customer_email).toBe(customer.Email)
+  await page.getByRole('button', { name: 'Book Another Detail', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Contact & Availability', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Choose a Date')).toHaveValue('')
 })
 
 test('a competing booking refreshes slots and preserves the customer form', async ({ page, request, booking }) => {
