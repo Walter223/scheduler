@@ -12,7 +12,8 @@ export type Appointment = {
   duration_minutes: number
   price_cents: number
   starts_at: string
-  customer_name: string
+  customer_first_name: string
+  customer_last_name: string
   customer_email: string
   customer_phone: string
   vehicle_make: string

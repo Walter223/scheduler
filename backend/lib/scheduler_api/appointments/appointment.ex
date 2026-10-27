@@ -12,7 +12,8 @@ defmodule SchedulerApi.Appointments.Appointment do
     field :duration_minutes, :integer
     field :price_cents, :integer
 
-    field :customer_name, :string
+    field :customer_first_name, :string
+    field :customer_last_name, :string
     field :customer_email, :string
     field :customer_phone, :string
 
@@ -29,7 +30,8 @@ defmodule SchedulerApi.Appointments.Appointment do
   end
 
   @customer_fields [
-    :customer_name,
+    :customer_first_name,
+    :customer_last_name,
     :customer_email,
     :customer_phone,
     :vehicle_make,
@@ -100,7 +102,8 @@ defmodule SchedulerApi.Appointments.Appointment do
 
   defp normalize_input(changeset) do
     changeset
-    |> trim_field(:customer_name)
+    |> trim_field(:customer_first_name)
+    |> trim_field(:customer_last_name)
     |> trim_field(:customer_phone)
     |> trim_field(:vehicle_make)
     |> trim_field(:vehicle_model)
@@ -143,7 +146,8 @@ defmodule SchedulerApi.Appointments.Appointment do
 
   defp validate_customer_fields(changeset) do
     Enum.reduce(@customer_fields, changeset, fn field, acc ->
-      validate_length(acc, field, max: 255)
+      max_length = if field in [:customer_first_name, :customer_last_name], do: 100, else: 255
+      validate_length(acc, field, max: max_length)
     end)
   end
 

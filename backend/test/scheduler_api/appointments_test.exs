@@ -28,7 +28,14 @@ defmodule SchedulerApi.AppointmentsTest do
     assert appointment.status == :pending
     assert appointment.notes == "Please call on arrival"
 
-    for field <- [:customer_name, :customer_email, :customer_phone, :vehicle_make, :vehicle_model] do
+    for field <- [
+          :customer_first_name,
+          :customer_last_name,
+          :customer_email,
+          :customer_phone,
+          :vehicle_make,
+          :vehicle_model
+        ] do
       assert Map.fetch!(appointment, field) == Map.fetch!(attrs, field)
     end
   end
@@ -89,7 +96,13 @@ defmodule SchedulerApi.AppointmentsTest do
   end
 
   test "rejects blank details, bad email, malformed time, and invalid selection", %{attrs: attrs} do
-    for field <- [:customer_name, :customer_phone, :vehicle_make, :vehicle_model] do
+    for field <- [
+          :customer_first_name,
+          :customer_last_name,
+          :customer_phone,
+          :vehicle_make,
+          :vehicle_model
+        ] do
       assert {:error, changeset} = Appointments.create_appointment(Map.put(attrs, field, "  "))
       assert "can't be blank" in Map.fetch!(errors_on(changeset), field)
     end
@@ -127,7 +140,8 @@ defmodule SchedulerApi.AppointmentsTest do
           price_cents: 0,
           duration_minutes: 0,
           status: "invalid",
-          customer_name: " "
+          customer_first_name: " ",
+          customer_last_name: " "
         ] do
       # Raw SQL bypasses schema validation to verify the database constraints.
       query_options = [mode: :savepoint]
@@ -155,8 +169,96 @@ defmodule SchedulerApi.AppointmentsTest do
     assert Map.has_key?(errors_on(changeset), :id)
   end
 
+  test "persists independently trimmed names and ignores the legacy combined name", %{
+    attrs: attrs
+  } do
+    attrs =
+      Map.merge(attrs, %{
+        customer_first_name: "  Alex Jane  ",
+        customer_last_name: "  van Driver  ",
+        customer_name: "Ignored Legacy Name"
+      })
+
+    assert {:ok, appointment} = Appointments.create_appointment(attrs)
+    stored = Appointments.get_appointment!(appointment.id)
+    assert stored.customer_first_name == "Alex Jane"
+    assert stored.customer_last_name == "van Driver"
+    refute :customer_name in Appointment.__schema__(:fields)
+  end
+
+  test "requires both names even when a legacy combined name is supplied", %{attrs: attrs} do
+    legacy =
+      attrs
+      |> Map.drop([:customer_first_name, :customer_last_name])
+      |> Map.put(:customer_name, "Alex Driver")
+
+    assert {:error, changeset} = Appointments.create_appointment(legacy)
+    assert "can't be blank" in errors_on(changeset).customer_first_name
+    assert "can't be blank" in errors_on(changeset).customer_last_name
+  end
+
+  test "each name permits 100 characters and rejects 101 independently", %{attrs: attrs} do
+    for field <- [:customer_first_name, :customer_last_name] do
+      assert {:error, changeset} =
+               Appointments.create_appointment(Map.put(attrs, field, String.duplicate("A", 101)))
+
+      assert "should be at most 100 character(s)" in Map.fetch!(errors_on(changeset), field)
+    end
+
+    assert {:ok, appointment} =
+             Appointments.create_appointment(
+               Map.merge(attrs, %{
+                 customer_first_name: String.duplicate("A", 100),
+                 customer_last_name: String.duplicate("B", 100)
+               })
+             )
+
+    assert String.length(appointment.customer_first_name) == 100
+    assert String.length(appointment.customer_last_name) == 100
+  end
+
+  test "backend names are not restricted by the frontend name regex", %{attrs: attrs} do
+    assert {:ok, appointment} =
+             Appointments.create_appointment(
+               Map.merge(attrs, %{
+                 customer_first_name: "李",
+                 customer_last_name: "小龍"
+               })
+             )
+
+    assert appointment.customer_first_name == "李"
+    assert appointment.customer_last_name == "小龍"
+  end
+
+  test "database enforces required, nonblank, and 100-character name columns", %{attrs: attrs} do
+    assert {:ok, appointment} = Appointments.create_appointment(attrs)
+
+    for field <- [:customer_first_name, :customer_last_name],
+        {value, code} <- [
+          {nil, :not_null_violation},
+          {"", :check_violation},
+          {" \t\n ", :check_violation},
+          {String.duplicate("A", 101), :string_data_right_truncation}
+        ] do
+      assert {:error, %Postgrex.Error{postgres: error}} =
+               Repo.query(
+                 "UPDATE appointments SET #{field} = $1 WHERE id = $2",
+                 [value, appointment.id],
+                 mode: :savepoint
+               )
+
+      assert error.code == code
+    end
+
+    assert %{rows: [[0]]} =
+             Repo.query!(
+               "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'appointments' AND column_name = 'customer_name'"
+             )
+  end
+
   defp constraint_name(:price_cents), do: :appointments_price_positive
   defp constraint_name(:duration_minutes), do: :appointments_duration_positive
   defp constraint_name(:status), do: :appointments_status_valid
-  defp constraint_name(:customer_name), do: :appointments_customer_name_not_blank
+  defp constraint_name(:customer_first_name), do: :appointments_customer_first_name_not_blank
+  defp constraint_name(:customer_last_name), do: :appointments_customer_last_name_not_blank
 end

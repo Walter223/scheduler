@@ -19,7 +19,8 @@ defmodule SchedulerApi.AppointmentsFixtures do
     %{
       service_price_id: price.id,
       starts_at: opens,
-      customer_name: "Alex Driver",
+      customer_first_name: "Alex",
+      customer_last_name: "Driver",
       customer_email: "alex@example.com",
       customer_phone: "+1 303 555 0100",
       vehicle_make: "Toyota",

@@ -1,7 +1,7 @@
 import DetailItem from '../components/DetailItem'
 import FormField from '../components/FormField'
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import BookingConfirmation from '../components/BookingConfirmation'
 import Button from '../components/Button'
@@ -15,6 +15,49 @@ import type {
 import { formatTime } from '../utils/formatTime'
 import { formatPhoneNumber, isValidPhoneNumber } from '../utils/phone'
 import { isValidName, isValidEmail } from '../utils/validation'
+
+function businessDateParts(value: Date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(value)
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value
+  return {
+    date: `${part('year')}-${part('month')}-${part('day')}`,
+    time: `${part('hour')}:${part('minute')}`,
+  }
+}
+
+function isServiceCatalog(value: unknown): value is Service[] {
+  const record = (item: unknown): item is Record<string, unknown> =>
+    typeof item === 'object' && item !== null
+  const number = (item: unknown) => typeof item === 'number' && Number.isFinite(item)
+
+  return Array.isArray(value) && value.every((service: unknown) =>
+    record(service) && number(service.id) && typeof service.name === 'string' &&
+    typeof service.description === 'string' && Array.isArray(service.prices) &&
+    service.prices.every((price: unknown) => record(price) &&
+      number(price.service_price_id) && number(price.vehicle_size_id) &&
+      number(price.price_cents) && number(price.duration_minutes) &&
+      typeof price.vehicle_size === 'string')
+  )
+}
+
+function bookingErrorMessage(errors: unknown) {
+  if (!errors || typeof errors !== 'object') return 'Could not book appointment'
+
+  const labels: Record<string, string> = {
+    customer_first_name: 'First name', customer_last_name: 'Last name', customer_email: 'Email', customer_phone: 'Phone',
+    vehicle_make: 'Vehicle make', vehicle_model: 'Vehicle model', notes: 'Notes',
+    starts_at: 'Appointment time', service_price_id: 'Selected service',
+  }
+  const messages = Object.entries(errors).flatMap(([field, values]) =>
+    Array.isArray(values) ? values.filter((value) => typeof value === 'string')
+      .map((value) => `${labels[field] ?? field.replaceAll('_', ' ')}: ${value}`) : []
+  )
+  return messages.join('. ') || 'Could not book appointment'
+}
 
 function businessDateTimeToUtc(
   date: string,
@@ -65,9 +108,13 @@ function businessDateTimeToUtc(
 
 
 function BookingPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
   const [services, setServices] = useState<Service[]>([])
+  const [servicesLoading, setServicesLoading] = useState(true)
+  const [servicesError, setServicesError] = useState('')
+  const availabilityScope = useRef<AbortController | null>(null)
   const [selectedDate, setSelectedDate] = useState('')
   const [availableTimes, setAvailableTimes] = useState<string[]>([])
   const [availabilityError, setAvailabilityError] = useState('')
@@ -108,13 +155,7 @@ function BookingPage() {
     }))
   }
 
-  const now = new Date()
-
-  const today = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('-')
+  const today = businessDateParts(new Date()).date
 
   const serviceParam = searchParams.get('service')
   const sizeParam = searchParams.get('size')
@@ -123,9 +164,30 @@ function BookingPage() {
   const sizeId = sizeParam ? Number(sizeParam) : null
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/services')
-      .then((response) => response.json())
-      .then((data) => setServices(data))
+    const controller = new AbortController()
+    fetch('http://localhost:4000/api/services', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Could not load detailing services. Please reload the page to try again.')
+        const data: unknown = await response.json().catch(() => {
+          throw new Error('The service catalog could not be read. Please reload the page to try again.')
+        })
+        if (!isServiceCatalog(data)) throw new Error('The service catalog could not be read. Please reload the page to try again.')
+        return data
+      })
+      .then((data) => {
+        if (!controller.signal.aborted) setServices(data)
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setServicesError(error instanceof Error && !(error instanceof TypeError)
+            ? error.message
+            : 'Could not load detailing services. Please reload the page to try again.')
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setServicesLoading(false)
+      })
+    return () => controller.abort()
   }, [])
 
   const selectedService = services.find(
@@ -153,38 +215,42 @@ function BookingPage() {
     useState<Appointment | null>(null)
 
   useEffect(() => {
-  if (!selectedDate || !servicePriceId) {
-    return
-  }
-
-  fetch(
-    `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`
-  )
-    .then(async (response) => {
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          data.error?.message ?? 'Could not load availability'
-        )
-      }
-
-      return data as AvailabilityResponse
-    })
-    .then((data) => {
-      setAvailableTimes(data.available_times)
-      setAvailabilityError('')
-    })
-    .catch((error) => {
-      setAvailableTimes([])
-      setAvailabilityError(error.message)
-    })
-}, [selectedDate, servicePriceId])
+    const controller = new AbortController()
+    availabilityScope.current = controller
+    if (selectedDate && servicePriceId) {
+      fetch(
+        `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`,
+        { signal: controller.signal }
+      )
+        .then(async (response) => {
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error?.message ?? 'Could not load availability')
+          return data as AvailabilityResponse
+        })
+        .then((data) => {
+          if (controller.signal.aborted) return
+          setAvailableTimes(data.available_times)
+          setAvailabilityError('')
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+          setAvailableTimes([])
+          setAvailabilityError(error instanceof Error ? error.message : 'Could not load availability')
+        })
+    }
+    // Initial availability and conflict refreshes share this selection's lifetime.
+    return () => controller.abort()
+  }, [selectedDate, servicePriceId])
 
 async function handleBookAppointment() {
-  if (!isBookingFormValid || !servicePriceId) {
+  if (!isBookingFormValid || !servicePriceId || isSubmitting) {
     return
   }
+
+  const scope = availabilityScope.current
+  if (!scope) return
+  const selectionIsCurrent = () =>
+    !scope.signal.aborted && availabilityScope.current === scope
 
   setIsSubmitting(true)
   setSubmitError('')
@@ -206,8 +272,8 @@ async function handleBookAppointment() {
         body: JSON.stringify({
           service_price_id: servicePriceId,
           starts_at: startsAt,
-          customer_name:
-            `${bookingForm.firstName.trim()} ${bookingForm.lastName.trim()}`,
+          customer_first_name: bookingForm.firstName.trim(),
+          customer_last_name: bookingForm.lastName.trim(),
           customer_email:
             bookingForm.customerEmail.trim(),
           customer_phone:
@@ -224,6 +290,7 @@ async function handleBookAppointment() {
     const data = await response.json()
 
     if (!response.ok) {
+      if (!selectionIsCurrent()) return
       const slotUnavailable = data.errors?.starts_at?.some(
         (message: string) =>
           message === 'is not an available start time' ||
@@ -235,9 +302,11 @@ async function handleBookAppointment() {
         setAvailableTimes([])
 
         const availabilityResponse = await fetch(
-          `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`
+          `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`,
+          { signal: scope.signal }
         )
         const availability = await availabilityResponse.json()
+        if (!selectionIsCurrent()) return
 
         if (!availabilityResponse.ok) {
           setAvailabilityError('Could not refresh available times. Please choose the date again.')
@@ -250,16 +319,13 @@ async function handleBookAppointment() {
         return
       }
 
-      const message =
-        data.errors?.starts_at?.[0] ??
-        'Could not book appointment'
-
-      throw new Error(message)
+      throw new Error(bookingErrorMessage(data.errors))
     }
 
     setCreatedAppointment(data.appointment)
     
   } catch (error) {
+    if (!selectionIsCurrent()) return
     setSubmitError(
       error instanceof Error
         ? error.message
@@ -290,8 +356,12 @@ async function handleBookAppointment() {
   const modelInvalid =
     touchedFields.vehicleModel && !bookingForm.vehicleModel.trim()
 
+  const savedDateTime = createdAppointment
+    ? businessDateParts(new Date(createdAppointment.starts_at))
+    : null
+
   if (
-    createdAppointment &&
+    createdAppointment && savedDateTime &&
     selectedService &&
     selectedPrice
   ) {
@@ -299,35 +369,17 @@ async function handleBookAppointment() {
       <main className="booking-page">
         <BookingConfirmation
           appointmentId={createdAppointment.id}
-          customerName={createdAppointment.customer_name}
+          customerName={`${createdAppointment.customer_first_name} ${createdAppointment.customer_last_name}`}
           serviceName={selectedService.name}
           vehicleSize={selectedPrice.vehicle_size}
           vehicleMake={createdAppointment.vehicle_make}
           vehicleModel={createdAppointment.vehicle_model}
-          date={selectedDate}
-          time={formatTime(selectedTime)}
+          date={savedDateTime.date}
+          time={formatTime(savedDateTime.time)}
           priceCents={createdAppointment.price_cents}
           durationMinutes={createdAppointment.duration_minutes}
           status={createdAppointment.status}
-          onBookAnother={() => {
-            setCreatedAppointment(null)
-            setSelectedDate('')
-            setSelectedTime('')
-            setAvailableTimes([])
-            setAvailabilityError('')
-            setSlotClaimed(false)
-            setSubmitError('')
-            setBookingForm({
-              firstName: '',
-              lastName: '',
-              customerEmail: '',
-              customerPhone: '',
-              vehicleMake: '',
-              vehicleModel: '',
-              notes: '',
-            })
-            setTouchedFields({})
-          }}
+          onBookAnother={() => navigate('/services')}
         />
       </main>
     )
@@ -337,7 +389,15 @@ async function handleBookAppointment() {
     <main className="booking-page">
       <h1>Contact & Availability</h1>
 
-      {selectedService && selectedPrice ? (
+      {servicesLoading ? (
+        <section className="booking-summary" aria-busy="true">
+          <p role="status">Loading detailing services...</p>
+        </section>
+      ) : servicesError ? (
+        <section className="booking-summary">
+          <p className="form-error" role="alert">{servicesError}</p>
+        </section>
+      ) : selectedService && selectedPrice ? (
         <section className="booking-summary">
           <p className="booking-label">Your Selection</p>
 
@@ -375,6 +435,7 @@ async function handleBookAppointment() {
                 onChange={(event) => {
                   const value = event.target.value
 
+                  availabilityScope.current?.abort()
                   setSelectedDate(value >= today ? value : '')
                   setSelectedTime('')
                   setAvailableTimes([])
