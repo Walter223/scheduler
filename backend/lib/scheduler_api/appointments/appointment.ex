@@ -6,6 +6,8 @@ defmodule SchedulerApi.Appointments.Appointment do
   alias SchedulerApi.Catalog.ServicePrice
 
   schema "appointments" do
+    belongs_to :business, SchedulerApi.Organizations.Business
+    belongs_to :shop, SchedulerApi.Organizations.Shop
     belongs_to :service_price, ServicePrice
 
     field :starts_at, :utc_datetime
@@ -74,6 +76,8 @@ defmodule SchedulerApi.Appointments.Appointment do
     |> force_change(:price_cents, appointment.price_cents)
     |> force_change(:duration_minutes, appointment.duration_minutes)
     |> validate_required([
+      :business_id,
+      :shop_id,
       :duration_minutes,
       :price_cents,
       :status
@@ -84,6 +88,9 @@ defmodule SchedulerApi.Appointments.Appointment do
       name: :appointments_no_active_overlap,
       message: "is no longer available"
     )
+    |> foreign_key_constraint(:business_id)
+    |> foreign_key_constraint(:shop_id, name: :appointments_shop_business_fkey)
+    |> foreign_key_constraint(:service_price_id, name: :appointments_price_ownership_fkey)
     |> foreign_key_constraint(:service_price_id)
     |> check_constraint(
       :duration_minutes,

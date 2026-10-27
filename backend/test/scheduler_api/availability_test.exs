@@ -67,7 +67,12 @@ defmodule SchedulerApi.AvailabilityTest do
     assert hd(result.available_times) == "09:00"
     {opens, _} = Availability.business_hours(@date)
 
-    %Appointment{price_cents: price.price_cents, duration_minutes: 510}
+    %Appointment{
+      business_id: price.business_id,
+      shop_id: price.shop_id,
+      price_cents: price.price_cents,
+      duration_minutes: 510
+    }
     |> Appointment.changeset(%{booking_attrs(price, @date) | starts_at: opens})
     |> Repo.insert!()
 
@@ -137,7 +142,12 @@ defmodule SchedulerApi.AvailabilityTest do
     {opens, _} = Availability.business_hours(@date)
     attrs = booking_attrs(price, @date)
 
-    %Appointment{price_cents: price.price_cents, duration_minutes: 180}
+    %Appointment{
+      business_id: price.business_id,
+      shop_id: price.shop_id,
+      price_cents: price.price_cents,
+      duration_minutes: 180
+    }
     |> Appointment.changeset(%{attrs | starts_at: DateTime.add(opens, -120 * 60, :second)})
     |> Repo.insert!()
 
@@ -228,7 +238,12 @@ defmodule SchedulerApi.AvailabilityTest do
 
     changeset =
       Appointment.changeset(
-        %Appointment{price_cents: other_price.price_cents, duration_minutes: 30},
+        %Appointment{
+          business_id: other_price.business_id,
+          shop_id: other_price.shop_id,
+          price_cents: other_price.price_cents,
+          duration_minutes: 30
+        },
         %{
           attrs
           | service_price_id: other_price.id,
@@ -242,6 +257,8 @@ defmodule SchedulerApi.AvailabilityTest do
 
   defp insert_booking(price, starts_at, status) do
     %Appointment{
+      business_id: price.business_id,
+      shop_id: price.shop_id,
       price_cents: price.price_cents,
       duration_minutes: price.duration_minutes,
       status: status

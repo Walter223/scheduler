@@ -118,16 +118,34 @@ defmodule SchedulerApi.AppointmentsTest do
     end
   end
 
-  test "schema validates snapshots and maps foreign key violations", %{attrs: attrs} do
-    changeset = Appointment.changeset(%Appointment{price_cents: 0, duration_minutes: 0}, attrs)
+  test "schema validates snapshots and maps foreign key violations", %{attrs: attrs, price: price} do
+    changeset =
+      Appointment.changeset(
+        %Appointment{
+          business_id: price.business_id,
+          shop_id: price.shop_id,
+          price_cents: 0,
+          duration_minutes: 0
+        },
+        attrs
+      )
+
     assert "must be greater than 0" in errors_on(changeset).price_cents
     assert "must be greater than 0" in errors_on(changeset).duration_minutes
 
     changeset =
-      Appointment.changeset(%Appointment{price_cents: 100, duration_minutes: 30}, %{
-        attrs
-        | service_price_id: -1
-      })
+      Appointment.changeset(
+        %Appointment{
+          business_id: price.business_id,
+          shop_id: price.shop_id,
+          price_cents: 100,
+          duration_minutes: 30
+        },
+        %{
+          attrs
+          | service_price_id: -1
+        }
+      )
 
     assert {:error, changeset} = Repo.insert(changeset)
     assert "does not exist" in errors_on(changeset).service_price_id

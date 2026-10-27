@@ -1,6 +1,6 @@
 defmodule SchedulerApi.Appointments.Availability do
   @moduledoc """
-  Availability for one shared detailing schedule in America/Denver.
+  Availability for one shared detailing schedule per shop in America/Denver.
 
   PostgreSQL's IANA timezone database handles local dates and DST. Stored
   appointment timestamps remain UTC. Occupied periods are half-open intervals:
@@ -8,19 +8,22 @@ defmodule SchedulerApi.Appointments.Availability do
   """
 
   import Ecto.Query
-  alias SchedulerApi.Repo
-  alias SchedulerApi.Catalog.ServicePrice
+  alias SchedulerApi.{Repo, Catalog, Organizations}
+  alias SchedulerApi.Organizations.Shop
   alias SchedulerApi.Appointments.Appointment
 
   @buffer_minutes 30
   @booking_days 90
 
   @doc "Returns local HH:MM start times. The optional clock supports deterministic tests."
-  def get(date, service_price_id, now \\ DateTime.utc_now()) do
+  def get(date, service_price_id, now \\ DateTime.utc_now()),
+    do: get_for_shop(Organizations.default_shop!(), date, service_price_id, now)
+
+  def get_for_shop(%Shop{} = shop, date, service_price_id, now \\ DateTime.utc_now()) do
     with {:ok, date} <- parse_date(date),
          :ok <- validate_date(date, now),
          {:ok, id} <- parse_id(service_price_id),
-         {:ok, price} <- fetch_price(id) do
+         {:ok, price} <- fetch_price(shop, id) do
       {opens, _} = business_hours(date)
 
       {:ok,
@@ -29,8 +32,8 @@ defmodule SchedulerApi.Appointments.Availability do
          service_price_id: price.id,
          duration_minutes: price.duration_minutes,
          available_times:
-           date
-           |> slots(price.duration_minutes, now)
+           shop
+           |> slots(date, price.duration_minutes, now)
            |> Enum.map(fn start ->
              ~T[09:00:00]
              |> Time.add(DateTime.diff(start, opens, :second), :second)
@@ -41,11 +44,22 @@ defmodule SchedulerApi.Appointments.Availability do
   end
 
   @doc "Revalidates a UTC appointment start using the trusted catalog duration."
-  def validate_slot(starts_at, duration_minutes, now \\ DateTime.utc_now()) do
+  def validate_slot(starts_at, duration_minutes, now \\ DateTime.utc_now()),
+    do: validate_slot_for_shop(Organizations.default_shop!(), starts_at, duration_minutes, now)
+
+  def validate_slot_for_shop(
+        %Shop{} = shop,
+        starts_at,
+        duration_minutes,
+        now \\ DateTime.utc_now()
+      ) do
     date = starts_at |> local_datetime() |> NaiveDateTime.to_date()
 
     with :ok <- validate_date(date, now) do
-      if Enum.any?(slots(date, duration_minutes, now), &(DateTime.compare(&1, starts_at) == :eq)) do
+      if Enum.any?(
+           slots(shop, date, duration_minutes, now),
+           &(DateTime.compare(&1, starts_at) == :eq)
+         ) do
         :ok
       else
         error(:starts_at, :unavailable, "is not an available start time")
@@ -112,16 +126,16 @@ defmodule SchedulerApi.Appointments.Availability do
   defp parse_id(_),
     do: error(:service_price_id, :invalid_service_price_id, "must be a positive integer")
 
-  defp fetch_price(id) do
-    case Repo.get(ServicePrice, id) do
+  defp fetch_price(shop, id) do
+    case Repo.one(from p in Catalog.service_price_query(shop), where: p.id == ^id) do
       nil -> error(:service_price_id, :not_found, "service price does not exist")
       price -> {:ok, price}
     end
   end
 
-  defp slots(date, duration, now) do
+  defp slots(shop, date, duration, now) do
     {opens, closes} = business_hours(date)
-    appointments = blocking_appointments(opens, closes)
+    appointments = blocking_appointments(shop, opens, closes)
 
     for offset <- 0..510//30,
         start = DateTime.add(opens, offset * 60, :second),
@@ -132,9 +146,10 @@ defmodule SchedulerApi.Appointments.Availability do
         do: start
   end
 
-  defp blocking_appointments(opens, closes) do
+  defp blocking_appointments(shop, opens, closes) do
     Repo.all(
       from a in Appointment,
+        where: a.shop_id == ^shop.id and a.business_id == ^shop.business_id,
         where: a.status in [:pending, :confirmed],
         where: a.starts_at < ^closes,
         where:

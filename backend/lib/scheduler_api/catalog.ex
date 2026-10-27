@@ -4,9 +4,10 @@ defmodule SchedulerApi.Catalog do
   """
 
   import Ecto.Query, warn: false
-  alias SchedulerApi.Repo
+  alias SchedulerApi.{Repo, Organizations}
 
   alias SchedulerApi.Catalog.Service
+  alias SchedulerApi.Organizations.Shop
 
   @doc """
   Returns the list of services.
@@ -17,17 +18,29 @@ defmodule SchedulerApi.Catalog do
       [%Service{}, ...]
 
   """
-  def list_services do
-    Repo.all(Service)
+  def list_services, do: list_services(Organizations.default_shop!())
+
+  def list_services(%Shop{} = shop) do
+    Repo.all(from s in Service, where: s.business_id == ^shop.business_id)
   end
 
   @doc """
   Returns services with their service prices and vehicle sizes loaded.
   """
-  def list_services_with_prices do
-    Service
-    |> Repo.all()
-    |> Repo.preload(service_prices: :vehicle_size)
+  def list_services_with_prices, do: list_services_with_prices(Organizations.default_shop!())
+
+  def list_services_with_prices(%Shop{} = shop) do
+    prices = service_price_query(shop) |> order_by([p], asc: p.id) |> preload(:vehicle_size)
+
+    Repo.all(
+      from s in Service,
+        join: p in subquery(service_price_query(shop)),
+        on: p.service_id == s.id,
+        where: s.business_id == ^shop.business_id,
+        distinct: true,
+        order_by: s.id,
+        preload: [service_prices: ^prices]
+    )
   end
 
   @doc """
@@ -44,7 +57,10 @@ defmodule SchedulerApi.Catalog do
       ** (Ecto.NoResultsError)
 
   """
-  def get_service!(id), do: Repo.get!(Service, id)
+  def get_service!(id), do: get_service!(Organizations.default_shop!(), id)
+
+  def get_service!(%Shop{} = shop, id),
+    do: Repo.one!(from s in Service, where: s.id == ^id and s.business_id == ^shop.business_id)
 
   @doc """
   Creates a service.
@@ -59,7 +75,7 @@ defmodule SchedulerApi.Catalog do
 
   """
   def create_service(attrs) do
-    %Service{}
+    %Service{business_id: Organizations.default_business!().id}
     |> Service.changeset(attrs)
     |> Repo.insert()
   end
@@ -123,7 +139,8 @@ defmodule SchedulerApi.Catalog do
 
   """
   def list_vehicle_sizes do
-    Repo.all(VehicleSize)
+    shop = Organizations.default_shop!()
+    Repo.all(from v in VehicleSize, where: v.business_id == ^shop.business_id)
   end
 
   @doc """
@@ -140,7 +157,10 @@ defmodule SchedulerApi.Catalog do
       ** (Ecto.NoResultsError)
 
   """
-  def get_vehicle_size!(id), do: Repo.get!(VehicleSize, id)
+  def get_vehicle_size!(id) do
+    shop = Organizations.default_shop!()
+    Repo.one!(from v in VehicleSize, where: v.id == ^id and v.business_id == ^shop.business_id)
+  end
 
   @doc """
   Creates a vehicle_size.
@@ -155,7 +175,7 @@ defmodule SchedulerApi.Catalog do
 
   """
   def create_vehicle_size(attrs) do
-    %VehicleSize{}
+    %VehicleSize{business_id: Organizations.default_business!().id}
     |> VehicleSize.changeset(attrs)
     |> Repo.insert()
   end
@@ -218,9 +238,8 @@ defmodule SchedulerApi.Catalog do
       [%ServicePrice{}, ...]
 
   """
-  def list_service_prices do
-    Repo.all(ServicePrice)
-  end
+  def list_service_prices,
+    do: Organizations.default_shop!() |> service_price_query() |> Repo.all()
 
   @doc """
   Gets a single service_price.
@@ -236,7 +255,20 @@ defmodule SchedulerApi.Catalog do
       ** (Ecto.NoResultsError)
 
   """
-  def get_service_price!(id), do: Repo.get!(ServicePrice, id)
+  def get_service_price!(id), do: get_service_price!(Organizations.default_shop!(), id)
+
+  def get_service_price!(%Shop{} = shop, id),
+    do: Repo.one!(from p in service_price_query(shop), where: p.id == ^id)
+
+  @doc "Trusted server-side shop boundary for price resolution; never populated from public query params."
+  def service_price_query(%Shop{} = shop) do
+    from p in ServicePrice,
+      join: s in assoc(p, :service),
+      join: v in assoc(p, :vehicle_size),
+      where: p.shop_id == ^shop.id and p.business_id == ^shop.business_id,
+      where: s.business_id == ^shop.business_id and v.business_id == ^shop.business_id,
+      select: p
+  end
 
   @doc """
   Creates a service_price.
@@ -250,8 +282,10 @@ defmodule SchedulerApi.Catalog do
       {:error, %Ecto.Changeset{}}
 
   """
-  def create_service_price(attrs) do
-    %ServicePrice{}
+  def create_service_price(attrs), do: create_service_price(Organizations.default_shop!(), attrs)
+
+  def create_service_price(%Shop{} = shop, attrs) do
+    %ServicePrice{business_id: shop.business_id, shop_id: shop.id}
     |> ServicePrice.changeset(attrs)
     |> Repo.insert()
   end

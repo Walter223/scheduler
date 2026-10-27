@@ -1,43 +1,37 @@
-alias SchedulerApi.Repo
+alias SchedulerApi.{Repo, Organizations}
 alias SchedulerApi.Catalog.{Service, ServicePrice, VehicleSize}
 
+shop = Organizations.default_shop!()
+
+get_or_insert = fn schema, keys, attrs ->
+  Repo.get_by(schema, keys) || Repo.insert!(struct(schema, Map.merge(attrs, Map.new(keys))))
+end
+
 basic =
-  Repo.insert!(%Service{
-    name: "Basic Detail",
+  get_or_insert.(Service, [business_id: shop.business_id, name: "Basic Detail"], %{
     description: "A simple wash, dry, and basic spray detail of the exterior. No interior detail."
   })
 
 mid =
-  Repo.insert!(%Service{
-    name: "Mid Detail",
+  get_or_insert.(Service, [business_id: shop.business_id, name: "Mid Detail"], %{
     description:
       "Exterior wash, clay bar, and spray wax. Interior surface cleaning included and vacuuming."
   })
 
 supreme =
-  Repo.insert!(%Service{
-    name: "Supreme Detail",
+  get_or_insert.(Service, [business_id: shop.business_id, name: "Supreme Detail"], %{
     description:
       "Exterior wash, clay bar, tire shine, 2-step polish, and hand wax. Interior surface cleaning, vacuum, shampooing, and choice of fragrance included."
   })
 
 small =
-  Repo.insert!(%VehicleSize{
-    name: "Small",
-    sort_order: 1
-  })
+  get_or_insert.(VehicleSize, [business_id: shop.business_id, name: "Small"], %{sort_order: 1})
 
 medium =
-  Repo.insert!(%VehicleSize{
-    name: "Medium",
-    sort_order: 2
-  })
+  get_or_insert.(VehicleSize, [business_id: shop.business_id, name: "Medium"], %{sort_order: 2})
 
 large =
-  Repo.insert!(%VehicleSize{
-    name: "Large",
-    sort_order: 3
-  })
+  get_or_insert.(VehicleSize, [business_id: shop.business_id, name: "Large"], %{sort_order: 3})
 
 prices = [
   {basic, small, 5999, 60},
@@ -52,10 +46,13 @@ prices = [
 ]
 
 Enum.each(prices, fn {service, vehicle_size, price_cents, duration_minutes} ->
-  Repo.insert!(%ServicePrice{
-    service_id: service.id,
-    vehicle_size_id: vehicle_size.id,
-    price_cents: price_cents,
-    duration_minutes: duration_minutes
-  })
+  get_or_insert.(
+    ServicePrice,
+    [shop_id: shop.id, service_id: service.id, vehicle_size_id: vehicle_size.id],
+    %{
+      business_id: shop.business_id,
+      price_cents: price_cents,
+      duration_minutes: duration_minutes
+    }
+  )
 end)

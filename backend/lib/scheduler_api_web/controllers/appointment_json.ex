@@ -1,4 +1,17 @@
 defmodule SchedulerApiWeb.AppointmentJSON do
+  def index(%{page: page}) do
+    %{
+      appointments: Enum.map(page.appointments, &list_data/1),
+      meta: %{
+        timezone: "America/Denver",
+        has_more: page.has_more,
+        next_cursor: page.next_cursor
+      }
+    }
+  end
+
+  def list_error(%{error: error}), do: %{error: error}
+
   def show(%{appointment: appointment}) do
     %{
       appointment: data(appointment)
@@ -23,6 +36,16 @@ defmodule SchedulerApiWeb.AppointmentJSON do
           end
         )
     }
+  end
+
+  defp list_data(appointment) do
+    appointment
+    |> data()
+    |> Map.merge(%{
+      service_name: appointment.service_price.service.name,
+      vehicle_size: appointment.service_price.vehicle_size.name,
+      starts_at: DateTime.to_iso8601(appointment.starts_at)
+    })
   end
 
   defp data(appointment) do

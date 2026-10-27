@@ -13,6 +13,14 @@ defmodule SchedulerApiWeb.Router do
     post "/appointments", AppointmentController, :create
   end
 
+  # Development-only use until real admin authentication/authorization exists.
+  # The URL prefix provides no access control; do not expose this API publicly.
+  scope "/api/admin", SchedulerApiWeb do
+    pipe_through :api
+
+    get "/appointments", AppointmentController, :index
+  end
+
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:scheduler_api, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
