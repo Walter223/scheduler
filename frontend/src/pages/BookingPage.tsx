@@ -165,7 +165,7 @@ function BookingPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch('http://localhost:4000/api/services', { signal: controller.signal })
+    fetch('/api/services', { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error('Could not load detailing services. Please reload the page to try again.')
         const data: unknown = await response.json().catch(() => {
@@ -219,7 +219,7 @@ function BookingPage() {
     availabilityScope.current = controller
     if (selectedDate && servicePriceId) {
       fetch(
-        `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`,
+        `/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`,
         { signal: controller.signal }
       )
         .then(async (response) => {
@@ -263,7 +263,7 @@ async function handleBookAppointment() {
     )
 
     const response = await fetch(
-      'http://localhost:4000/api/appointments',
+      '/api/appointments',
       {
         method: 'POST',
         headers: {
@@ -302,7 +302,7 @@ async function handleBookAppointment() {
         setAvailableTimes([])
 
         const availabilityResponse = await fetch(
-          `http://localhost:4000/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`,
+          `/api/availability?date=${selectedDate}&service_price_id=${servicePriceId}`,
           { signal: scope.signal }
         )
         const availability = await availabilityResponse.json()

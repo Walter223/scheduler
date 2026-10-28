@@ -15,6 +15,10 @@ defmodule SchedulerApiWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
+  # Keep auth requests outside body parsers, dashboard capture, and endpoint
+  # telemetry carrying raw conns. Logout has no request-body contract.
+  plug :browser_auth_boundary
+
   # Serve at "/" the static files from "priv/static" directory.
   #
   # When code reloading is disabled (e.g., in production),
@@ -50,8 +54,45 @@ defmodule SchedulerApiWeb.Endpoint do
   plug Plug.Head
   plug Plug.Session, @session_options
 
-  plug CORSPlug,
-    origin: ["http://localhost:5173"]
+  plug CORSPlug, origin: ["http://localhost:5173"]
 
   plug SchedulerApiWeb.Router
+
+  defp browser_auth_boundary(%{path_info: ["auth" | _]} = conn, _),
+    do: private_dispatch(conn) |> Plug.Conn.halt()
+
+  defp browser_auth_boundary(%{path_info: ["api", "me"]} = conn, _),
+    do: private_dispatch(conn) |> Plug.Conn.halt()
+
+  defp browser_auth_boundary(conn, _), do: conn
+
+  defp private_dispatch(conn) do
+    conn
+    |> Plug.RequestId.call(Plug.RequestId.init([]))
+    |> Plug.Conn.fetch_query_params()
+    |> SchedulerApiWeb.Router.call(SchedulerApiWeb.Router.init([]))
+  rescue
+    # Never render the dev debugger or log exception terms carrying callback
+    # query strings, credentials, provider claims or SQL protocol secrets.
+    _ ->
+      conn =
+        conn
+        |> Plug.Conn.put_resp_header("cache-control", "no-store")
+        |> Plug.Conn.put_resp_header("referrer-policy", "no-referrer")
+
+      origin = SchedulerApi.Authentication.BrowserConfig.current().origin
+
+      if conn.path_info == ["auth", "callback"] and is_binary(origin) do
+        conn
+        |> SchedulerApiWeb.BrowserSession.clear_binding()
+        |> Plug.Conn.put_resp_header("location", origin <> "/?auth_error=login_failed")
+        |> Plug.Conn.send_resp(302, "")
+      else
+        Plug.Conn.send_resp(
+          conn,
+          503,
+          "Authentication is temporarily unavailable. Start a new login."
+        )
+      end
+  end
 end

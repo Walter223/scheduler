@@ -6,7 +6,7 @@ defmodule SchedulerApi.Accounts do
   """
   import Ecto.Query
   alias SchedulerApi.Repo
-  alias SchedulerApi.Accounts.{SessionCredential, User, VerifiedIdentity, WebSession}
+  alias SchedulerApi.Accounts.{SessionCredential, SessionCSRF, User, VerifiedIdentity, WebSession}
 
   @profile_fields [
     :email,
@@ -31,6 +31,7 @@ defmodule SchedulerApi.Accounts do
       |> Repo.insert(
         on_conflict: {:replace, @profile_fields},
         conflict_target: [:keycloak_issuer, :keycloak_subject],
+        log: false,
         returning: true
       )
     end
@@ -81,6 +82,7 @@ defmodule SchedulerApi.Accounts do
             %WebSession{
               user_id: user.id,
               token_hash: digest,
+              csrf_state: SessionCSRF.new_state(),
               inserted_at: now,
               updated_at: now,
               last_seen_at: now,
@@ -136,6 +138,23 @@ defmodule SchedulerApi.Accounts do
     end
   end
 
+  @doc "Initialize legacy session CSRF state under lock without touching idle expiry."
+  def session_csrf_token(%WebSession{} = session, opts \\ []) do
+    with {:ok, now} <- clock(opts) do
+      with_locked_session(session, fn current, user ->
+        if not usable?(current, user, now), do: Repo.rollback(:invalid_session)
+
+        state = current.csrf_state || SessionCSRF.new_state()
+
+        if is_nil(current.csrf_state) do
+          current |> Ecto.Changeset.change(csrf_state: state) |> persist!()
+        end
+
+        SessionCSRF.masked_token(state)
+      end)
+    end
+  end
+
   @doc "Durably revokes one session; first revocation timestamp/reason are preserved."
   def revoke_session(%WebSession{} = session, reason, opts \\ []) do
     with :ok <- valid_reason(reason), {:ok, now} <- clock(opts) do
@@ -144,7 +163,12 @@ defmodule SchedulerApi.Accounts do
           current
         else
           current
-          |> Ecto.Changeset.change(revoked_at: now, revocation_reason: reason, updated_at: now)
+          |> Ecto.Changeset.change(
+            revoked_at: now,
+            revocation_reason: reason,
+            csrf_state: nil,
+            updated_at: now
+          )
           |> persist!()
         end
       end)
@@ -201,7 +225,7 @@ defmodule SchedulerApi.Accounts do
   defp revoke_user_sessions(id, reason, now) do
     {count, _} =
       Repo.update_all(from(s in WebSession, where: s.user_id == ^id and is_nil(s.revoked_at)),
-        set: [revoked_at: now, revocation_reason: reason, updated_at: now]
+        set: [revoked_at: now, revocation_reason: reason, csrf_state: nil, updated_at: now]
       )
 
     count
@@ -218,7 +242,7 @@ defmodule SchedulerApi.Accounts do
   defp status_reason(:deactivated), do: :account_deactivated
 
   defp persist!(changeset) do
-    case Repo.insert_or_update(changeset) do
+    case Repo.insert_or_update(changeset, log: false) do
       {:ok, value} -> value
       {:error, changeset} -> Repo.rollback(changeset)
     end

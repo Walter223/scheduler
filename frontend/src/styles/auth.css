@@ -1,0 +1,15 @@
+.session-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+.session-controls p {
+  flex-basis: 100%;
+  text-align: center;
+  margin: 0;
+}

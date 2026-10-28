@@ -136,7 +136,7 @@ Exactly one issuer is accepted by the future application:
 | Token | `http://auth.magnum.test:8080/realms/magnum/protocol/openid-connect/token` |
 | JWKS | `http://auth.magnum.test:8080/realms/magnum/protocol/openid-connect/certs` |
 | End session | `http://auth.magnum.test:8080/realms/magnum/protocol/openid-connect/logout` |
-| Future Phoenix callback | `http://localhost:4000/auth/callback` |
+| Future Phoenix callback | `http://localhost:5173/auth/callback` |
 | Future logout return | `http://localhost:5173/` |
 
 Callback/logout URLs are reserved contracts, **not implemented routes**.
@@ -346,3 +346,17 @@ initially denied its Phoenix server's local TCP lock. No tests were weakened.
 - [Versioned password policies](https://github.com/keycloak/keycloak/blob/26.8.1/docs/documentation/server_admin/topics/authentication/password-policies.adoc)
 - [PostgreSQL 18.6](https://www.postgresql.org/docs/release/18.6/)
 - [Mailpit v1.32.0](https://github.com/axllent/mailpit/releases/tag/v1.32.0), [runtime configuration](https://mailpit.axllent.org/docs/configuration/runtime-options/)
+
+## Phoenix browser boundary
+
+The same-origin callback is now `http://localhost:5173/auth/callback`. After
+pulling this change, run `python3 scripts/auth.py reconcile-callback` against the
+existing local stack, then `python3 scripts/auth.py smoke`. This supported Admin
+API update retains the empty webOrigins list explicitly; it never resets the realm
+or rotates secrets. Restarting containers alone does not apply realm source changes.
+
+See [backend authentication](../backend/AUTHENTICATION.md) for runtime environment,
+opaque cookies, CSRF, local logout, pending-account behavior and the isolated
+`npm run test:auth` real-login workflow. Staff MFA remains unenforced and the
+unauthorized admin endpoint remains development-only. Keycloak authenticates
+identity; Phoenix authorizes Magnum access.

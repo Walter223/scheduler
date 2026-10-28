@@ -14,7 +14,7 @@ defmodule SchedulerApi.Authentication.ProviderTest do
   test "HTTP is allowed only for the exact local development issuer and callback" do
     options = [
       issuer: "http://auth.magnum.test:8080/realms/magnum",
-      callback_url: "http://localhost:4000/auth/callback",
+      callback_url: "http://localhost:5173/auth/callback",
       client_secret: "test-only"
     ]
 

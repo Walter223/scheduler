@@ -35,6 +35,7 @@ defmodule SchedulerApi.WebSessionsTest do
                :id,
                :user_id,
                :token_hash,
+               :csrf_state,
                :inserted_at,
                :updated_at,
                :last_seen_at,

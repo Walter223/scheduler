@@ -114,3 +114,12 @@ deployment, cookie/CSRF policy, provider-token encryption/storage, refresh and
 logout/revocation behavior, and MFA/step-up proof. Membership authorization,
 account activation policy and admin protection remain separate work; login must
 never automatically grant appointment/customer access.
+
+## Browser-session CSRF extension
+
+Milestone B adds nullable `csrf_state` to web sessions without rewriting existing
+rows. New sessions receive Plug-generated state; existing sessions initialize it
+under lock on first status request. Only the masked form leaves Phoenix. Revocation
+clears the state, and status requests do not renew idle expiry. No provider tokens
+are stored. See [AUTHENTICATION.md](AUTHENTICATION.md) for the implemented browser
+boundary; earlier next-milestone notes above describe the original Accounts stage.

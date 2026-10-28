@@ -5,8 +5,16 @@ defmodule SchedulerApiWeb.Router do
     plug :accepts, ["json"]
   end
 
+  scope "/auth", SchedulerApiWeb do
+    get "/login", AuthController, :login, log: false
+    get "/callback", AuthController, :callback, log: false
+    post "/logout", AuthController, :logout, log: false
+  end
+
   scope "/api", SchedulerApiWeb do
     pipe_through :api
+
+    get "/me", AuthController, :me, log: false
 
     get "/services", ServiceController, :index
     get "/availability", AvailabilityController, :index

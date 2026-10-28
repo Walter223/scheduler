@@ -34,7 +34,7 @@ defmodule SchedulerApi.Authentication do
         updated_at: now
       }
 
-      with {:ok, transaction} <- Repo.insert(transaction) do
+      with {:ok, transaction} <- Repo.insert(transaction, log: false) do
         {:ok, %LoginAttempt{transaction: transaction, state: state, browser_binding: binding}}
       end
     else

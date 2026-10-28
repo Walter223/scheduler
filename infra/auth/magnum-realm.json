@@ -56,7 +56,7 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": false,
-      "redirectUris": ["http://localhost:4000/auth/callback"],
+      "redirectUris": ["http://localhost:5173/auth/callback"],
       "webOrigins": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",

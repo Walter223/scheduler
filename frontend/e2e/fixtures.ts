@@ -41,19 +41,7 @@ export const test = base.extend<{
   catalog: async ({ page }, run) => {
     const catalog = JSON.parse(await fixtures('seed')) as CatalogData
     try {
-      // Forward every browser API call to the real isolated Phoenix test server.
-      // No canned responses; this also prevents any writes to the dev API.
-      await page.route('http://localhost:4000/api/**', async (route) => {
-        const url = new URL(route.request().url())
-        const response = await route.fetch({ url: `${apiURL}${url.pathname}${url.search}` })
-        await route.fulfill({
-          response,
-          headers: {
-            ...response.headers(),
-            'access-control-allow-origin': 'http://127.0.0.1:5174',
-          },
-        })
-      })
+      // Vite proxies same-origin API requests to the isolated test server.
       await run(catalog)
     } finally {
       await page.close()

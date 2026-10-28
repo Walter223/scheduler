@@ -15,7 +15,7 @@ defmodule SchedulerApi.Authentication.Config do
     if valid_url?(issuer) and valid_url?(callback) and
          (issuer.scheme == "https" or local) and
          (callback.scheme == "https" or
-            (local and config.callback_url == "http://localhost:4000/auth/callback")) and
+            (local and config.callback_url == "http://localhost:5173/auth/callback")) and
          config.client_id == "magnum-web" and
          is_binary(config.client_secret) and byte_size(config.client_secret) > 0 do
       {:ok, %{config | local_http: local}}

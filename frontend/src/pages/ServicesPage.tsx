@@ -26,7 +26,7 @@ function ServicesPage() {
   } | null>(null)
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/services')
+    fetch('/api/services')
       .then((response) => response.json())
       .then((data) => setServices(data))
   }, [])

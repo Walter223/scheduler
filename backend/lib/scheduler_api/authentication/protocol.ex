@@ -21,6 +21,8 @@ defmodule SchedulerApi.Authentication.Protocol do
              nonce: transaction.nonce,
              pkce_verifier: transaction.pkce_verifier,
              require_pkce: true,
+             preferred_auth_methods: [:client_secret_basic],
+             request_opts: %{timeout: 5_000},
              response_mode: "query"
            }) do
         {:ok, url} -> {:ok, IO.iodata_to_binary(url)}
@@ -47,6 +49,7 @@ defmodule SchedulerApi.Authentication.Protocol do
              nonce: login.nonce,
              pkce_verifier: login.pkce_verifier,
              require_pkce: true,
+             preferred_auth_methods: [:client_secret_basic],
              trusted_audiences: [],
              validate_azp: :client_id,
              request_opts: %{timeout: 5_000}

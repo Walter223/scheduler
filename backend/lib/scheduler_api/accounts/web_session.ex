@@ -17,6 +17,7 @@ defmodule SchedulerApi.Accounts.WebSession do
   schema "web_sessions" do
     belongs_to :user, SchedulerApi.Accounts.User
     field :token_hash, :binary, redact: true
+    field :csrf_state, :string, redact: true
     field :last_seen_at, :utc_datetime
     field :idle_expires_at, :utc_datetime
     field :absolute_expires_at, :utc_datetime

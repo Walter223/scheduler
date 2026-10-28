@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV = ROOT / "infra/auth/.env"
 REALM = ROOT / "infra/auth/magnum-realm.json"
 ISSUER = "http://auth.magnum.test:8080/realms/magnum"
-CALLBACK = "http://localhost:4000/auth/callback"
+CALLBACK = "http://localhost:5173/auth/callback"
 LOGOUT_RETURN = "http://localhost:5173/"
 SERVICES = {"auth-db", "auth-mail", "keycloak"}
 SMTP = {
@@ -90,13 +90,13 @@ def check_source():
     print("PASS: source realm contract and obvious-secret guard")
 
 
-def compose(*args, capture=False):
+def compose(*args, capture=False, input_text=None):
     require(shutil.which("docker"), "Docker with Compose v2 is required; Docker is not installed/on PATH")
     require(ENV.exists(), "Run python3 scripts/auth.py init first")
     # Never print rendered Compose configuration: it contains resolved secrets.
     command = ["docker", "compose", "--project-name", "magnum-auth-dev",
                "--env-file", str(ENV), "-f", str(ROOT / "compose.yaml"), "--profile", "auth"]
-    result = subprocess.run(command + list(args), cwd=ROOT, text=True,
+    result = subprocess.run(command + list(args), cwd=ROOT, text=True, input=input_text,
                             stdout=subprocess.PIPE if capture else None,
                             stderr=subprocess.PIPE if capture else None)
     require(result.returncode == 0, "Compose command failed" if capture else "Compose failed; see output")
@@ -254,6 +254,46 @@ done
     return values
 
 
+def admin_write(method, path, body=None):
+    """Supported kcadm API; JSON/credentials never appear in process arguments/output."""
+    require(method in {"create", "update", "delete"}, "Invalid admin operation")
+    script = '''set -eu
+config=$(mktemp)
+payload=$(mktemp)
+trap 'rm -f "$config" "$payload"' EXIT
+/opt/keycloak/bin/kcadm.sh config credentials --config "$config" --server http://localhost:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1
+if [ "$1" = delete ]; then
+  /opt/keycloak/bin/kcadm.sh delete "$2" --config "$config" >/dev/null 2>&1
+else
+  cat > "$payload"
+  /opt/keycloak/bin/kcadm.sh "$1" "$2" --config "$config" -f "$payload" >/dev/null 2>&1
+fi
+'''
+    compose("exec", "-T", "keycloak", "bash", "-ec", script, "auth-admin", method, path,
+            capture=True, input_text=json.dumps(body) if body is not None else "")
+
+
+def reconcile_callback():
+    """Opt-in partial client update only: no realm import/reset, no secret rotation."""
+    check_source()
+    check_compose()
+    check_reset_ownership()
+    clients, = admin_get("realms/magnum/clients")
+    web = next(c for c in clients if c["clientId"] == "magnum-web")
+    require(web["redirectUris"] in [["http://localhost:4000/auth/callback"], [CALLBACK]],
+            "Unexpected existing redirect URIs; refusing to overwrite")
+    # Keycloak derives webOrigins from redirectUris when webOrigins is omitted
+    # in this partial update. Explicitly retain the source's empty BFF CORS list.
+    require(web.get("webOrigins", []) in [[], ["http://localhost:5173"]],
+            "Unexpected existing webOrigins; refusing to overwrite")
+    patch = {"redirectUris": [CALLBACK], "webOrigins": []}
+    admin_write("update", "realms/magnum/clients/" + web["id"], patch)
+    updated, = admin_get("realms/magnum/clients/" + web["id"])
+    require(updated == {**web, **patch},
+            "Unexpected client change; inspect non-secret configuration before continuing")
+    print("PASS: magnum-web callback reconciled with empty webOrigins; other client fields preserved")
+
+
 def smoke():
     check_source()
     config = check_compose()
@@ -327,7 +367,7 @@ def init():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["init", "check", "config-check", "up", "status",
-                                            "logs", "stop", "smoke", "reset"])
+                                            "logs", "stop", "smoke", "reset", "reconcile-callback"])
     parser.add_argument("--destroy-local-auth-state", action="store_true",
                         help="Required for reset: deletes ONLY this Compose project's auth volumes")
     args = parser.parse_args()
@@ -340,6 +380,8 @@ def main():
         check_compose()
     elif args.command == "smoke":
         smoke()
+    elif args.command == "reconcile-callback":
+        reconcile_callback()
     elif args.command == "reset":
         require(args.destroy_local_auth_state, "Reset requires --destroy-local-auth-state")
         check_source()

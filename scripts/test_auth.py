@@ -8,6 +8,17 @@ import auth
 
 
 class AuthContractTest(unittest.TestCase):
+    def test_callback_reconciliation_explicitly_preserves_empty_web_origins(self):
+        web = {"id": "test-client", "clientId": "magnum-web", "redirectUris": ["http://localhost:4000/auth/callback"], "webOrigins": []}
+        updated = {**web, "redirectUris": [auth.CALLBACK]}
+        with patch.object(auth, "check_source"), patch.object(auth, "check_compose"), \
+             patch.object(auth, "check_reset_ownership"), \
+             patch.object(auth, "admin_get", side_effect=[[[web]], [updated]]), \
+             patch.object(auth, "admin_write") as write:
+            auth.reconcile_callback()
+            write.assert_called_once_with("update", "realms/magnum/clients/test-client",
+                                          {"redirectUris": [auth.CALLBACK], "webOrigins": []})
+
     def setUp(self):
         self.realm = json.loads(auth.REALM.read_text())
 

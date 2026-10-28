@@ -3,13 +3,31 @@ import Config
 # OIDC is opt-in. Never source identity configuration from browser/request data.
 config :oidcc, max_clock_skew: 0
 
+origin = System.get_env("MAGNUM_APP_ORIGIN", "http://localhost:5173")
+browser_environment = if config_env() == :test, do: :dev, else: config_env()
+
+if config_env() != :prod or System.get_env("MAGNUM_OIDC_ENABLED") == "true" do
+  case SchedulerApi.Authentication.BrowserConfig.new(origin, browser_environment) do
+    {:ok, browser} ->
+      config :scheduler_api, :browser_auth, browser
+
+    _ ->
+      raise "Invalid MAGNUM_APP_ORIGIN; production authentication requires an explicit HTTPS origin"
+  end
+else
+  config :scheduler_api, :browser_auth, %{origin: nil, secure: true}
+end
+
 if System.get_env("MAGNUM_OIDC_ENABLED") == "true" do
   options = [
     issuer: System.get_env("OIDC_ISSUER", "http://auth.magnum.test:8080/realms/magnum"),
     client_id: System.get_env("OIDC_CLIENT_ID", "magnum-web"),
     client_secret: System.fetch_env!("MAGNUM_WEB_CLIENT_SECRET"),
-    callback_url: System.get_env("OIDC_REDIRECT_URI", "http://localhost:4000/auth/callback")
+    callback_url: System.get_env("OIDC_REDIRECT_URI", origin <> "/auth/callback")
   ]
+
+  unless options[:callback_url] == origin <> "/auth/callback",
+    do: raise("OIDC callback must match the configured application origin")
 
   case SchedulerApi.Authentication.Config.new(options, config_env()) do
     {:ok, provider} ->

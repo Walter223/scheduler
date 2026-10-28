@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage'
 import ServicesPage from './pages/ServicesPage'
 import NavBar from './components/NavBar'
 import BookingPage from './pages/BookingPage'
+import SessionControls from './components/SessionControls'
 
 const App = () => {
   const location = useLocation()
@@ -32,6 +33,7 @@ const App = () => {
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/contact" element={<BookingPage />} />
       </Routes>
+      <SessionControls />
     </>
   )
 }
