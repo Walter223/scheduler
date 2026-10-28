@@ -1,5 +1,27 @@
 import Config
 
+# OIDC is opt-in. Never source identity configuration from browser/request data.
+config :oidcc, max_clock_skew: 0
+
+if System.get_env("MAGNUM_OIDC_ENABLED") == "true" do
+  options = [
+    issuer: System.get_env("OIDC_ISSUER", "http://auth.magnum.test:8080/realms/magnum"),
+    client_id: System.get_env("OIDC_CLIENT_ID", "magnum-web"),
+    client_secret: System.fetch_env!("MAGNUM_WEB_CLIENT_SECRET"),
+    callback_url: System.get_env("OIDC_REDIRECT_URI", "http://localhost:4000/auth/callback")
+  ]
+
+  case SchedulerApi.Authentication.Config.new(options, config_env()) do
+    {:ok, provider} ->
+      config :scheduler_api, :oidc, provider
+
+    {:error, _} ->
+      raise "Invalid OIDC server configuration (HTTPS required outside local development)"
+  end
+else
+  config :scheduler_api, :oidc, nil
+end
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration

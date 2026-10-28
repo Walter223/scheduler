@@ -7,11 +7,11 @@ endpoint remains unauthenticated and development-only, not production-safe.
 
 ## Identity boundary
 
-Only a future OIDC verifier may construct
+Only the validated OIDC adapter (see [AUTHENTICATION.md](AUTHENTICATION.md)) may construct
 `SchedulerApi.Accounts.VerifiedIdentity`. There is no map/params constructor;
 `Accounts.sync_verified_identity/2` rejects ordinary maps. This is a typed code
 boundary, not proof against other trusted BEAM code constructing a struct. The
-future verifier must validate issuer, subject, signature, audience, nonce and
+verifier must validate issuer, subject, signature, audience, nonce and
 authentication-time requirements before handing over this type.
 
 The exact `(keycloak_issuer, keycloak_subject)` pair uniquely identifies a local

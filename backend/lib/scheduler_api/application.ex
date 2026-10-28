@@ -7,16 +7,17 @@ defmodule SchedulerApi.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      SchedulerApiWeb.Telemetry,
-      SchedulerApi.Repo,
-      {DNSCluster, query: Application.get_env(:scheduler_api, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: SchedulerApi.PubSub},
-      # Start a worker by calling: SchedulerApi.Worker.start_link(arg)
-      # {SchedulerApi.Worker, arg},
-      # Start to serve requests, typically the last entry
-      SchedulerApiWeb.Endpoint
-    ]
+    children =
+      [
+        SchedulerApiWeb.Telemetry,
+        SchedulerApi.Repo,
+        {DNSCluster, query: Application.get_env(:scheduler_api, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: SchedulerApi.PubSub},
+        # Start a worker by calling: SchedulerApi.Worker.start_link(arg)
+        # {SchedulerApi.Worker, arg},
+        # Start to serve requests, typically the last entry
+        SchedulerApiWeb.Endpoint
+      ] ++ SchedulerApi.Authentication.Provider.children()
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
