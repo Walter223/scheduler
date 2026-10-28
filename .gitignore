@@ -1,0 +1,9 @@
+# Local authentication secrets; examples are safe to track.
+/.env
+/.env.*
+!/.env.example
+/infra/auth/.env
+/infra/auth/.env.*
+!/infra/auth/.env.example
+__pycache__/
+*.pyc

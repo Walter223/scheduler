@@ -1,0 +1,91 @@
+name: magnum-auth-dev
+
+services:
+  auth-db:
+    image: postgres:18.6
+    profiles: [auth]
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Use python3 scripts/auth.py init}
+    volumes:
+      - auth-postgres:/var/lib/postgresql
+    networks: [auth]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U keycloak -d keycloak']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  auth-mail:
+    image: axllent/mailpit:v1.32.0
+    profiles: [auth]
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: '500'
+      MP_DISABLE_VERSION_CHECK: 'true'
+    volumes:
+      - auth-mail:/data
+    ports:
+      - '127.0.0.1:8025:8025'
+    networks: [auth, auth-local]
+    healthcheck:
+      test: [CMD, /mailpit, readyz]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    profiles: [auth]
+    command: [start-dev, --import-realm]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://auth-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Use python3 scripts/auth.py init}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:?Use python3 scripts/auth.py init}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD:?Use python3 scripts/auth.py init}
+      KC_HOSTNAME: http://auth.magnum.test:8080
+      KC_HOSTNAME_STRICT: 'true'
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'false'
+      KC_HEALTH_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'true'
+      MAGNUM_WEB_CLIENT_SECRET: ${MAGNUM_WEB_CLIENT_SECRET:?Use python3 scripts/auth.py init}
+    volumes:
+      - ./infra/auth/magnum-realm.json:/opt/keycloak/data/import/magnum-realm.json:ro
+    ports:
+      - '127.0.0.1:8080:8080'
+      # Local diagnostic access only; never publish management in production.
+      - '127.0.0.1:9000:9000'
+    networks:
+      auth:
+        aliases: [auth.magnum.test]
+      auth-local:
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      auth-mail:
+        condition: service_healthy
+    healthcheck:
+      # Official Bash TCP probe; no curl/debug packages in the Keycloak image.
+      test:
+        - CMD
+        - bash
+        - -ec
+        - "{ printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000"
+      interval: 5s
+      timeout: 5s
+      start_period: 60s
+      retries: 30
+
+networks:
+  auth:
+    internal: true
+  # Docker Desktop needs a non-internal bridge for published loopback ports.
+  # PostgreSQL is deliberately NOT attached to this host-facing network.
+  auth-local:
+
+volumes:
+  auth-postgres:
+  auth-mail:
