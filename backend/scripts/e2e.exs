@@ -20,62 +20,91 @@ Ecto.Adapters.SQL.Sandbox.mode(SchedulerApi.Repo, :auto)
 
 defmodule SchedulerApi.E2EFixtures do
   import Ecto.Query
-  alias SchedulerApi.{Catalog, Repo}
-  alias SchedulerApi.Appointments.Appointment
+  alias SchedulerApi.{Catalog, Organizations, Repo}
+  alias SchedulerApi.Appointments.{Appointment, Availability}
   alias SchedulerApi.Catalog.{Service, ServicePrice, VehicleSize}
   import SchedulerApi.AppointmentsFixtures
 
-  @service_name "E2E Mid Detail"
-  @size_name "E2E Small"
+  @service_names ["Basic Detail", "Mid Detail", "Supreme Detail"]
+  @size_names ["Small", "Medium", "Large"]
+  @marker "Playwright-owned fixture: "
 
   def cleanup do
+    shop = Organizations.default_shop!()
+
     Repo.transaction(fn ->
-      prices =
-        from p in ServicePrice,
-          join: s in Service,
-          on: p.service_id == s.id,
-          where: s.name == @service_name,
-          select: p.id
+      services =
+        from s in Service,
+          where:
+            s.business_id == ^shop.business_id and s.name in @service_names and
+              like(s.description, ^"#{@marker}%"),
+          select: s.id
+
+      service_ids = Repo.all(services)
+      prices = from p in ServicePrice, where: p.service_id in ^service_ids, select: p.id
+
+      size_ids =
+        Repo.all(
+          from p in ServicePrice,
+            where: p.service_id in ^service_ids,
+            distinct: true,
+            select: p.vehicle_size_id
+        )
+
+      # Never remove someone else's prices or shared sizes, even in the test DB.
+      if Repo.exists?(
+           from p in ServicePrice,
+             where:
+               (p.service_id in ^service_ids and p.shop_id != ^shop.id) or
+                 (p.vehicle_size_id in ^size_ids and p.service_id not in ^service_ids)
+         ) do
+        raise "E2E catalog has foreign references; refusing cleanup"
+      end
 
       Repo.delete_all(from a in Appointment, where: a.service_price_id in subquery(prices))
       Repo.delete_all(from p in ServicePrice, where: p.id in subquery(prices))
-      Repo.delete_all(from s in Service, where: s.name == @service_name)
-      Repo.delete_all(from v in VehicleSize, where: v.name == @size_name)
+      Repo.delete_all(from s in Service, where: s.id in ^service_ids)
+
+      Repo.delete_all(
+        from v in VehicleSize, where: v.id in ^size_ids and v.business_id == ^shop.business_id
+      )
     end)
   end
 
   def seed do
-    # Clear only our named fixtures, including leftovers from an interrupted run.
     cleanup()
 
     {:ok, result} =
       Repo.transaction(fn ->
-        {:ok, service} =
-          Catalog.create_service(%{
-            name: @service_name,
-            description: "Playwright booking fixture"
-          })
+        shop = Organizations.default_shop!()
 
-        {:ok, size} = Catalog.create_vehicle_size(%{name: @size_name, sort_order: 10_000})
+        if Repo.exists?(
+             from s in Service,
+               where: s.business_id == ^shop.business_id and s.name in @service_names
+           ) or
+             Repo.exists?(
+               from v in VehicleSize,
+                 where: v.business_id == ^shop.business_id and v.name in @size_names
+             ) do
+          raise "E2E catalog names already exist without fixture ownership; refusing to overwrite"
+        end
 
-        {:ok, price} =
-          Catalog.create_service_price(%{
-            service_id: service.id,
-            vehicle_size_id: size.id,
-            duration_minutes: 90,
-            price_cents: 8999
-          })
+        # Exercise the actual source-controlled catalog, not one synthetic offering.
+        Code.eval_file(Path.expand("../priv/repo/seeds.exs", __DIR__))
+
+        for service <- Catalog.list_services_with_prices(), service.name in @service_names do
+          {:ok, _} =
+            Catalog.update_service(service, %{description: @marker <> service.description})
+        end
 
         date = booking_date()
-        attrs = booking_attrs(price, date)
+        {opens, _} = Availability.business_hours(date)
 
         %{
-          service_id: service.id,
-          service_price_id: price.id,
-          service_name: service.name,
-          vehicle_size: size.name,
           date: Date.to_iso8601(date),
-          starts_at: DateTime.to_iso8601(attrs.starts_at)
+          starts_at: DateTime.to_iso8601(opens),
+          services:
+            SchedulerApiWeb.ServiceJSON.index(%{services: Catalog.list_services_with_prices()})
         }
       end)
 

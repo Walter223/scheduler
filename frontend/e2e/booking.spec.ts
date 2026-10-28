@@ -25,31 +25,10 @@ function followingWeek(date: string) {
 }
 
 async function openBooking(page: Page, booking: BookingData) {
-  await page.goto('/')
-  await expect(page.getByRole('link', { name: 'View Services', exact: true })).toHaveAttribute('href', '/services')
-  await expect(page.getByRole('link', { name: 'Check Availability', exact: true })).toHaveAttribute('href', '/contact')
-  await page.getByRole('navigation').getByRole('link', { name: 'Services', exact: true }).click()
-  const service = page.getByRole('heading', { name: booking.service_name, exact: true }).locator('..')
-  const option = service.getByRole('button', { name: new RegExp(booking.vehicle_size) })
-  const book = service.getByRole('link', { name: 'Book This Detail' })
-  await expect(book).toHaveAttribute('aria-disabled', 'true')
-  await expect(book).toHaveAttribute('tabindex', '-1')
-  await expect(option).toHaveAttribute('aria-pressed', 'false')
-  await option.click()
-  await expect(option).toHaveAttribute('aria-pressed', 'true')
-  await expect(book).toHaveAttribute('aria-disabled', 'false')
-  await expect(book).toHaveAttribute('tabindex', '0')
-  await option.click()
-  await expect(option).toHaveAttribute('aria-pressed', 'false')
-  await expect(book).toHaveAttribute('aria-disabled', 'true')
-  await option.click()
-  await book.click()
-  await expect(page).toHaveURL(new RegExp(`/contact\\?service=${booking.service_id}&size=\\d+$`))
+  await page.goto(`/contact?service=${booking.service_id}&size=${booking.vehicle_size_id}`)
   await page.getByLabel('Choose a Date').fill(booking.date)
   const slot = page.getByRole('button', { name: '9:00 AM', exact: true })
   await slot.click()
-  await expect(slot).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('button', { name: 'Book Appointment', exact: true })).toBeDisabled()
 }
 
 async function prepareBooking(page: Page, booking: BookingData) {
@@ -60,56 +39,73 @@ async function prepareBooking(page: Page, booking: BookingData) {
   await expect(page.getByRole('button', { name: 'Book Appointment', exact: true })).toBeEnabled()
 }
 
-test.describe('saved confirmation outside the business timezone', () => {
-  test.use({ timezoneId: 'Asia/Tokyo' })
+for (const offering of [
+  { name: 'Basic Detail', size: 'Small', price: '$59.99', duration: '60 min' },
+  { name: 'Mid Detail', size: 'Medium', price: '$119.99', duration: '120 min' },
+  { name: 'Supreme Detail', size: 'Large', price: '$179.99', duration: '230 min' },
+]) {
+  test.describe(offering.name, () => {
+    test.use({ packageName: offering.name, vehicleSize: offering.size, timezoneId: 'Asia/Tokyo' })
+    test('books through Services and displays saved confirmation in Denver time', async ({ page, booking }) => {
+      await page.goto('/')
+      await page.getByRole('navigation').getByRole('link', { name: 'Services', exact: true }).click()
+      // Service cards are unnamed sections; scope by their visible package heading.
+      const service = page.getByRole('heading', { name: offering.name, exact: true }).locator('..')
+      await service.getByRole('button', { name: new RegExp(`^${offering.size} `) }).click()
+      await service.getByRole('link', { name: 'Book This Detail' }).click()
+      await page.getByLabel('Choose a Date').fill(booking.date)
+      await page.getByRole('button', { name: '9:00 AM', exact: true }).click()
+      for (const [label, value] of Object.entries(customer)) {
+        await page.getByLabel(label, { exact: true }).fill(value)
+      }
+      const pending = gate()
+      const release = gate()
+      await page.route('**/api/appointments', async (route) => {
+        const response = await route.fetch({ url: `${apiURL}/api/appointments` })
+        pending.release()
+        await release.promise
+        await route.fulfill({ response, headers: { ...response.headers(), 'access-control-allow-origin': 'http://127.0.0.1:5174' } })
+      })
+      const submitted = page.waitForResponse((response) =>
+        response.url().endsWith('/api/appointments') && response.request().method() === 'POST'
+      )
+      await page.getByRole('button', { name: 'Book Appointment', exact: true }).click()
+      await pending.promise
+      // The saved confirmation must survive changes made while submission is pending.
+      await page.getByLabel('First Name', { exact: true }).fill('Unsaved')
+      await page.getByLabel('Last Name', { exact: true }).fill('Changes')
+      await page.getByLabel('Choose a Date').fill(followingWeek(booking.date))
+      release.release()
+      const response = await submitted
+      expect(response.status()).toBe(201)
+      const { appointment } = await response.json()
 
-  test('booking succeeds and displays the BookingConfirmation details', async ({ page, booking }) => {
-    await prepareBooking(page, booking)
-    const pending = gate()
-    const release = gate()
-    await page.route('**/api/appointments', async (route) => {
-      const response = await route.fetch({ url: `${apiURL}/api/appointments` })
-      pending.release()
-      await release.promise
-      await route.fulfill({ response, headers: { ...response.headers(), 'access-control-allow-origin': 'http://127.0.0.1:5174' } })
+      await expect(page.getByRole('heading', { name: "You're On The Schedule", exact: true })).toBeVisible()
+      const confirmation = page.getByRole('main')
+      const date = new Intl.DateTimeFormat('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+      }).format(new Date(`${booking.date}T12:00:00Z`))
+      for (const text of [booking.service_name, booking.vehicle_size, date, '9:00 AM', 'Toyota Camry', offering.duration, offering.price, 'pending', `Confirmation #${appointment.id}`]) {
+        await expect(confirmation.getByText(text, { exact: true })).toBeVisible()
+      }
+      await expect(confirmation.getByText('Thanks, Alex Driver!', { exact: false })).toBeVisible()
+      expect(appointment.starts_at).toBe(booking.starts_at)
+      expect(appointment.service_price_id).toBe(booking.service_price_id)
+      expect(appointment.customer_email).toBe(customer.Email)
+      expect(appointment.customer_first_name).toBe(customer['First Name'])
+      expect(appointment.customer_last_name).toBe(customer['Last Name'])
+      expect(appointment).not.toHaveProperty('customer_name')
+      const payload = response.request().postDataJSON()
+      expect(payload.service_price_id).toBe(booking.service_price_id)
+      expect(payload.customer_first_name).toBe(customer['First Name'])
+      expect(payload.customer_last_name).toBe(customer['Last Name'])
+      expect(payload).not.toHaveProperty('customer_name')
+      await page.getByRole('button', { name: 'Book Another Detail', exact: true }).click()
+      await expect(page).toHaveURL(/\/services$/)
+      await expect(page.getByRole('heading', { name: 'Magnum Detailing Services', exact: true })).toBeVisible()
     })
-    const submitted = page.waitForResponse((response) =>
-      response.url().endsWith('/api/appointments') && response.request().method() === 'POST'
-    )
-    await page.getByRole('button', { name: 'Book Appointment', exact: true }).click()
-    await pending.promise
-    // The saved confirmation must survive changes made while submission is pending.
-    await page.getByLabel('First Name', { exact: true }).fill('Unsaved')
-    await page.getByLabel('Last Name', { exact: true }).fill('Changes')
-    await page.getByLabel('Choose a Date').fill(followingWeek(booking.date))
-    release.release()
-    const response = await submitted
-    expect(response.status()).toBe(201)
-    const { appointment } = await response.json()
-
-    await expect(page.getByRole('heading', { name: "You're On The Schedule", exact: true })).toBeVisible()
-    const confirmation = page.getByRole('main')
-    const date = new Intl.DateTimeFormat('en-US', {
-      month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
-    }).format(new Date(`${booking.date}T12:00:00Z`))
-    for (const text of [booking.service_name, booking.vehicle_size, date, '9:00 AM', 'Toyota Camry', '90 min', '$89.99', 'pending', `Confirmation #${appointment.id}`]) {
-      await expect(confirmation.getByText(text, { exact: true })).toBeVisible()
-    }
-    await expect(confirmation.getByText('Thanks, Alex Driver!', { exact: false })).toBeVisible()
-    expect(appointment.starts_at).toBe(booking.starts_at)
-    expect(appointment.customer_email).toBe(customer.Email)
-    expect(appointment.customer_first_name).toBe(customer['First Name'])
-    expect(appointment.customer_last_name).toBe(customer['Last Name'])
-    expect(appointment).not.toHaveProperty('customer_name')
-    const payload = response.request().postDataJSON()
-    expect(payload.customer_first_name).toBe(customer['First Name'])
-    expect(payload.customer_last_name).toBe(customer['Last Name'])
-    expect(payload).not.toHaveProperty('customer_name')
-    await page.getByRole('button', { name: 'Book Another Detail', exact: true }).click()
-    await expect(page).toHaveURL(/\/services$/)
-    await expect(page.getByRole('heading', { name: 'Magnum Detailing Services', exact: true })).toBeVisible()
   })
-})
+}
 
 test('a competing booking refreshes slots and preserves the customer form', async ({ page, request, booking }) => {
   await prepareBooking(page, booking)
@@ -155,6 +151,8 @@ test('a competing booking refreshes slots and preserves the customer form', asyn
 
 test('validated fields preserve blur validation, label associations and phone formatting', async ({ page, booking }) => {
   await openBooking(page, booking)
+  await expect(page.getByRole('button', { name: '9:00 AM', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Book Appointment', exact: true })).toBeDisabled()
   const fields = [
     { label: 'First Name', id: 'first-name', type: 'text', invalid: '123', corrected: '  Alex  ', expected: 'Alex', message: 'Please enter a valid first name' },
     { label: 'Last Name', id: 'last-name', type: 'text', invalid: '456', corrected: '  Driver  ', expected: 'Driver', message: 'Please enter a valid last name' },
@@ -284,48 +282,3 @@ test.describe('Denver calendar date', () => {
     await expect(page.getByLabel('Choose a Date')).toHaveAttribute('min', booking.date)
   })
 })
-
-for (const scenario of [
-  { name: 'HTTP error', status: 503, body: { error: 'Unavailable' } },
-  { name: 'invalid JSON', status: 200, body: 'not JSON' },
-  { name: 'network failure', status: 0, body: null },
-  { name: 'unexpected object', status: 200, body: { services: [] } },
-  { name: 'malformed nested prices', status: 200, body: [{ id: 1, name: 'Detail', description: '', prices: [null] }] },
-]) {
-  test(`catalog ${scenario.name} displays a meaningful error`, async ({ page }) => {
-    const errors: string[] = []
-    page.on('pageerror', (error) => errors.push(error.message))
-    const pending = gate()
-    const release = gate()
-    await page.route('**/api/services', async (route) => {
-      pending.release()
-      await release.promise
-      if (scenario.status === 0) await route.abort('failed')
-      else if (typeof scenario.body === 'string') await route.fulfill({ status: scenario.status, body: scenario.body })
-      else await route.fulfill({ status: scenario.status, json: scenario.body })
-    })
-    await page.goto('/contact?service=1&size=1')
-    await pending.promise
-    await expect(page.getByRole('status')).toHaveText('Loading detailing services...')
-    await expect(page.getByText('No Detail Selected', { exact: true })).toHaveCount(0)
-    release.release()
-    await expect(page.getByRole('alert')).toContainText('Please reload the page to try again.')
-    await expect(page.getByText('No Detail Selected', { exact: true })).toHaveCount(0)
-    expect(errors).toEqual([])
-  })
-}
-
-
-for (const field of [
-  { label: 'First Name', errorLabel: 'First name' },
-  { label: 'Last Name', errorLabel: 'Last name' },
-]) {
-  test(`backend rejects oversized ${field.label} with a readable field error`, async ({ page, booking }) => {
-    await prepareBooking(page, booking)
-    const value = 'A'.repeat(101)
-    await page.getByLabel(field.label, { exact: true }).fill(value)
-    await page.getByRole('button', { name: 'Book Appointment', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText(`${field.errorLabel}: should be at most 100 character(s)`)
-    await expect(page.getByLabel(field.label, { exact: true })).toHaveValue(value)
-  })
-}

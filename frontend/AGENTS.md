@@ -63,11 +63,12 @@ Run frontend verification commands from `frontend/`.
 
 After frontend code changes, run:
 
-1. `npm run lint`
-2. `npm run build`
-3. `npm run test:e2e`
+1. `npm run test:component`
+2. `npm run lint`
+3. `npm run build`
+4. `npm run test:e2e`
 
-Focused checks may be used while developing, but all three should pass before
+Focused checks may be used while developing, but all four should pass before
 reporting significant frontend work as complete.
 
 Do not report success unless the requested checks were actually run.
