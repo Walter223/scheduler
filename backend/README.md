@@ -195,6 +195,13 @@ and appointment rows/IDs/data/timestamps are untouched. Allow time for constrain
 validation/index building on a large table. Rollback to global scheduling fails
 safely if cross-shop overlaps now exist; review data rather than deleting bookings.
 
-Authentication, memberships, users, employees, frontend shop selection, and admin
+HTTP authentication, memberships, employees, frontend shop selection, and admin
 authorization remain out of scope. `/api/admin/appointments` is still development
 only and unauthenticated; shop filtering is not a replacement for access control.
+
+## Account identity and session primitives
+
+See [ACCOUNTS.md](ACCOUNTS.md) for the internal Accounts context, verified-identity
+boundary, pending-user lifecycle, hashed revocable sessions and timeout policy.
+These primitives add no login/session routes or application authorization and
+work without Keycloak. Provider-token storage and OIDC integration are deferred.

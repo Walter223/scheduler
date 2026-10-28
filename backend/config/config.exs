@@ -11,6 +11,10 @@ config :scheduler_api,
   ecto_repos: [SchedulerApi.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :scheduler_api, SchedulerApi.Accounts,
+  idle_timeout_seconds: 30 * 60,
+  absolute_lifetime_seconds: 8 * 60 * 60
+
 # Configure the endpoint
 config :scheduler_api, SchedulerApiWeb.Endpoint,
   url: [host: "localhost"],
