@@ -263,3 +263,42 @@ zero automatic grants; concurrency fixtures use independent connections and clea
 only their own rows. Rolling the migration back after real use removes RBAC
 history, so production rollback needs review/export even though operational tables
 are untouched.
+
+## Authorization decisions (RBAC Milestone 2A)
+
+`Authorization.authorize(user, action, resource)` returns `:ok` or
+`{:error, :forbidden}`. Supported resources are persisted `Business`, `Shop`,
+and `Appointment` references; their IDs are re-resolved, never their supplied
+ownership/status fields. Unknown actions/targets and missing rows fail closed.
+Caller identity must come from existing session authentication, not request IDs.
+This context does not replace session validity, CSRF or tenant-specific context
+validation, and it does not protect existing admin endpoints automatically.
+
+`Authorization.permissions(role)` lists fixed policy names, not effective access.
+Business Owners have the explicit business/HR/finance and shop-operation actions;
+Business Managers have business-wide employment, compensation, payroll and finance
+actions, but no access-management or shop operations. Shop Managers have shop
+appointment, schedule, assignment, customer and operational actions only at their
+assigned shops. Employee own/assigned actions and Shop Manager employee-specific
+contact/compensation visibility are declared but always denied until employment
+and job-record ownership resolvers exist. Broad compensation actions never grant
+Shop Managers employee pay access. No permission enables payroll record storage,
+role-management APIs or platform administration in this milestone.
+
+`Authorization.authorized_shop_ids_query(user, action)` selects `%{id: shop_id}`
+for supported shop actions. Compose it as a subquery into protected reads before
+pagination; unknown/deferred actions produce an empty query. Grants, account
+status/verified email, membership, business and shop status are evaluated when
+SQL executes. One joined grant provides BOTH the action and matching scope;
+no flattened roles/scopes, cookies, claims or cached allowlists are used.
+Business-wide operations require a Business target; shop operations require a
+Shop or supported record target. Appointment targets accept only appointment
+read/manage actions; new resource types need explicit persisted resolvers.
+
+These are current-statement decisions, not durable capabilities. Do not cache
+materialized IDs or reuse an earlier `:ok` for a later write. Future sensitive
+mutations must coordinate authoritative authorization/revocation checks with their
+transaction/lock strategy. Field-level HR projections, protected controllers,
+audited role changes and first-owner provisioning remain later milestones.
+
+Focused checks: `mix test test/scheduler_api/authorization_test.exs`.
