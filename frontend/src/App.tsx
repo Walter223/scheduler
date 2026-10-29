@@ -11,7 +11,7 @@ import HomePage from './pages/HomePage'
 import ServicesPage from './pages/ServicesPage'
 import NavBar from './components/NavBar'
 import BookingPage from './pages/BookingPage'
-import SessionControls from './components/SessionControls'
+import AdminPage from './pages/AdminPage'
 
 const App = () => {
   const location = useLocation()
@@ -32,8 +32,8 @@ const App = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/contact" element={<BookingPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
-      <SessionControls />
     </>
   )
 }

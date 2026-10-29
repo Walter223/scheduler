@@ -11,7 +11,8 @@ async function login(page: Page, kind: string) {
   const user = users.find((entry) => entry.kind === kind)!
   await page.goto('/')
   await expect(page.getByRole('link', { name: 'Staff sign in' })).toHaveCount(0)
-  await page.goto('/auth/login')
+  await page.goto('/admin')
+  await page.getByRole('link', { name: 'Staff sign in' }).click()
   // A real Keycloak form, real authorization code and real signed ID token.
   await page.getByRole('textbox', { name: /email|username/i }).fill(user.username)
   await page.getByLabel('Password', { exact: true }).fill(user.password)

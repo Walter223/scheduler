@@ -85,7 +85,7 @@ defmodule SchedulerApiWeb.Endpoint do
       if conn.path_info == ["auth", "callback"] and is_binary(origin) do
         conn
         |> SchedulerApiWeb.BrowserSession.clear_binding()
-        |> Plug.Conn.put_resp_header("location", origin <> "/?auth_error=login_failed")
+        |> Plug.Conn.put_resp_header("location", origin <> "/admin?auth_error=login_failed")
         |> Plug.Conn.send_resp(302, "")
       else
         Plug.Conn.send_resp(

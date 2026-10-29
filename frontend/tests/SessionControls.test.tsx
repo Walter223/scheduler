@@ -4,12 +4,13 @@ import SessionControls from '../src/components/SessionControls'
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
-test('anonymous status exposes no sign-in control', async () => {
+test('signed-out admin entry provides the Phoenix login link', async () => {
   const fetcher = vi.fn(async () => Response.json({ authenticated: false, user: null, csrf_token: null }))
   vi.stubGlobal('fetch', fetcher)
   render(<SessionControls />)
-  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
-  expect(screen.queryByRole('link', { name: 'Staff sign in' })).toBeNull()
+  await screen.findByRole('link', { name: 'Staff sign in' })
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('link', { name: 'Staff sign in' }).getAttribute('href')).toBe('/auth/login')
   expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
 })
 
@@ -39,7 +40,7 @@ test('failed logout does not claim the server session was revoked', async () => 
 })
 
 test('pending denial uses a bounded message; unexpected provider text is never reflected', async () => {
-  window.history.replaceState({}, '', '/?auth_error=account_unavailable&error_description=untrusted')
+  window.history.replaceState({}, '', '/admin?auth_error=account_unavailable&error_description=untrusted')
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ authenticated: false })))
   render(<SessionControls />)
   await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Contact your administrator'))
@@ -49,5 +50,5 @@ test('pending denial uses a bounded message; unexpected provider text is never r
 test('invalid session responses show a safe error without affecting booking', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ authenticated: true, user: null })))
   render(<SessionControls />)
-  expect((await screen.findByRole('status')).textContent).toContain('Booking is still available')
+  await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Account status is temporarily unavailable'))
 })

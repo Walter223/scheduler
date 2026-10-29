@@ -27,7 +27,7 @@ defmodule SchedulerApi.Authentication.LoginTransactionTest do
     refute Map.has_key?(Map.from_struct(t), :state)
     refute Map.has_key?(Map.from_struct(t), :browser_binding)
     assert DateTime.diff(t.expires_at, @now) == 600
-    assert t.return_path == "/"
+    assert t.return_path == "/admin"
   end
 
   test "consumption clears both persisted secrets and rejects all replay" do
@@ -66,8 +66,11 @@ defmodule SchedulerApi.Authentication.LoginTransactionTest do
     assert {:ok, _} = consume(attempt, @now)
   end
 
-  test "only root return destination is approved" do
+  test "only admin return destination is approved" do
     for path <- [
+          "/",
+          "/admin/",
+          "/admin?next=https://evil.invalid",
           "https://evil.invalid",
           "//evil.invalid",
           "/\\evil",
@@ -83,6 +86,18 @@ defmodule SchedulerApi.Authentication.LoginTransactionTest do
 
     assert {:error, :invalid_options} =
              Authentication.create_login_transaction(config(), now: "invalid")
+  end
+
+  test "database rejects a return destination outside the fixed admin allowlist" do
+    {:ok, attempt} = Authentication.create_login_transaction(config(), now: @now)
+
+    changeset =
+      attempt.transaction
+      |> Ecto.Changeset.change(return_path: "/")
+      |> Ecto.Changeset.check_constraint(:return_path, name: :login_transaction_return_path)
+
+    assert {:error, invalid} = Repo.update(changeset)
+    assert Keyword.has_key?(invalid.errors, :return_path)
   end
 
   test "cleanup deletes only expired transactions" do

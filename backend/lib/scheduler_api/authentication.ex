@@ -15,7 +15,7 @@ defmodule SchedulerApi.Authentication do
 
   def create_login_transaction(%Config{} = config, opts \\ []) do
     with {:ok, now} <- now(opts),
-         "/" <- Keyword.get(opts, :return_path, "/") do
+         "/admin" <- Keyword.get(opts, :return_path, "/admin") do
       [state, binding, nonce, verifier] = Enum.map(1..4, fn _ -> Credential.generate() end)
       {:ok, state_hash} = Credential.hash(Credential.reveal(state))
       {:ok, binding_hash} = Credential.hash(Credential.reveal(binding))
@@ -28,7 +28,7 @@ defmodule SchedulerApi.Authentication do
         browser_binding_hash: binding_hash,
         nonce: Credential.reveal(nonce),
         pkce_verifier: Credential.reveal(verifier),
-        return_path: "/",
+        return_path: "/admin",
         expires_at: DateTime.add(now, @lifetime_seconds),
         inserted_at: now,
         updated_at: now
@@ -54,7 +54,7 @@ defmodule SchedulerApi.Authentication do
             from t in LoginTransaction,
               where:
                 t.state_hash == ^state_hash and t.browser_binding_hash == ^binding_hash and
-                  is_nil(t.consumed_at) and t.expires_at > ^now,
+                  is_nil(t.consumed_at) and t.expires_at > ^now and t.return_path == "/admin",
               lock: "FOR UPDATE"
           )
 

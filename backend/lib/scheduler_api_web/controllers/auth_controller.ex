@@ -30,7 +30,7 @@ defmodule SchedulerApiWeb.AuthController do
       {:ok, {_session, credential}} ->
         conn
         |> BrowserSession.put_session(SessionCredential.reveal(credential))
-        |> redirect(external: BrowserConfig.current().origin <> "/")
+        |> redirect(external: BrowserConfig.current().origin <> "/admin")
 
       {:error, :ineligible_account} ->
         failure(conn, "account_unavailable")
@@ -83,7 +83,7 @@ defmodule SchedulerApiWeb.AuthController do
 
     case BrowserConfig.current().origin do
       origin when is_binary(origin) ->
-        redirect(conn, external: origin <> "/?auth_error=" <> reason)
+        redirect(conn, external: origin <> "/admin?auth_error=" <> reason)
 
       _ ->
         conn |> put_status(503) |> json(%{error: "authentication_unavailable"})

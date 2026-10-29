@@ -65,7 +65,7 @@ providers advertising only plain PKCE are rejected.
 PostgreSQL stores only SHA-256 of serialized state and binding. Nonce and verifier
 are bounded server-side fields until consumption. Issuer, client, and exact
 callback are snapshotted; changed configuration invalidates protocol use. The
-only approved return path is `/`; all other values are rejected.
+only approved return path is `/admin`; all other values are rejected.
 
 `consume_login_transaction(state, binding, now: utc_datetime)` hashes bounded,
 canonical presented values and locks the matching unconsumed/unexpired row.
@@ -116,7 +116,7 @@ Do not attach telemetry/log handlers that dump raw provider error bodies/claims.
 
 ## Browser routes and cookies
 
-- `GET /auth/login`: fixed return `/`, `openid profile email`, no offline access
+- `GET /auth/login`: fixed return `/admin`, `openid profile email`, no offline access
   or forced fresh SSO login. Creates a new independent binding each time.
 - `GET /auth/callback`: consumes state + binding **before** code exchange. Denial
   consumes the matching transaction too. Synchronizes immutable issuer/subject,
@@ -192,7 +192,7 @@ production use. No memberships, invitations, God Mode or MFA flows were added.
 
 ## Logging, errors and retention
 
-Auth responses are no-store with no-referrer; callbacks redirect to `/` or a
+Auth responses are no-store with no-referrer; callbacks redirect to `/admin` or a
 bounded `auth_error` code without callback parameters. No external assets are
 served on callback responses. Phoenix parameter filters include code/state/nonce,
 verifier/token/secret/cookie/authorization. Router parameter logging and Dashboard
@@ -231,3 +231,17 @@ until the invitation/activation policy is implemented.
 Next: authorization/invitation design plus a separate remote-revocation/MFA
 hardening milestone before production staff/customer-data access. Do not treat
 this browser boundary as permission to expose the current admin API.
+
+## Hidden account entry
+
+`/admin` is a minimal frontend account-entry page (loading, signed out, login
+error/retry, signed in and local logout). It has no public navigation link and
+fetches only `/api/me`, never privileged admin data. Public pages do not mount
+account controls or read auth error codes. Phoenix retains `/auth/login` and
+`/auth/callback`; success and bounded failures return only to `/admin`. Caller
+return parameters are ignored; context and DB allow only `/admin`. The additive
+return-path migration maps existing fixed `/` metadata to `/admin` without
+changing credentials, expiry or consumption. Apply migrations before deployment.
+Production must serve the frontend for direct `/admin` loads while proxying
+`/auth/*` and `/api/*` to Phoenix. No Keycloak callback URI changes are needed.
+This page proves identity only and grants no business/shop permission.

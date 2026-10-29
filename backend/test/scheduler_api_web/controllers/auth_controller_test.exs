@@ -83,7 +83,12 @@ defmodule SchedulerApiWeb.AuthControllerTest do
   end
 
   defp start_login(c, changes \\ %{}, status \\ 200) do
-    conn = get(build_conn(), "/auth/login")
+    conn =
+      get(build_conn(), "/auth/login", %{
+        return_to: "https://evil.invalid",
+        return_path: "/contact"
+      })
+
     params = conn |> redirected_to() |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
     {:ok, hash} = Credential.hash(params["state"])
     login = Repo.get_by!(LoginTransaction, state_hash: hash)
@@ -127,7 +132,7 @@ defmodule SchedulerApiWeb.AuthControllerTest do
     refute Map.has_key?(binding, :domain)
     refute binding.value == params["state"]
     refute Map.has_key?(conn.resp_cookies, BrowserSession.session_name())
-    assert login.return_path == "/"
+    assert login.return_path == "/admin"
     assert get_resp_header(conn, "cache-control") == ["no-store"]
   end
 
@@ -139,7 +144,7 @@ defmodule SchedulerApiWeb.AuthControllerTest do
     binding = conn.resp_cookies[BrowserSession.binding_name()].value
     conn = conn |> recycle() |> put_req_cookie(BrowserSession.session_name(), previous_token)
     response = get(conn, "/auth/callback", Map.put(params, "code", "synthetic-code"))
-    assert redirected_to(response) == "http://localhost:5173/"
+    assert redirected_to(response) == "http://localhost:5173/admin"
     cookie = response.resp_cookies[BrowserSession.session_name()]
     assert cookie.http_only and cookie.path == "/" and cookie.same_site == "Lax"
     refute Map.has_key?(cookie, :max_age)
@@ -159,7 +164,7 @@ defmodule SchedulerApiWeb.AuthControllerTest do
   test "unknown identity remains pending and receives no session", c do
     {conn, params, _} = start_login(c)
     response = callback(conn, params)
-    assert redirected_to(response) == "http://localhost:5173/?auth_error=account_unavailable"
+    assert redirected_to(response) == "http://localhost:5173/admin?auth_error=account_unavailable"
     assert Repo.one!(User).status == :pending
     assert Repo.aggregate(WebSession, :count) == 0
     refute Map.has_key?(response.resp_cookies, BrowserSession.session_name())
@@ -364,13 +369,13 @@ defmodule SchedulerApiWeb.AuthControllerTest do
       |> Map.put(:host, "evil.invalid")
       |> get("/auth/callback", Map.put(params, "error", "denied"))
 
-    assert redirected_to(response) == "http://localhost:5173/?auth_error=login_failed"
+    assert redirected_to(response) == "http://localhost:5173/admin?auth_error=login_failed"
     assert get_resp_header(response, "access-control-allow-origin") == []
   end
 
   test "malformed callback queries clear binding and redirect without debugger or secrets" do
     response = get(build_conn(), "/auth/callback?state=%FF&code=synthetic-sensitive-code")
-    assert redirected_to(response) == "http://localhost:5173/?auth_error=login_failed"
+    assert redirected_to(response) == "http://localhost:5173/admin?auth_error=login_failed"
     assert response.resp_cookies[BrowserSession.binding_name()].max_age == 0
     refute response.resp_body =~ "synthetic-sensitive-code"
     assert get_resp_header(response, "cache-control") == ["no-store"]

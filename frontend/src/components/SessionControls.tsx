@@ -16,9 +16,11 @@ const errors: Record<string, string> = {
 
 function SessionControls() {
   const [session, setSession] = useState<Session>(anonymous)
+  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(() =>
-    errors[new URLSearchParams(window.location.search).get('auth_error') ?? ''] ?? '')
+    Object.hasOwn(errors, new URLSearchParams(window.location.search).get('auth_error') ?? '')
+      ? errors[new URLSearchParams(window.location.search).get('auth_error')!] : '')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -36,8 +38,9 @@ function SessionControls() {
         else throw new Error('invalid session')
       })
       .catch(() => {
-        if (!controller.signal.aborted) setMessage('Account status is unavailable. Booking is still available.')
+        if (!controller.signal.aborted) setMessage('Account status is temporarily unavailable. Please try signing in again.')
       })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [])
 
@@ -60,11 +63,11 @@ function SessionControls() {
 
   return (
     <section className="session-controls" aria-label="Account">
-      {session.authenticated && session.user && <>
+      {loading ? <p role="status">Checking account status...</p> : session.authenticated && session.user ? <>
         <span>Signed in as {session.user.first_name || session.user.email}</span>
         <Button variant="confirmation" onClick={logout} disabled={busy}>Sign out</Button>
-      </>}
-      {message && <p role="status">{message}</p>}
+      </> : <a className="secondary-button" href="/auth/login">{message ? 'Try signing in again' : 'Staff sign in'}</a>}
+      {!loading && message && <p role="status">{message}</p>}
     </section>
   )
 }
