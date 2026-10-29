@@ -302,3 +302,61 @@ transaction/lock strategy. Field-level HR projections, protected controllers,
 audited role changes and first-owner provisioning remain later milestones.
 
 Focused checks: `mix test test/scheduler_api/authorization_test.exs`.
+
+## Audited customer access changes (Milestone 2B-1)
+
+Internal entry points in `Authorization.RoleManagement`:
+
+- `grant_role(actor_credential, business, membership, role, shop \\ nil)`
+- `revoke_role(actor_credential, business, assignment)`
+- `revoke_membership(actor_credential, business, membership)`
+- `reactivate_membership(actor_credential, business, membership)`
+
+Actor credentials are existing inspect-redacted `Accounts.SessionCredential`
+values, not user structs, user IDs or claims. A live session and eligible same-business
+Owner assignment are verified inside every transaction using Authorization.
+Targets are persisted schema references: membership identity and assignment scope
+must match persisted values. Grant targets must be active, verified accounts with
+active membership; shop grants require an active shop in the business. No operation
+creates a membership, activates a user, bootstraps ownership or grants platform access.
+
+All four operations lock the business row, then its member users (in ID order),
+memberships and grants. Session rows are locked after account eligibility rows.
+This serializes cooperating access changes and blocks account-status/grant changes
+while authorization and the last-eligible-Owner check run. A last Owner cannot lose
+their Owner grant or membership through these operations. Concurrent duplicate
+grants return `:duplicate_grant`; repeated revocations/reactivations return existing
+metadata with a `noop` event. Reactivation never restores revoked grants.
+
+`authorization_audit_events` records only validated actor/target IDs, business,
+membership/assignment, fixed role/shop, action, outcome, bounded reason and UTC time.
+Membership revocation records its parent action and each cascaded grant revocation.
+Foreign keys restrict history loss by cascading deletion. There is no public audit
+mutation API, arbitrary payload or credential/profile field. Deployment database
+privileges/retention must separately prevent unauthorized direct audit alterations.
+
+Successful mutations and audit events commit together. Expected policy/input
+rejections commit ONLY a denied event, returning `{:error, reason}`; never raise or
+rollback merely to report those expected denials. Unexpected SQL/persistence errors
+roll back the whole operation and return `{:error, :persistence_failed}`. An audit
+outage therefore commits neither a grant change nor an unreliable success record;
+a rejected attempt cannot be durably recorded while its audit storage is unavailable.
+Outer caller transactions control final durability too: rolling back the caller
+also removes its access mutation and audit events. Do not claim committed success
+until the outermost transaction commits.
+
+These are the required application-level management entry points. Older
+`Organizations.Memberships` helpers and raw Repo writes remain trusted persistence
+mechanics, not authorized/audited management workflows. No database can prevent its
+privileged operator bypassing application policy. Global account suspension/recovery,
+first-Owner provisioning, audited membership creation and protected HTTP APIs remain
+separate workflows; do not route them through an unaudited production bypass.
+God Mode remains separate and unimplemented.
+
+Focused checks: `mix test test/scheduler_api/role_management_test.exs
+test/scheduler_api/role_management_concurrency_test.exs` (one command). Tests use
+isolated fixtures, direct audit-failure injection and independent-connection races;
+no actual development identities receive access changes. The new audit migration
+creates an empty table and does not rewrite existing records. Apply it before using
+these operations; rollback drops audit history and requires an explicit retention
+review once production events exist.
