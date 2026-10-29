@@ -9,6 +9,25 @@ Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
 Ready to run in production? Please [check our deployment guides](https://phoenix.hexdocs.pm/deployment.html).
 
+## Development verification
+
+Run these scripts from any working directory (examples below are from the repository root):
+
+- `./scripts/check-fast.sh`: formatting check, frontend lint and component tests; no browsers, servers or database setup.
+- `./scripts/check-full.sh`: backend `mix precommit`, then frontend component tests, lint, build and anonymous Playwright, once each. Requires PostgreSQL, installed dependencies/Playwright Chromium, and free ports **4002/5174**. It refuses occupied ports and never stops services. Existing test aliases create/migrate only the test databases; Playwright owns and cleans its isolated fixtures. Do not run concurrently with other test runs sharing those databases.
+- `./scripts/dev-smoke.sh`: read-only GETs of `/api/services` on **4000/5173**, validating and comparing backend/proxied catalogs. Start your normal dev services separately; this script never starts/stops anything.
+
+Put the pinned runtimes (`mise`) and npm/Mix on PATH first. The full script forces
+backend test mode and disables optional OIDC for anonymous checks. `mix precommit`
+already compiles, formats and tests, and may remove unused lockfile entries; no
+extra backend checks or dependency installation are added. Review resulting diffs.
+The fast script is a feedback loop, not a replacement for full regression.
+
+Real-Keycloak verification remains separate: from `frontend/`, run
+`npm run test:auth` with **4000/5173 free**, Docker available, and the local auth
+prerequisites in [AUTHENTICATION.md](AUTHENTICATION.md) satisfied. It uses isolated
+test identities/data; do not stop user-owned servers or reset Keycloak to run it.
+
 ## Learn more
 
 * Official website: https://www.phoenixframework.org/
