@@ -224,3 +224,42 @@ See [ACCOUNTS.md](ACCOUNTS.md) for the internal Accounts context, verified-ident
 boundary, pending-user lifecycle, hashed revocable sessions and timeout policy.
 These primitives add no login/session routes or application authorization and
 work without Keycloak. Provider-token storage and OIDC integration are deferred.
+
+## Membership and role persistence (RBAC Milestone 1)
+
+`business_memberships` uniquely links a user/business with active/revoked lifecycle.
+`role_assignments` stores one fixed role and complete scope: `business_owner` and
+`business_manager` require NULL shop; `shop_manager` and `employee` require one
+business-owned shop. Separate partial unique indexes prevent duplicate active
+business and shop grants, including NULL scope. Composite foreign keys enforce
+membership/business/shop consistency; all references use restrictive deletion.
+
+No seeds, login paths or migrations grant membership/roles. New tables are empty.
+The internal `Organizations.Memberships.revoke/2` and `reactivate/2` primitives
+are persistence helpers, not authorized management APIs. Database triggers lock
+membership rows for active grants and atomically revoke active assignments when
+membership is revoked, including direct SQL revocation. Reactivation restores
+membership only; revoked grants are immutable history, and any future regrant must
+create a new row. Membership user/business and grant identity/scope are immutable.
+Revocation records retain a timestamp, bounded reason and optional actor reference;
+production audited workflows and last-owner protection are Milestone 2 work.
+
+This adds no permission evaluator or protected API. Future checks MUST require
+an eligible account, active membership, active business/shop and a single complete
+active assignment that supplies both permission and matching scope. Never combine
+roles/scopes across assignments. An archived tenant or a pending/suspended account
+has no authorization merely because a grant exists. Employment relationships and
+field-level personal-data permissions remain separate, unimplemented features.
+
+God Mode is reserved for future separately controlled platform authorization with
+strong MFA/step-up, audit and cross-tenant safeguards. It is not a customer role,
+wildcard, seed or implicit access path. Existing admin APIs remain development-only.
+
+Focused verification: `mix test test/scheduler_api/membership_persistence_test.exs
+test/scheduler_api/membership_concurrency_test.exs
+test/scheduler_api/membership_migration_test.exs` (one command). The migration test
+runs up/down in a sandbox-owned schema and verifies existing row preservation and
+zero automatic grants; concurrency fixtures use independent connections and clean
+only their own rows. Rolling the migration back after real use removes RBAC
+history, so production rollback needs review/export even though operational tables
+are untouched.
