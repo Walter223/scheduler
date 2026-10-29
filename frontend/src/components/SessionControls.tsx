@@ -60,10 +60,10 @@ function SessionControls() {
 
   return (
     <section className="session-controls" aria-label="Account">
-      {session.authenticated && session.user ? <>
+      {session.authenticated && session.user && <>
         <span>Signed in as {session.user.first_name || session.user.email}</span>
         <Button variant="confirmation" onClick={logout} disabled={busy}>Sign out</Button>
-      </> : <a className="secondary-button" href="/auth/login">Staff sign in</a>}
+      </>}
       {message && <p role="status">{message}</p>}
     </section>
   )

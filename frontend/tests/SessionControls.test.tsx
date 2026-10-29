@@ -4,12 +4,12 @@ import SessionControls from '../src/components/SessionControls'
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
-test('anonymous status preserves the native server login link', async () => {
+test('anonymous status exposes no sign-in control', async () => {
   const fetcher = vi.fn(async () => Response.json({ authenticated: false, user: null, csrf_token: null }))
   vi.stubGlobal('fetch', fetcher)
   render(<SessionControls />)
   await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
-  expect(screen.getByRole('link', { name: 'Staff sign in' }).getAttribute('href')).toBe('/auth/login')
+  expect(screen.queryByRole('link', { name: 'Staff sign in' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
 })
 
@@ -20,7 +20,7 @@ test('authenticated logout sends the masked CSRF token and clears local profile'
   vi.stubGlobal('fetch', fetcher)
   render(<SessionControls />)
   fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
-  await screen.findByRole('link', { name: 'Staff sign in' })
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull())
   expect(fetcher).toHaveBeenLastCalledWith('/auth/logout', {
     method: 'POST', headers: { 'x-csrf-token': 'synthetic-masked-csrf' },
   })

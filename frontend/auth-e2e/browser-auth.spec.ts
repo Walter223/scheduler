@@ -10,7 +10,8 @@ const { users } = JSON.parse(readFileSync(path, 'utf8')) as { users: Fixture[] }
 async function login(page: Page, kind: string) {
   const user = users.find((entry) => entry.kind === kind)!
   await page.goto('/')
-  await page.getByRole('link', { name: 'Staff sign in' }).click()
+  await expect(page.getByRole('link', { name: 'Staff sign in' })).toHaveCount(0)
+  await page.goto('/auth/login')
   // A real Keycloak form, real authorization code and real signed ID token.
   await page.getByRole('textbox', { name: /email|username/i }).fill(user.username)
   await page.getByLabel('Password', { exact: true }).fill(user.password)
@@ -33,7 +34,7 @@ test('active verified staff can log in, receive session-bound CSRF, and log out 
   })
   expect(metadata).toEqual({ authenticated: true, hasCSRF: true, noStore: 'no-store', missingCSRFStatus: 403 })
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
-  await expect(page.getByRole('link', { name: 'Staff sign in' })).toBeVisible()
+  await expect(page.getByRole('status')).toContainText('Signed out of Magnum')
   expect((await context.cookies('http://localhost:5173')).some((cookie) => cookie.name === 'magnum_session_dev')).toBe(false)
   const status = await page.evaluate(async () => (await fetch('/api/me')).json())
   expect(status).toEqual({ authenticated: false, user: null, csrf_token: null })

@@ -1,105 +1,54 @@
+
 # Frontend Guidelines
 
-React + TypeScript + Vite frontend for Magnum Detailing.
+Root instructions apply. Run npm commands from `frontend/`.
 
-## Architecture
+## Architecture and conventions
 
-- Pages belong under `src/pages/`.
-- Reusable UI belongs under `src/components/`.
-- Shared TypeScript types belong under `src/types/`.
-- Pure reusable helpers belong under `src/utils/`.
-- Preserve the existing neon/synthwave design unless a task explicitly changes it.
-- Phoenix remains authoritative for pricing, duration, availability, and appointment creation.
-- Do not duplicate backend business rules in React.
+- `src/pages/`: route pages; `src/components/`: reusable UI; `src/types/`: shared types; `src/utils/`: pure helpers; `src/assets/`: imported assets.
+- `App.tsx` owns routing and the application shell; `main.tsx` is the entry point. Preserve established routes unless explicitly changing routing.
+- Use two-space indentation, single quotes, no semicolons, PascalCase components/types, camelCase functions/variables and `import type` for type-only imports.
+- Reuse components, utilities and styles when beneficial. Keep feature-specific logic near its owner; avoid abstractions that add complexity without value.
+- Preserve Magnum's established neon/synthwave design, responsive layouts and interactive states. Do not introduce new styling frameworks or CSS-in-JS without a demonstrated need.
+- Use semantic HTML, accessible controls, labels, keyboard behavior and stable accessible selectors. Preserve native disabled behavior and validation relationships.
 
-## Working Rules
+## Application boundaries
 
-- Prefer small, focused changes.
-- Do not modify unrelated files.
-- Preserve existing behavior unless the task explicitly requests a behavior change.
-- Reuse existing components, types, and utilities rather than duplicating them.
-- Inspect existing implementation and dependencies before editing.
-- Do not add dependencies unless necessary.
+- Use same-origin relative `/api` requests. Phoenix is authoritative for service prices, durations, availability, booking rules and ownership.
+- Keep anonymous service browsing and booking functional independently of staff authentication.
+- Keep staff account controls and authentication errors out of public booking pages. Staff entry belongs to the `/admin` experience; `/auth/*` remains handled by Phoenix.
+- Never expose Keycloak provider tokens, client secrets or authorization logic in React. Backend authentication does not imply admin authorization.
+- Preserve loading, empty, error, retry and success states without introducing unrelated visual changes.
 
-## Refactoring Rules
+## Verification
 
-For refactor-only tasks:
+During development, run focused checks appropriate to the change.
 
-- Preserve runtime behavior.
-- Do not change API contracts, routes, validation rules, accessibility behavior,
-  timezone behavior, CSS class names, or styling unless explicitly requested.
-- Prefer moving working code verbatim before simplifying or redesigning it.
-- Make the smallest change necessary for the requested refactor.
-- Do not combine architectural cleanup with unrelated behavior changes.
-- Keep domain-specific logic near its feature unless there is clear reuse.
+At checkpoints:
+- Component/UI logic: `npm run test:component`, `npm run lint`, `npm run build`.
+- Public booking/browser behavior: `npm run test:e2e`.
+- Browser authentication: `npm run test:auth`, following the documented isolated runner requirements.
+- Major frontend integrations: run all relevant suites once after the implementation stabilizes.
 
-## TypeScript / React Style
+Do not repeat unchanged, successful checks. If a fix changes behavior, rerun affected checks.
 
-- Use two-space indentation.
-- Use single quotes.
-- Omit semicolons.
-- Use PascalCase for components and types.
-- Use camelCase for functions and variables.
-- Prefer `import type` for type-only imports.
-- Prefer accessible selectors, labels, roles, and semantic HTML.
-- Preserve existing React Router URLs unless explicitly changing routing.
+For auth-related tasks, consult `../backend/AUTHENTICATION.md`. Real-provider verification cannot be replaced by mocked tests when the milestone requires live Keycloak behavior.
 
-## UI and Styling
+## Test isolation
 
-- Prefer reusable components for repeated UI patterns such as buttons, cards,
-  form controls, panels, and navigation elements.
-- Preserve existing visual behavior when extracting reusable components.
-- Avoid duplicating CSS for visually equivalent components.
-- Prefer shared style primitives or component classes over increasingly specific
-  page-level selectors when the same pattern appears in multiple places.
-- Keep responsive behavior intact during styling refactors.
-- Do not introduce a new styling framework or CSS-in-JS library unless explicitly requested.
-- Preserve existing neon effects, spacing, typography, hover states, focus states,
-  disabled states, and responsive behavior unless the task explicitly changes them.
+- Component tests: `tests/`; anonymous Playwright: `e2e/`; real-provider browser tests: `auth-e2e/`.
+- Browser tests use isolated test infrastructure and must not alter development appointments or user identities.
+- Confirm required ports are available before running suites that launch servers. Never terminate user-owned development servers without authorization.
+- Use accessible selectors and condition-based waits rather than brittle selectors or arbitrary sleeps.
+- Choose booking dates relative to the clock, not permanently hardcoded dates.
+- Fixtures must be repeatable, positively owned and cleaned after execution.
+- Preserve booking success, validation, concurrency/conflict and confirmation coverage.
+- Never weaken production security, business rules or assertions to make tests pass.
 
-## Frontend Verification
+## Local commands
 
-Run frontend verification commands from `frontend/`.
+- `npm ci`: install locked dependencies.
+- `npm run dev`: start Vite.
+- `npm run preview`: serve the production build.
 
-After frontend code changes, run:
-
-1. `npm run test:component`
-2. `npm run lint`
-3. `npm run build`
-4. `npm run test:e2e`
-
-Focused checks may be used while developing, but all four should pass before
-reporting significant frontend work as complete.
-
-Do not report success unless the requested checks were actually run.
-
-If a check fails:
-
-- Report the failure clearly.
-- Distinguish failures introduced by the current change from pre-existing failures.
-- Do not weaken tests, validation, accessibility, or production behavior simply
-  to make checks pass.
-
-## E2E Testing
-
-- Playwright is the permanent frontend E2E test framework.
-- Prefer accessible selectors over brittle CSS selectors.
-- Do not use arbitrary sleeps.
-- E2E tests must not consume or depend on development appointment data.
-- Use the dedicated Phoenix E2E test database and fixture cleanup.
-- Avoid hardcoded dates that will eventually become invalid.
-- Preserve customer-visible race-condition behavior and confirmation behavior.
-- Core booking-flow E2E tests should exercise the real Phoenix API rather than
-  replacing appointment creation or conflict handling with mocked responses.
-- New E2E tests must clean up any fixtures they create and remain repeatable.
-
-## Reporting
-
-After significant frontend work, report:
-
-1. Files changed
-2. Important code/types/helpers moved or added
-3. Behavioral changes, if any
-4. Lint result
-5. Build result
-6. E2E result
+Prefer existing npm scripts over duplicate tooling.
