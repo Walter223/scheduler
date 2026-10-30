@@ -134,6 +134,32 @@ Playwright starts Phoenix on **4002** and Vite on **5174**, never reusing existi
 servers. Normal development can continue on 4000/5173. Browser API requests are
 sent through Vite's same-origin `/api` proxy to the real isolated test API. Conflict tests use a second real API client, not canned 422 responses.
 
+### API contracts in the anonymous runner
+
+`npm run test:e2e` runs **19 browser tests + 4 API contract tests** once each.
+Disjoint `chromium`/`api` project matchers prevent duplicate execution; both share
+one isolated database, startup/teardown and the same **2-worker** limit.
+`check-full.sh` includes both via its existing `test:e2e` command.
+
+For API-only verification, run `npm run test:e2e -- --project=api`; for browser-only
+verification, use `--project=chromium`. `npx playwright test --list` lists project
+membership without starting servers. The API project uses Playwright's HTTP
+request fixture against Vite on 5174, exercising the real `/api` proxy without
+launching browsers or creating additional fixtures.
+
+The four contracts cover catalog shape, availability success and representative
+validation errors, private anonymous admin denial, and ownership-selector bypass
+attempts. Anonymous admin responses must be exactly the generic 401 body with
+`Cache-Control: no-store`, exposing no customer data. Availability dates are
+relative to the Denver calendar; these tests are read-only.
+
+Authenticated 403/200 and shop-scope API scenarios remain covered by focused
+ExUnit tests. The anonymous runner has no owned session/role fixtures, and the
+real-Keycloak runner grants no roles; extending those is deliberately deferred.
+`npm run test:auth` remains separate and unchanged, requires **free 4000/5173**
+ports and the prerequisites in [AUTHENTICATION.md](../backend/AUTHENTICATION.md).
+Do not stop developer servers or add grants to real accounts to run these tests.
+
 ### Isolated catalog fixtures and cleanup
 
 The backend helper refuses to run unless `MIX_ENV=test`, `MIX_TEST_PARTITION=_e2e`
@@ -146,7 +172,8 @@ allocates a distinct future Monday–Saturday date to each test, reserving its
 following-week date too. Prices/durations remain independently asserted.
 
 The default is **2 workers**; override with `npm run test:e2e -- --workers=1`
-or `--workers=4`. Six meaningful spec files run concurrently; tests within each
+or `--workers=4`. The browser and API projects share this worker pool. Six browser spec files and
+one API spec file run concurrently; tests within each
 file stay sequential (`fullyParallel: false`). Conflict tests still use real
 competing bookings within their own reserved dates. Allocation is capped at 36
 per invocation to stay inside the booking horizon; use separate invocations for

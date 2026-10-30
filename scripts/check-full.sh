@@ -24,4 +24,4 @@ PY
 # precommit includes compile --warnings-as-errors, format and mix test.
 (cd "$ROOT/backend" && MIX_ENV=test MIX_TEST_PARTITION='' MAGNUM_OIDC_ENABLED=false mix precommit)
 (cd "$ROOT/frontend" && npm run test:component && npm run lint && npm run build && MAGNUM_OIDC_ENABLED=false npm run test:e2e)
-printf 'PASS: full anonymous regression (real-Keycloak tests are separate)\n'
+printf 'PASS: full anonymous browser/API regression (real-Keycloak tests are separate)\n'

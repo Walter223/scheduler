@@ -16,7 +16,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Disjoint matching: every browser/API test runs exactly once, sharing two workers.
+  projects: [
+    { name: 'chromium', testIgnore: '**/*.api.spec.ts', use: { ...devices['Desktop Chrome'] } },
+    { name: 'api', testMatch: '**/*.api.spec.ts' },
+  ],
   webServer: [
     {
       command: 'mix ecto.create --quiet && mix ecto.migrate --quiet && mix run --no-start scripts/e2e.exs server',
