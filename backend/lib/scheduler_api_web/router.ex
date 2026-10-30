@@ -30,6 +30,16 @@ defmodule SchedulerApiWeb.Router do
     pipe_through :admin_api
 
     get "/appointments", AppointmentController, :index, log: false
+    get "/businesses/:business_id/employees", EmployeeController, :index, log: false
+    get "/businesses/:business_id/shops/:shop_id/employees", EmployeeController, :shop, log: false
+    get "/businesses/:business_id/employees/:employee_id", EmployeeController, :show, log: false
+
+    get "/businesses/:business_id/employees/:employee_id/periods", EmployeeController, :history,
+      log: false
+
+    get "/businesses/:business_id/employees/:employee_id/periods/:period_id",
+        EmployeeController,
+        :period, log: false
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

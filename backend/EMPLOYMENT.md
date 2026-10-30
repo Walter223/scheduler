@@ -147,3 +147,6 @@ permanent tenant/shop, offboarding, Owner-protection and rehire requirements,
 current test evidence, explicit gaps and future Admin UI acceptance criteria.
 Rehire and period privacy are implemented in [REHIRE.md](REHIRE.md); browser/HTTP
 acceptance remains separate.
+
+[Protected HR read APIs](HR_READ_API.md) expose bounded, session-backed admin
+directories, shop rosters, latest-period profiles and HR-only period history.

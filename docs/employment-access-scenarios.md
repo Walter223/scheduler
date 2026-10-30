@@ -75,3 +75,14 @@ Employment, login identity, classification and RBAC remain separate.
 [owner-races]: ../backend/test/scheduler_api/owner_termination_concurrency_test.exs
 
 [rehire]: ../backend/test/scheduler_api/rehire_test.exs
+
+## 4F-1 HTTP coverage update
+
+[HR read API contract](../backend/HR_READ_API.md) and
+[controller tests](../backend/test/scheduler_api_web/controllers/employee_controller_test.exs)
+now cover the same stale cookie losing terminated-business HR access while retaining
+unrelated-business HR access; distinct/same-human Owners; scoped shop rosters;
+current/former and rehire timelines; prior-period admin denial for Employees;
+stable-ID/period-ID mismatches; and scope-bound cursor isolation. These are actual
+Phoenix HTTP/session tests, not a real Keycloak browser login. Future browser/UI
+selector races and self-service HTTP surfaces remain separate acceptance gaps.
