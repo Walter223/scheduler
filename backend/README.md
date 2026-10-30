@@ -282,7 +282,7 @@ are untouched.
 
 `Authorization.authorize(user, action, resource)` returns `:ok` or
 `{:error, :forbidden}`. Supported resources are persisted `Business`, `Shop`,
-and `Appointment` references; their IDs are re-resolved, never their supplied
+`Appointment` and `EmploymentRecord` references; their IDs are re-resolved, never their supplied
 ownership/status fields. Unknown actions/targets and missing rows fail closed.
 Caller identity must come from existing session authentication, not request IDs.
 This context does not replace session validity, CSRF or tenant-specific context
@@ -293,9 +293,9 @@ Business Owners have the explicit business/HR/finance and shop-operation actions
 Business Managers have business-wide employment, compensation, payroll and finance
 actions, but no access-management or shop operations. Shop Managers have shop
 appointment, schedule, assignment, customer and operational actions only at their
-assigned shops. Employee own/assigned actions and Shop Manager employee-specific
-contact/compensation visibility are declared but always denied until employment
-and job-record ownership resolvers exist. Broad compensation actions never grant
+assigned shops. Employment own-read and assigned-contact reads now resolve active
+employment/shop assignments through [EMPLOYMENT.md](EMPLOYMENT.md). Assigned-job,
+schedule and employee-compensation resolvers remain denied. Broad compensation actions never grant
 Shop Managers employee pay access. No permission enables payroll record storage,
 role-management APIs or platform administration in this milestone.
 

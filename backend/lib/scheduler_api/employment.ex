@@ -1,14 +1,143 @@
 defmodule SchedulerApi.Employment do
   @moduledoc """
-  Internal employment persistence, NOT an HR authorization or account-linking API.
-  Callers must eventually enforce HR permissions separately. No role, membership,
-  account activation or scheduling effects. Structs are references; reload ownership.
+  Employment persistence and authorized read projections. Mutations remain trusted
+  internal persistence primitives, NOT authorized HR/account-linking APIs.
+  Read callers must authenticate actors separately; current persisted RBAC scopes
+  govern all projections. No account, grant or scheduling effects.
   """
   import Ecto.Query
-  alias SchedulerApi.Repo
+  alias SchedulerApi.{Repo, Authorization}
   alias SchedulerApi.Accounts.User
   alias SchedulerApi.Organizations.{Business, Shop}
   alias SchedulerApi.Employment.{EmploymentRecord, ShopAssignment}
+
+  @doc "Business-wide current roster/contact projection for Business Owners/Managers."
+  def list_business_roster(user, business, opts \\ [])
+
+  def list_business_roster(%User{} = user, %Business{id: id}, opts)
+      when is_integer(id) and id > 0,
+      do: roster(user, :employment_private_read, {:business, id}, opts)
+
+  def list_business_roster(_, _, _), do: {:error, :forbidden}
+
+  @doc "Current staff/contact projection at one authorized shop; no other shop memberships are exposed."
+  def list_shop_roster(user, shop, opts \\ [])
+
+  def list_shop_roster(%User{} = user, %Shop{id: id}, opts) when is_integer(id) and id > 0,
+    do: roster(user, :assigned_employee_contact_read, {:shop, id}, opts)
+
+  def list_shop_roster(_, _, _), do: {:error, :forbidden}
+
+  @doc "Only the caller's current linked employment, backed by a complete own-read grant."
+  def get_own_employment(user, business, opts \\ [])
+
+  def get_own_employment(%User{} = user, %Business{id: id}, opts)
+      when is_integer(id) and id > 0 do
+    action = :employment_own_read
+    scope = {:business, id}
+
+    with true <- Repo.exists?(read_scopes(user, action, scope)),
+         :ok <- read_options(opts, [:now]),
+         {:ok, now} <- read_clock(opts) do
+      case Repo.one(projected_records(user, action, scope, now)) do
+        nil -> {:error, :forbidden}
+        record -> {:ok, record}
+      end
+    else
+      false -> {:error, :forbidden}
+      error -> error
+    end
+  end
+
+  def get_own_employment(_, _, _), do: {:error, :forbidden}
+
+  defp roster(user, action, scope, opts) do
+    with true <- Repo.exists?(read_scopes(user, action, scope)),
+         :ok <- read_options(opts, [:now, :limit, :cursor]),
+         {:ok, now} <- read_clock(opts),
+         {:ok, limit} <- roster_limit(Keyword.get(opts, :limit, 50)),
+         {:ok, cursor} <- roster_cursor(Keyword.get(opts, :cursor)) do
+      rows =
+        projected_records(user, action, scope, now)
+        |> where([e], e.id > ^cursor)
+        |> order_by([e], asc: e.id)
+        |> limit(^(limit + 1))
+        |> Repo.all()
+
+      records = Enum.take(rows, limit)
+      has_more = length(rows) > limit
+
+      next_cursor =
+        if has_more,
+          do: Base.url_encode64(Jason.encode!([1, List.last(records).id]), padding: false)
+
+      {:ok, %{employments: records, has_more: has_more, next_cursor: next_cursor}}
+    else
+      false -> {:error, :forbidden}
+      error -> error
+    end
+  end
+
+  defp read_scopes(user, action, scope),
+    do: user |> Authorization.employment_scopes_query(action) |> filter_scope(scope)
+
+  defp filter_scope(query, {:business, id}),
+    do: from(p in subquery(query), where: p.business_id == ^id)
+
+  defp filter_scope(query, {:shop, id}), do: from(p in subquery(query), where: p.shop_id == ^id)
+
+  defp projected_records(user, action, scope, now) do
+    allowed =
+      user |> Authorization.authorized_employment_ids_query(action, now) |> filter_scope(scope)
+
+    # The supporting scope stays with its grant through the target-assignment
+    # join. DISTINCT collapses overlapping grants before LIMIT or cursor creation.
+    from e in EmploymentRecord,
+      join: p in subquery(allowed),
+      on: e.id == p.id and e.business_id == p.business_id,
+      distinct: true,
+      select: %{
+        id: e.id,
+        business_id: e.business_id,
+        first_name: e.first_name,
+        last_name: e.last_name,
+        classification: e.classification,
+        starts_on: e.starts_on,
+        phone: e.phone,
+        email: e.email,
+        home_address: e.home_address
+      }
+  end
+
+  defp read_options(opts, allowed) do
+    if is_list(opts) and Keyword.keyword?(opts) and
+         Enum.all?(Keyword.keys(opts), &(&1 in allowed)),
+       do: :ok,
+       else: {:error, :invalid_options}
+  end
+
+  defp read_clock(opts) do
+    case Keyword.get_lazy(opts, :now, &DateTime.utc_now/0) do
+      %DateTime{} = now -> {:ok, now |> DateTime.to_unix(:second) |> DateTime.from_unix!(:second)}
+      _ -> {:error, :invalid_clock}
+    end
+  end
+
+  defp roster_limit(limit) when is_integer(limit) and limit in 1..100, do: {:ok, limit}
+  defp roster_limit(_), do: {:error, :invalid_limit}
+  defp roster_cursor(nil), do: {:ok, 0}
+
+  defp roster_cursor(cursor) when is_binary(cursor) and byte_size(cursor) <= 128 do
+    with {:ok, json} <- Base.url_decode64(cursor, padding: false),
+         {:ok, [1, id]} <- Jason.decode(json),
+         true <- is_integer(id) and id > 0 and id <= 9_223_372_036_854_775_807 do
+      {:ok, id}
+    else
+      _ -> {:error, :invalid_cursor}
+    end
+  end
+
+  defp roster_cursor(_), do: {:error, :invalid_cursor}
 
   @doc "Creates independent employment; optional :user must already be eligible in this business."
   def create_employment(%Business{id: id}, attrs, opts \\ []) do

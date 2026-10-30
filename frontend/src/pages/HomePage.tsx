@@ -32,7 +32,7 @@ function HomePage() {
           </h2> */}
 
           <h2>
-            The most beautiful name in auto detailing,
+            The most beautiful name in auto detailing
             <br />
             is{' '}
             <span className="tagline-accent">

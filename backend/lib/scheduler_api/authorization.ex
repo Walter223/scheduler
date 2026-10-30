@@ -9,6 +9,7 @@ defmodule SchedulerApi.Authorization do
   alias SchedulerApi.Accounts.User
   alias SchedulerApi.Organizations.{Business, Shop, BusinessMembership, RoleAssignment}
   alias SchedulerApi.Appointments.Appointment
+  alias SchedulerApi.Employment.{EmploymentRecord, ShopAssignment}
 
   @business_actions [
     :business_manage,
@@ -29,8 +30,8 @@ defmodule SchedulerApi.Authorization do
     :shop_operations_manage,
     :shop_staff_manage
   ]
-  # Declared policy, but deliberately NOT executable until record ownership and
-  # employment/job assignment relationships exist. No broad shop fallback.
+  # Contact and own-employment reads now resolve actual employment records.
+  # Compensation, jobs and schedules remain deferred; no broad shop fallback.
   @assigned_staff [:assigned_employee_contact_read, :assigned_employee_compensation_read]
   @own_work [:jobs_assigned_read, :schedule_own_read, :employment_own_read]
   @permissions %{
@@ -79,6 +80,18 @@ defmodule SchedulerApi.Authorization do
     |> decision()
   end
 
+  def authorize(%User{} = user, action, %EmploymentRecord{id: id})
+      when is_integer(id) and
+             action in [
+               :employment_private_read,
+               :assigned_employee_contact_read,
+               :employment_own_read
+             ] do
+    from(e in subquery(authorized_employment_ids_query(user, action)), where: e.id == ^id)
+    |> Repo.exists?()
+    |> decision()
+  end
+
   def authorize(_, _, _), do: {:error, :forbidden}
 
   @doc """
@@ -98,6 +111,98 @@ defmodule SchedulerApi.Authorization do
   end
 
   def authorized_shop_ids_query(_, _), do: from(s in Shop, where: false, select: %{id: s.id})
+
+  @employment_reads [
+    :employment_private_read,
+    :assigned_employee_contact_read,
+    :employment_own_read
+  ]
+
+  @doc """
+  Complete persisted grants for employment collections. Each row retains its own
+  business/shop/user scope; callers must never flatten these into separate sets.
+  Contact scopes require an active shop; business HR scopes do not require staff.
+  """
+  def employment_scopes_query(%User{id: id}, action)
+      when is_integer(id) and id > 0 and action in @employment_reads do
+    query = grants(id, action)
+
+    case action do
+      :employment_private_read ->
+        from [r, m, u, b] in query,
+          where: is_nil(r.shop_id),
+          select: %{business_id: b.id, shop_id: r.shop_id, user_id: u.id},
+          distinct: true
+
+      :assigned_employee_contact_read ->
+        from [r, m, u, b] in query,
+          join: s in Shop,
+          on: s.business_id == b.id,
+          where: s.status == :active and (is_nil(r.shop_id) or r.shop_id == s.id),
+          select: %{business_id: b.id, shop_id: s.id, user_id: u.id},
+          distinct: true
+
+      :employment_own_read ->
+        from [r, m, u, b] in query,
+          left_join: s in Shop,
+          on: s.id == r.shop_id and s.business_id == b.id and s.status == :active,
+          where: is_nil(r.shop_id) or not is_nil(s.id),
+          select: %{business_id: b.id, shop_id: r.shop_id, user_id: u.id},
+          distinct: true
+    end
+  end
+
+  def employment_scopes_query(_, _),
+    do:
+      from(m in BusinessMembership,
+        where: false,
+        select: %{
+          business_id: m.business_id,
+          shop_id: fragment("NULL::bigint"),
+          user_id: m.user_id
+        }
+      )
+
+  @doc """
+  SQL-authorized current employment IDs WITH their supporting shop scope.
+  Dates use the existing Magnum America/Denver calendar. :now is a trusted clock,
+  never a caller-selected authorization date. Target account state does not erase
+  employment from HR/contact rosters; self-service requires current actor eligibility.
+  """
+  def authorized_employment_ids_query(user, action, now \\ DateTime.utc_now())
+
+  def authorized_employment_ids_query(user, action, %DateTime{} = now)
+      when action in @employment_reads do
+    scopes = employment_scopes_query(user, action)
+    now = now |> DateTime.to_unix(:second) |> DateTime.from_unix!(:second)
+
+    query =
+      from e in EmploymentRecord,
+        join: p in subquery(scopes),
+        on: p.business_id == e.business_id,
+        left_join: a in ShopAssignment,
+        on:
+          a.employment_id == e.id and a.business_id == e.business_id and a.shop_id == p.shop_id and
+            a.status == :active and
+            a.starts_on <= fragment("(?::timestamptz AT TIME ZONE 'America/Denver')::date", ^now),
+        where:
+          e.status == :active and
+            e.starts_on <= fragment("(?::timestamptz AT TIME ZONE 'America/Denver')::date", ^now) and
+            (is_nil(p.shop_id) or not is_nil(a.id)),
+        distinct: true,
+        select: %{id: e.id, business_id: e.business_id, shop_id: p.shop_id}
+
+    if action == :employment_own_read,
+      do: where(query, [e, p], e.user_id == p.user_id),
+      else: query
+  end
+
+  def authorized_employment_ids_query(_, _, _),
+    do:
+      from(e in EmploymentRecord,
+        where: false,
+        select: %{id: e.id, business_id: e.business_id, shop_id: fragment("NULL::bigint")}
+      )
 
   defp grants(user_id, action) do
     roles = for {role, actions} <- @permissions, action in actions, do: role

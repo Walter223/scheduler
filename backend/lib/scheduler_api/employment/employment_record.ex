@@ -10,6 +10,10 @@ defmodule SchedulerApi.Employment.EmploymentRecord do
     belongs_to :user, SchedulerApi.Accounts.User
     field :first_name, :string
     field :last_name, :string
+    # Business-specific contact data. No profile fallback or write API in 4B.
+    field :phone, :string, redact: true
+    field :email, :string, redact: true
+    field :home_address, :string, redact: true
     field :classification, Ecto.Enum, values: @classifications
     field :status, Ecto.Enum, values: [:active, :ended], default: :active
     field :starts_on, :date
