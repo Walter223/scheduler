@@ -8,7 +8,7 @@ defmodule SchedulerApi.Authorization do
   alias SchedulerApi.Repo
   alias SchedulerApi.Accounts.User
   alias SchedulerApi.Organizations.{Business, Shop, BusinessMembership, RoleAssignment}
-  alias SchedulerApi.Appointments.Appointment
+  alias SchedulerApi.Appointments.{Appointment, JobAssignment}
   alias SchedulerApi.Employment.{EmploymentRecord, ShopAssignment, WorkShift}
 
   @business_actions [
@@ -31,7 +31,7 @@ defmodule SchedulerApi.Authorization do
     :shop_staff_manage
   ]
   # Contact and own-employment reads now resolve actual employment records.
-  # Pay and explicit shifts have separate guards below; assigned jobs remain deferred.
+  # Pay, shifts and assigned jobs have separate persisted-record guards below.
   @assigned_staff [:assigned_employee_contact_read, :assigned_employee_compensation_read]
   @own_work [
     :jobs_assigned_read,
@@ -115,6 +115,13 @@ defmodule SchedulerApi.Authorization do
   def authorize(%User{} = user, action, %WorkShift{id: id})
       when is_integer(id) and action in [:schedule_manage, :schedule_own_read] do
     from(w in subquery(authorized_work_shift_ids_query(user, action)), where: w.id == ^id)
+    |> Repo.exists?()
+    |> decision()
+  end
+
+  def authorize(%User{} = user, action, %JobAssignment{id: id})
+      when is_integer(id) and action in [:jobs_assign, :jobs_assigned_read] do
+    from(j in subquery(authorized_job_assignment_ids_query(user, action)), where: j.id == ^id)
     |> Repo.exists?()
     |> decision()
   end
@@ -357,6 +364,64 @@ defmodule SchedulerApi.Authorization do
           (is_nil(p.assignment_id) or w.assignment_id == p.assignment_id),
       distinct: true,
       select: %{id: w.id, business_id: w.business_id, shop_id: w.shop_id}
+  end
+
+  @doc "Complete current assignment scopes for job management or linked Detailer own work."
+  def job_scopes_query(%User{id: id}, action)
+      when is_integer(id) and id > 0 and action in [:jobs_assign, :jobs_assigned_read] do
+    scopes =
+      from [r, m, u, b] in grants(id, action),
+        join: s in Shop,
+        on: s.business_id == b.id,
+        where: s.status == :active and (is_nil(r.shop_id) or r.shop_id == s.id)
+
+    if action == :jobs_assign do
+      from [r, m, u, b, s] in scopes,
+        distinct: true,
+        select: %{business_id: b.id, shop_id: s.id, assignment_id: fragment("NULL::bigint")}
+    else
+      from [r, m, u, b, s] in scopes,
+        join: e in EmploymentRecord,
+        on: e.business_id == b.id and e.user_id == u.id,
+        join: a in ShopAssignment,
+        on: a.employment_id == e.id and a.business_id == b.id and a.shop_id == s.id,
+        where:
+          e.status == :active and e.classification == :detailer and a.status == :active and
+            e.starts_on <= fragment("(CURRENT_TIMESTAMP AT TIME ZONE ?)::date", s.timezone) and
+            a.starts_on <= fragment("(CURRENT_TIMESTAMP AT TIME ZONE ?)::date", s.timezone),
+        distinct: true,
+        select: %{business_id: b.id, shop_id: s.id, assignment_id: a.id}
+    end
+  end
+
+  def job_scopes_query(_, _),
+    do:
+      from(s in Shop,
+        where: false,
+        select: %{
+          business_id: s.business_id,
+          shop_id: s.id,
+          assignment_id: fragment("NULL::bigint")
+        }
+      )
+
+  @doc "Job SQL scope is applied before projection and pagination; no role/scope mixing."
+  def authorized_job_assignment_ids_query(user, action) do
+    query =
+      from j in JobAssignment,
+        join: p in subquery(job_scopes_query(user, action)),
+        on:
+          j.business_id == p.business_id and j.shop_id == p.shop_id and
+            (is_nil(p.assignment_id) or j.assignment_id == p.assignment_id),
+        join: a in Appointment,
+        on:
+          a.id == j.appointment_id and a.business_id == j.business_id and a.shop_id == j.shop_id,
+        distinct: true,
+        select: %{id: j.id}
+
+    if action == :jobs_assigned_read,
+      do: where(query, [j, p, a], j.status == :active and a.status in [:pending, :confirmed]),
+      else: query
   end
 
   defp grants(user_id, action) do

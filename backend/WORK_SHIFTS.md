@@ -1,7 +1,8 @@
 # Employee work shifts — Milestone 4D-1
 
 `SchedulerApi.Employment.WorkSchedules` owns explicit employee work shifts. No
-HTTP, UI, recurring generation, job assignment or Calendar integration exists.
+HTTP, UI, recurring generation or Calendar integration exists. Explicit
+[appointment assignments](APPOINTMENT_ASSIGNMENTS.md) now require covering shifts.
 Shifts do not participate in appointment availability, hours, buffers, capacity
 or appointment scheduling locks. Compensation behavior is unchanged.
 
@@ -91,7 +92,9 @@ or replacement of an inactive row returns `:not_active`; an identical replacemen
 returns `:unchanged`. Terminating employment or ending an assignment never deletes
 or silently cancels historical/future shifts. New creation/replacement then fails
 eligibility; a still-authorized manager can explicitly cancel outstanding shifts
-with an audit. A combined audited offboarding workflow is future work.
+with an audit. A combined audited offboarding workflow is future work. Active appointment jobs
+must first be explicitly unassigned before shift cancellation/rescheduling; those
+changes otherwise return the audited `:assigned_jobs` denial.
 
 The additive migration creates empty shift/audit tables and adds a unique identity
 index to existing assignments (IDs already guarantee uniqueness). No rows are

@@ -484,3 +484,9 @@ See [WORK_SHIFTS.md](WORK_SHIFTS.md) for explicit UTC employee shifts, persisted
 shop timezone/DST handling, assignment eligibility, cross-shop overlap protection,
 scoped management/own reads and atomic audit/history. Shifts are independent of
 public appointment capacity; no recurring generation, job assignment or UI is added.
+
+## Detailer appointment assignments
+
+See [APPOINTMENT_ASSIGNMENTS.md](APPOINTMENT_ASSIGNMENTS.md) for internal audited
+assignment APIs, covering-shift policy, scope/field allowlists and locking.
+Assignments remain independent of public customer booking availability.

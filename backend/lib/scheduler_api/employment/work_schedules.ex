@@ -113,6 +113,9 @@ defmodule SchedulerApi.Employment.WorkSchedules do
               action != :create and target.shift.status != :active ->
                 {:error, :not_active}
 
+              action != :create and assigned_jobs?(target.shift.id) ->
+                {:error, :assigned_jobs}
+
               action == :cancel ->
                 closed = update!(WorkShift.close_changeset(target.shift, :cancelled, now))
                 {:ok, closed, nil}
@@ -176,6 +179,13 @@ defmodule SchedulerApi.Employment.WorkSchedules do
     ] ->
       {:error, :persistence_failed}
   end
+
+  defp assigned_jobs?(id),
+    do:
+      Repo.exists?(
+        from j in SchedulerApi.Appointments.JobAssignment,
+          where: j.work_shift_id == ^id and j.status == :active
+      )
 
   defp prepare_shift(t, action, attrs, now) do
     candidate = %WorkShift{

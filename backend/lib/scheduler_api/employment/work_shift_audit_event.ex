@@ -22,6 +22,7 @@ defmodule SchedulerApi.Employment.WorkShiftAuditEvent do
         :ineligible_assignment,
         :overlap,
         :not_active,
+        :assigned_jobs,
         :unchanged
       ]
 

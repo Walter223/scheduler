@@ -129,3 +129,7 @@ explicit shifts use [WORK_SHIFTS.md](WORK_SHIFTS.md); assigned-job resolvers rem
 they are not substitutes for these authorized projections.
 
 Focused access verification: `mix test test/scheduler_api/employment_access_test.exs`.
+
+Detailer [appointment assignments](APPOINTMENT_ASSIGNMENTS.md) require an active
+shop assignment and covering shift. Termination preserves all job/shift/audit
+history; explicit audited unassignment is separate from ending employment.
