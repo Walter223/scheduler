@@ -8,7 +8,20 @@ defmodule SchedulerApi.Appointments.JobAssignmentAuditEvent do
     belongs_to :shop, SchedulerApi.Organizations.Shop
     belongs_to :job, SchedulerApi.Appointments.JobAssignment
     belongs_to :replacement_job, SchedulerApi.Appointments.JobAssignment
-    field :action, Ecto.Enum, values: [:assign, :reassign, :unassign]
+    belongs_to :previous_lead_job, SchedulerApi.Appointments.JobAssignment
+    belongs_to :lead_job, SchedulerApi.Appointments.JobAssignment
+
+    field :action, Ecto.Enum,
+      values: [
+        :assign,
+        :reassign,
+        :unassign,
+        :add_member,
+        :remove_member,
+        :designate_lead,
+        :clear_lead
+      ]
+
     field :outcome, Ecto.Enum, values: [:applied, :denied]
     field :reason, :string
     field :occurred_at, :utc_datetime

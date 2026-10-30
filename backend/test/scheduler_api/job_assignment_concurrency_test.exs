@@ -194,4 +194,165 @@ defmodule SchedulerApi.JobAssignmentConcurrencyTest do
              ) == 3
     end)
   end
+
+  test "independent team additions both succeed while duplicate employee additions give one success",
+       c do
+    results =
+      compete(
+        c,
+        for(
+          a <- [c.assignment, c.next.assignment],
+          do: fn ->
+            JobAssignments.add_member(c.credential, c.booking, a)
+          end
+        )
+      )
+
+    assert Enum.all?(results, &match?({:ok, _}, &1))
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert {:ok, %{assignments: members}} = JobAssignments.list_team(c.owner, c.booking)
+      assert length(members) == 2
+
+      for member <- members,
+          do:
+            assert(
+              {:ok, _} =
+                JobAssignments.remove_member(c.credential, c.booking, %JobAssignment{
+                  id: member.id
+                })
+            )
+    end)
+
+    results =
+      compete(
+        c,
+        for(
+          _ <- 1..2,
+          do: fn ->
+            JobAssignments.add_member(c.credential, c.booking, c.assignment)
+          end
+        )
+      )
+
+    assert Enum.count(results, &match?({:ok, _}, &1)) == 1
+    assert Enum.count(results, &match?({:error, :already_assigned}, &1)) == 1
+  end
+
+  test "three concurrent lead transfers serialize without deadlocks and preserve the audit chain",
+       c do
+    members =
+      Sandbox.unboxed_run(Repo, fn ->
+        for a <- [c.assignment, c.next.assignment] do
+          {:ok, j} = JobAssignments.add_member(c.credential, c.booking, a)
+          %JobAssignment{id: j.id}
+        end
+      end)
+
+    for _ <- 1..3 do
+      Sandbox.unboxed_run(Repo, fn -> JobAssignments.clear_lead(c.credential, c.booking) end)
+
+      results =
+        compete(
+          c,
+          for(
+            j <- members,
+            do: fn ->
+              JobAssignments.designate_lead(c.credential, c.booking, j)
+            end
+          )
+        )
+
+      assert Enum.all?(results, &match?({:ok, %{is_lead: true}}, &1))
+
+      Sandbox.unboxed_run(Repo, fn ->
+        leads =
+          Repo.all(
+            from j in JobAssignment, where: j.appointment_id == ^c.booking.id and j.is_lead
+          )
+
+        assert length(leads) == 1
+
+        events =
+          Repo.all(
+            from a in JobAssignmentAuditEvent,
+              where: a.appointment_id == ^c.booking.id and a.action == :designate_lead,
+              order_by: [desc: a.id],
+              limit: 2
+          )
+
+        [last, previous] = events
+        assert last.previous_lead_job_id == previous.lead_job_id
+        assert last.lead_job_id == hd(leads).id
+      end)
+    end
+  end
+
+  test "concurrent removal and designation cannot leave the removed member as lead", c do
+    {first, second} =
+      Sandbox.unboxed_run(Repo, fn ->
+        {:ok, first} = JobAssignments.add_member(c.credential, c.booking, c.assignment)
+        {:ok, second} = JobAssignments.add_member(c.credential, c.booking, c.next.assignment)
+        {first, second}
+      end)
+
+    results =
+      compete(c, [
+        fn ->
+          JobAssignments.remove_member(c.credential, c.booking, %JobAssignment{id: first.id})
+        end,
+        fn ->
+          JobAssignments.designate_lead(c.credential, c.booking, %JobAssignment{id: first.id})
+        end
+      ])
+
+    assert Enum.all?(results, fn
+             {:ok, _} -> true
+             {:error, :not_assigned} -> true
+             _ -> false
+           end)
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert Repo.get!(JobAssignment, first.id).status == :unassigned
+      refute Repo.get!(JobAssignment, first.id).is_lead
+      assert Repo.get!(JobAssignment, second.id).status == :active
+      refute Repo.get!(JobAssignment, second.id).is_lead
+    end)
+  end
+
+  test "PostgreSQL itself rejects competing lead flags on independent connections", c do
+    members =
+      Sandbox.unboxed_run(Repo, fn ->
+        for a <- [c.assignment, c.next.assignment] do
+          {:ok, j} = JobAssignments.add_member(c.credential, c.booking, a)
+          j
+        end
+      end)
+
+    results =
+      compete(
+        c,
+        for(
+          j <- members,
+          do: fn ->
+            Repo.query("UPDATE appointment_assignments SET is_lead=true WHERE id=$1", [j.id],
+              log: false
+            )
+          end
+        )
+      )
+
+    assert Enum.count(results, &match?({:ok, _}, &1)) == 1
+
+    assert Enum.count(
+             results,
+             &match?(
+               {:error,
+                %Postgrex.Error{
+                  postgres: %{code: :unique_violation, constraint: "appointment_jobs_one_lead"}
+                }},
+               &1
+             )
+           ) == 1
+  end
 end

@@ -11,6 +11,7 @@ defmodule SchedulerApi.Appointments.JobAssignment do
     field :starts_at, :utc_datetime
     field :ends_at, :utc_datetime
     field :status, Ecto.Enum, values: [:active, :reassigned, :unassigned], default: :active
+    field :is_lead, :boolean, default: false
     field :closed_at, :utc_datetime
     timestamps(type: :utc_datetime, updated_at: false)
   end

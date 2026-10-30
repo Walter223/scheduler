@@ -19,6 +19,7 @@ defmodule SchedulerApi.Appointments.JobAssignments do
     :starts_at,
     :ends_at,
     :status,
+    :is_lead,
     :closed_at
   ]
 
@@ -30,6 +31,29 @@ defmodule SchedulerApi.Appointments.JobAssignments do
 
   def unassign(credential, appointment, opts \\ []),
     do: mutate(:unassign, credential, appointment, nil, opts)
+
+  @doc "Add one Detailer without changing any other team member."
+  def add_member(credential, appointment, assignment, opts \\ []),
+    do: mutate(:add_member, credential, appointment, assignment, opts)
+
+  @doc "Remove one explicitly identified active job; removing a lead leaves no lead."
+  def remove_member(credential, appointment, job, opts \\ []),
+    do: mutate(:remove_member, credential, appointment, job, opts)
+
+  @doc "Explicitly designate/transfer the optional lead to an existing eligible member."
+  def designate_lead(credential, appointment, job, opts \\ []),
+    do: mutate(:designate_lead, credential, appointment, job, opts)
+
+  def clear_lead(credential, appointment, opts \\ []),
+    do: mutate(:clear_lead, credential, appointment, nil, opts)
+
+  @doc "Authorized active team roster; pagination has no crew-size implication."
+  def list_team(user, appointment, opts \\ [])
+
+  def list_team(%User{} = user, %Appointment{id: id}, opts) when is_integer(id),
+    do: list(user, :jobs_assign, :appointment_id, id, opts)
+
+  def list_team(_, _, _), do: {:error, :forbidden}
 
   def list_shop_assignments(user, shop, opts \\ [])
 
@@ -60,15 +84,22 @@ defmodule SchedulerApi.Appointments.JobAssignments do
                  Authorization.authorize(actor.user, :jobs_assign, %Shop{id: booking.shop_id}) ==
                    :ok
 
-             target = if authorized, do: lock_target(booking, assignment)
+             target = if authorized, do: lock_target(booking, assignment, action)
              outcome = if target, do: change_job(action, target, now), else: {:error, :forbidden}
 
              {status, reason, job, replacement} =
                case outcome do
                  {:ok, job, replacement} ->
                    {:applied,
-                    %{assign: :assigned, reassign: :reassigned, unassign: :unassigned}[action],
-                    job, replacement}
+                    %{
+                      assign: :assigned,
+                      reassign: :reassigned,
+                      unassign: :unassigned,
+                      add_member: :assigned,
+                      remove_member: :unassigned,
+                      designate_lead: :lead_designated,
+                      clear_lead: :lead_cleared
+                    }[action], job, replacement}
 
                  {:error, reason} ->
                    {:denied, reason, target && target.current, nil}
@@ -81,6 +112,8 @@ defmodule SchedulerApi.Appointments.JobAssignments do
                shop_id: booking && booking.shop_id,
                job_id: job && job.id,
                replacement_job_id: replacement && replacement.id,
+               previous_lead_job_id: if(status == :applied, do: target.lead && target.lead.id),
+               lead_job_id: if(status == :applied, do: active_lead_id(booking.id)),
                action: action,
                outcome: status,
                reason: Atom.to_string(reason),
@@ -109,13 +142,25 @@ defmodule SchedulerApi.Appointments.JobAssignments do
 
   defp change_job(action, t, now) do
     cond do
-      action == :assign and t.current ->
+      action in [:reassign, :unassign] and length(t.members) > 1 ->
+        {:error, :ambiguous_team}
+
+      action == :assign and t.members != [] ->
         {:error, :already_assigned}
 
-      action != :assign and is_nil(t.current) ->
+      action == :add_member and t.current ->
+        {:error, :already_assigned}
+
+      action == :clear_lead and is_nil(t.lead) ->
+        {:error, :no_lead}
+
+      action == :clear_lead ->
+        {:ok, lead!(t.lead, false), nil}
+
+      action in [:reassign, :unassign, :remove_member, :designate_lead] and is_nil(t.current) ->
         {:error, :not_assigned}
 
-      action == :unassign ->
+      action in [:unassign, :remove_member] ->
         {:ok, close!(t.current, :unassigned, now), nil}
 
       t.booking.status not in [:pending, :confirmed] ->
@@ -124,7 +169,20 @@ defmodule SchedulerApi.Appointments.JobAssignments do
       not eligible?(t) ->
         {:error, :ineligible_detailer}
 
-      t.current && t.current.assignment_id == t.assignment.id ->
+      action == :designate_lead and t.current.is_lead ->
+        {:error, :already_lead}
+
+      is_nil(t.shift) and action == :designate_lead ->
+        {:error, :missing_covering_shift}
+
+      action == :designate_lead ->
+        # Release the previous lead in the same transaction before the unique
+        # index admits the new one. An audit failure restores both flags.
+        old = if t.lead, do: lead!(t.lead, false)
+        new = lead!(t.current, true)
+        if old, do: {:ok, old, new}, else: {:ok, new, nil}
+
+      action == :reassign and t.current.assignment_id == t.assignment.id ->
         {:error, :unchanged}
 
       overlap?(t) ->
@@ -134,7 +192,7 @@ defmodule SchedulerApi.Appointments.JobAssignments do
         {:error, :missing_covering_shift}
 
       true ->
-        old = if t.current, do: close!(t.current, :reassigned, now)
+        old = if action == :reassign, do: close!(t.current, :reassigned, now)
 
         job =
           persist!(
@@ -158,19 +216,44 @@ defmodule SchedulerApi.Appointments.JobAssignments do
     end
   end
 
+  defp active_lead_id(appointment_id),
+    do:
+      Repo.one(
+        from j in JobAssignment,
+          where: j.appointment_id == ^appointment_id and j.status == :active and j.is_lead,
+          select: j.id
+      )
+
+  defp lead!(job, value),
+    do: persist!(Repo.update(Ecto.Changeset.change(job, is_lead: value), log: false))
+
   defp reference(%Appointment{id: id}) when is_integer(id), do: Repo.get(Appointment, id)
   defp reference(_), do: nil
 
-  defp lock_target(booking, ref) do
-    current =
-      Repo.one(
-        from j in JobAssignment, where: j.appointment_id == ^booking.id and j.status == :active
+  defp lock_target(booking, ref, action) do
+    members =
+      Repo.all(
+        from j in JobAssignment,
+          where: j.appointment_id == ^booking.id and j.status == :active,
+          order_by: j.id
       )
+
+    lead = Enum.find(members, & &1.is_lead)
+
+    member =
+      case ref do
+        %JobAssignment{id: id} when is_integer(id) -> Enum.find(members, &(&1.id == id))
+        _ -> nil
+      end
 
     assignment =
       case ref do
-        %ShopAssignment{id: id} when is_integer(id) -> Repo.get(ShopAssignment, id)
-        _ -> nil
+        %ShopAssignment{id: id}
+        when action in [:assign, :add_member, :reassign] and is_integer(id) ->
+          Repo.get(ShopAssignment, id)
+
+        _ ->
+          if member, do: Repo.get(ShopAssignment, member.assignment_id)
       end
 
     assignment =
@@ -178,13 +261,28 @@ defmodule SchedulerApi.Appointments.JobAssignments do
            assignment.shop_id == booking.shop_id,
          do: assignment
 
+    current =
+      cond do
+        action in [:assign, :reassign, :unassign] ->
+          if length(members) == 1, do: hd(members)
+
+        action == :add_member ->
+          if assignment, do: Enum.find(members, &(&1.employment_id == assignment.employment_id))
+
+        action == :clear_lead ->
+          lead
+
+        true ->
+          member
+      end
+
     # Business -> actor -> employments (ascending) -> assignments -> shop -> shifts
     # -> appointment -> job. WorkSchedules shares this parent-first order. No
     # appointment booking advisory lock is changed or acquired in the reverse order.
     ids =
       Enum.uniq(
         Enum.reject(
-          [assignment && assignment.employment_id, current && current.employment_id],
+          [assignment && assignment.employment_id | Enum.map(members, & &1.employment_id)],
           &is_nil/1
         )
       )
@@ -196,7 +294,10 @@ defmodule SchedulerApi.Appointments.JobAssignments do
 
     assignment_ids =
       Enum.uniq(
-        Enum.reject([assignment && assignment.id, current && current.assignment_id], &is_nil/1)
+        Enum.reject(
+          [assignment && assignment.id | Enum.map(members, & &1.assignment_id)],
+          &is_nil/1
+        )
       )
 
     Repo.all(
@@ -235,9 +336,15 @@ defmodule SchedulerApi.Appointments.JobAssignments do
            DateTime.compare(shift.ends_at, ends_at) != :lt,
          do: shift
 
-    current =
-      if current,
-        do: Repo.one!(from j in JobAssignment, where: j.id == ^current.id, lock: "FOR UPDATE")
+    member_ids = Enum.map(members, & &1.id)
+
+    locked =
+      Repo.all(
+        from j in JobAssignment, where: j.id in ^member_ids, order_by: j.id, lock: "FOR UPDATE"
+      )
+
+    current = if current, do: Enum.find(locked, &(&1.id == current.id))
+    lead = if lead, do: Enum.find(locked, &(&1.id == lead.id))
 
     %{
       booking: booking,
@@ -246,6 +353,8 @@ defmodule SchedulerApi.Appointments.JobAssignments do
       shop: shop,
       shift: shift,
       current: current,
+      members: locked,
+      lead: lead,
       ends_at: ends_at
     }
   end
@@ -286,7 +395,9 @@ defmodule SchedulerApi.Appointments.JobAssignments do
   defp close!(job, status, now),
     do:
       persist!(
-        Repo.update(Ecto.Changeset.change(job, status: status, closed_at: now), log: false)
+        Repo.update(Ecto.Changeset.change(job, status: status, closed_at: now, is_lead: false),
+          log: false
+        )
       )
 
   defp persist!({:ok, value}), do: value
@@ -338,8 +449,15 @@ defmodule SchedulerApi.Appointments.JobAssignments do
 
   defp list(user, action, field, id, opts) do
     scopes =
-      from p in subquery(Authorization.job_scopes_query(user, action)),
-        where: field(p, ^field) == ^id
+      if field == :appointment_id do
+        from p in subquery(Authorization.job_scopes_query(user, action)),
+          join: a in Appointment,
+          on: a.business_id == p.business_id and a.shop_id == p.shop_id,
+          where: a.id == ^id
+      else
+        from p in subquery(Authorization.job_scopes_query(user, action)),
+          where: field(p, ^field) == ^id
+      end
 
     with true <- Repo.exists?(scopes), {:ok, limit, cursor} <- list_options(opts) do
       allowed = Authorization.authorized_job_assignment_ids_query(user, action)
@@ -351,6 +469,8 @@ defmodule SchedulerApi.Appointments.JobAssignments do
           where: field(j, ^field) == ^id,
           order_by: [asc: j.starts_at, asc: j.id],
           limit: ^(limit + 1)
+
+      query = if field == :appointment_id, do: where(query, [j], j.status == :active), else: query
 
       query =
         case cursor do

@@ -485,8 +485,9 @@ shop timezone/DST handling, assignment eligibility, cross-shop overlap protectio
 scoped management/own reads and atomic audit/history. Shifts are independent of
 public appointment capacity; no recurring generation, job assignment or UI is added.
 
-## Detailer appointment assignments
+## Detailer appointment teams
 
 See [APPOINTMENT_ASSIGNMENTS.md](APPOINTMENT_ASSIGNMENTS.md) for internal audited
-assignment APIs, covering-shift policy, scope/field allowlists and locking.
+multi-member assignment/lead APIs, covering-shift policy, scope/field allowlists
+and locking. Legacy single-member operations reject ambiguous team changes.
 Assignments remain independent of public customer booking availability.

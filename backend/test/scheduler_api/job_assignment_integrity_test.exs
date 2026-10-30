@@ -60,12 +60,21 @@ defmodule SchedulerApi.JobAssignmentIntegrityTest do
 
     assert Repo.aggregate(JobAssignment, :count) == 0
     assert {:ok, _} = insert(c)
-    # The unique grant and employee exclusion both protect the duplicate. Assert
-    # the actual unique constraint, and inspect the separate exclusion below.
+    # Employee overlap is checked before the newer per-employee unique index.
+    # Verify the actual rejection and the separate unique index definition.
     assert {:error,
             %Postgrex.Error{
-              postgres: %{code: :unique_violation, constraint: "appointment_jobs_one_active"}
+              postgres: %{code: :exclusion_violation, constraint: "appointment_jobs_no_overlap"}
             }} = insert(c)
+
+    %{rows: [[employee_index]]} =
+      Repo.query!(
+        "SELECT indexdef FROM pg_indexes WHERE indexname='appointment_jobs_active_employee'"
+      )
+
+    assert employee_index =~ "UNIQUE INDEX"
+    assert employee_index =~ "(appointment_id, employment_id)"
+    assert employee_index =~ "active"
 
     %{rows: [[definition]]} =
       Repo.query!(
