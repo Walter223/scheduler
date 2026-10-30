@@ -360,3 +360,59 @@ no actual development identities receive access changes. The new audit migration
 creates an empty table and does not rewrite existing records. Apply it before using
 these operations; rollback drops audit history and requires an explicit retention
 review once production events exist.
+
+## First Business Owner bootstrap (Milestone 2B-2)
+
+Deployment operators with authorized shell/deployment access and Magnum DB
+configuration may explicitly run this task from `backend/`. Set BUSINESS_ID to
+an existing business ID, OIDC_ISSUER to its exact configured Keycloak issuer,
+and KEYCLOAK_SUBJECT to the exact existing Magnum user's immutable subject.
+These are identifiers, not an email lookup or credentials. Never copy tokens or
+client secrets into command arguments. Production uses the actual production
+issuer/configuration; no production hostname is assumed here.
+
+```sh
+# Read-only dry-run: does not reserve ownership or write even an audit event.
+env -u PHX_SERVER MIX_ENV=prod mix magnum.bootstrap_owner --business-id "$BUSINESS_ID" --issuer "$OIDC_ISSUER" --subject "$KEYCLOAK_SUBJECT"
+# Explicitly apply after reviewing the dry-run and deployment approval.
+env -u PHX_SERVER MIX_ENV=prod mix magnum.bootstrap_owner --business-id "$BUSINESS_ID" --issuer "$OIDC_ISSUER" --subject "$KEYCLOAK_SUBJECT" --apply
+```
+
+Use `MIX_ENV=dev` only for intentionally approved local provisioning. This is not
+part of startup, login, migrations, seeds or HTTP. Apply the audit migration first.
+Unset PHX_SERVER as shown; the command needs database access, not a new HTTP server.
+No real development identities are provisioned by the tests or documentation.
+
+`Authorization.OwnerBootstrap.run(business_id, issuer, subject, apply: false)`
+is the task's internal implementation. It requires an existing active,
+email-verified local user and active business. Unknown/pending/suspended/deactivated
+identities are never created or activated. An existing membership must be active;
+a revoked membership needs a separate reviewed process, not silent reactivation.
+New membership creation and the fixed business-wide Owner grant occur only in apply.
+
+The business row is locked using the same helper as RoleManagement. Eligibility
+is rechecked under a user-row lock, then all Owner assignment history is checked
+regardless of status/target. Any current or revoked Owner history blocks bootstrap
+and requires a separate recovery process. Grant constraints remain authoritative;
+no platform role, wildcard, alternative scope or email-based identity is accepted.
+A new grant is also checked through the existing Authorization policy before commit.
+
+Apply commits provisioning with an audit event whose source is
+`deployment_operator_command`, action is `bootstrap_owner`, role is `business_owner`,
+and actor_user_id is NULL. This truthfully identifies an invocation channel, NOT a
+verified human operator. There is no operator-name flag or arbitrary asserted
+identity. Deployment access control, approval and external operator logs must
+identify the human; a person already holding privileged database credentials can
+bypass application code, so this command is not protection against that operator.
+Apply-mode expected denials commit only a bounded denied event; persistence/audit
+errors commit nothing and return failure. Dry-run denials write nothing. Shell
+output contains only bounded outcomes and local business/user IDs, never identity
+claims, tokens or secrets. Existing audit records default to their original
+customer-role-management source. Migration rollback refuses to discard/mislabel
+bootstrap audit history once events exist.
+
+Focused checks: `mix test test/scheduler_api/owner_bootstrap_test.exs
+test/scheduler_api/owner_bootstrap_concurrency_test.exs` (one command). These use
+sandbox fixtures and positively owned, cleaned test rows only. No actual development
+accounts receive memberships or privileges. Protected admin APIs, owner recovery,
+activation/invitations, verified operator attestation and God Mode remain separate.

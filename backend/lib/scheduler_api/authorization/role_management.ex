@@ -29,7 +29,7 @@ defmodule SchedulerApi.Authorization.RoleManagement do
   defp run(action, credential, business_ref, target_ref, role, shop_ref) do
     result =
       Repo.transaction(fn ->
-        business = load_business(business_ref)
+        business = lock_business(business_ref)
         if business, do: lock_business_members(business.id)
         actor = actor(credential)
         {membership, assignment} = load_target(target_ref, business, action)
@@ -147,10 +147,12 @@ defmodule SchedulerApi.Authorization.RoleManagement do
       {:error, :persistence_failed}
   end
 
-  defp load_business(%Business{id: id}) when is_integer(id) and id > 0,
+  # Shared lock namespace for every customer access mutation, including operator bootstrap.
+  @doc false
+  def lock_business(%Business{id: id}) when is_integer(id) and id > 0,
     do: Repo.one(from b in Business, where: b.id == ^id, lock: "FOR UPDATE")
 
-  defp load_business(_), do: nil
+  def lock_business(_), do: nil
 
   defp lock_business_members(business_id) do
     # One business row serializes cooperating role changes. Lock eligibility rows
