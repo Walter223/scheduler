@@ -24,6 +24,11 @@ defmodule SchedulerApi.EmploymentHRConcurrencyTest do
 
     on_exit(fn ->
       Sandbox.unboxed_run(Repo, fn ->
+        Repo.delete_all(
+          from a in SchedulerApi.Employment.OffboardingAudit,
+            where: a.business_id == ^c.business.id
+        )
+
         Repo.delete_all(from a in HrAuditEvent, where: a.business_id == ^c.business.id)
         Repo.delete_all(from a in WorkShiftAuditEvent, where: a.business_id == ^c.business.id)
         Repo.delete_all(from w in WorkShift, where: w.business_id == ^c.business.id)
@@ -169,6 +174,66 @@ defmodule SchedulerApi.EmploymentHRConcurrencyTest do
       assignment = Repo.get!(ShopAssignment, a.id)
       has_shift = Repo.exists?(from w in WorkShift, where: w.business_id == ^c.business.id)
       assert has_shift == (assignment.status == :active)
+    end)
+  end
+
+  test "two offboarding requests create exactly one termination and historical audit", c do
+    results =
+      compete(
+        c,
+        for(_ <- 1..2, do: fn -> HR.terminate_employment(c.credential, c.employment) end)
+      )
+
+    assert Enum.count(results, &match?({:ok, %{already_terminated: false}}, &1)) == 1
+    assert Enum.count(results, &match?({:ok, %{already_terminated: true}}, &1)) == 1
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert Repo.reload!(c.employment).status == :ended
+
+      assert Repo.aggregate(
+               from(a in SchedulerApi.Employment.OffboardingAudit,
+                 where: a.business_id == ^c.business.id
+               ),
+               :count
+             ) == 1
+    end)
+  end
+
+  test "offboarding and shift creation serialize without active future work on ended employee",
+       c do
+    a =
+      Sandbox.unboxed_run(Repo, fn ->
+        {:ok, a} =
+          HR.assign_shop(c.credential, c.employment, c.shop, %{starts_on: ~D[2026-01-01]})
+
+        %ShopAssignment{id: a.id}
+      end)
+
+    start = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.add(86400)
+
+    results =
+      compete(c, [
+        fn -> HR.terminate_employment(c.credential, c.employment) end,
+        fn ->
+          WorkSchedules.create_shift(c.credential, a, %{
+            starts_at: start,
+            ends_at: DateTime.add(start, 3600)
+          })
+        end
+      ])
+
+    assert Enum.all?(results, fn
+             {:ok, _} -> true
+             {:error, :ineligible_assignment} -> true
+             _ -> false
+           end)
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert Repo.reload!(c.employment).status == :ended
+
+      refute Repo.exists?(
+               from w in WorkShift, where: w.business_id == ^c.business.id and w.status == :active
+             )
     end)
   end
 end

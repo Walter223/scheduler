@@ -135,3 +135,6 @@ Focused access verification: `mix test test/scheduler_api/employment_access_test
 Detailer [appointment assignments](APPOINTMENT_ASSIGNMENTS.md) require an active
 shop assignment and covering shift. Termination preserves all job/shift/audit
 history; explicit audited unassignment is separate from ending employment.
+
+Use [secure offboarding](OFFBOARDING.md) for authorized employment termination
+with future-work cleanup and business-scoped access revocation.

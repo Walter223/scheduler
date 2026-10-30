@@ -116,3 +116,7 @@ rows in FK order. Development data is not migrated by these checks.
 mix test test/scheduler_api/employment_hr*_test.exs
 mix precommit
 ```
+
+Milestone 4E-2A adds [secure atomic offboarding](OFFBOARDING.md) through
+`HR.terminate_employment/2`, plus authorized retained former-employee projections.
+The earlier low-level termination helper remains a trusted persistence primitive.

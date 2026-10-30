@@ -26,7 +26,22 @@ defmodule SchedulerApi.Authorization.RoleManagement do
   def reactivate_membership(actor, business, membership),
     do: run(:reactivate_membership, actor, business, membership, nil, nil)
 
-  defp run(action, credential, business_ref, target_ref, role, shop_ref) do
+  @doc "HR-only revocation tied to a persisted active employment, never arbitrary membership scope."
+  def revoke_employment_access(credential, %SchedulerApi.Employment.EmploymentRecord{id: id})
+      when is_integer(id) do
+    e = Repo.get(SchedulerApi.Employment.EmploymentRecord, id)
+
+    if e && e.user_id do
+      m = Repo.get_by(BusinessMembership, user_id: e.user_id, business_id: e.business_id)
+      run(:revoke_membership, credential, %Business{id: e.business_id}, m, nil, nil, e.id)
+    else
+      {:error, :invalid_target}
+    end
+  end
+
+  def revoke_employment_access(_, _), do: {:error, :invalid_target}
+
+  defp run(action, credential, business_ref, target_ref, role, shop_ref, employment_id \\ nil) do
     result =
       Repo.transaction(fn ->
         business = lock_business(business_ref)
@@ -62,7 +77,7 @@ defmodule SchedulerApi.Authorization.RoleManagement do
         outcome =
           cond do
             is_nil(business) or is_nil(actor) or
-                Authorization.authorize(actor.user, :access_manage, business) != :ok ->
+                not authorized_change?(actor.user, business, membership, employment_id) ->
               {:error, :forbidden}
 
             is_nil(membership) ->
@@ -147,6 +162,33 @@ defmodule SchedulerApi.Authorization.RoleManagement do
       {:error, :persistence_failed}
   end
 
+  defp authorized_change?(user, business, _, nil),
+    do: Authorization.authorize(user, :access_manage, business) == :ok
+
+  defp authorized_change?(user, business, membership, employment_id) do
+    e = Repo.get(SchedulerApi.Employment.EmploymentRecord, employment_id)
+
+    valid =
+      e && membership && e.status == :active && e.business_id == business.id &&
+        e.user_id == membership.user_id
+
+    if valid && Authorization.authorize(user, :employment_manage, business) == :ok do
+      owner =
+        Repo.exists?(
+          from r in RoleAssignment,
+            where:
+              r.membership_id == ^membership.id and r.status == :active and
+                r.role == :business_owner
+        )
+
+      # Last-owner enforcement still occurs in revoke_membership_locked/2.
+      not owner or last_owner?(membership) or
+        Authorization.authorize(user, :access_manage, business) == :ok
+    else
+      false
+    end
+  end
+
   # Shared lock namespace for every customer access mutation, including operator bootstrap.
   @doc false
   def lock_business(%Business{id: id}) when is_integer(id) and id > 0,
@@ -154,7 +196,8 @@ defmodule SchedulerApi.Authorization.RoleManagement do
 
   def lock_business(_), do: nil
 
-  defp lock_business_members(business_id) do
+  @doc false
+  def lock_business_members(business_id) do
     # One business row serializes cooperating role changes. Lock eligibility rows
     # in stable order before session/membership/grant rows (Accounts locks user first).
     ids = from m in BusinessMembership, where: m.business_id == ^business_id, select: m.user_id

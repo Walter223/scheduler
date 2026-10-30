@@ -1,5 +1,5 @@
 defmodule SchedulerApi.Employment.HR do
-  @moduledoc "Session-authorized, audited HR writes. No account linking, grants or employment termination."
+  @moduledoc "Session-authorized, audited HR writes. No account linking or grant provisioning; termination delegates to atomic offboarding."
   import Ecto.Query
   alias SchedulerApi.{Accounts, Authorization, Repo}
   alias SchedulerApi.Accounts.{SessionCredential, User, WebSession}
@@ -45,6 +45,32 @@ defmodule SchedulerApi.Employment.HR do
 
   def end_shop_assignment(credential, assignment, date, opts \\ []),
     do: run(:end_shop, credential, assignment, nil, date, opts)
+
+  def terminate_employment(credential, employment),
+    do: SchedulerApi.Employment.Offboarding.terminate(credential, employment)
+
+  @doc "Authorized retained former employees; no account, pay or audit schemas are returned."
+  def list_former_employees(%User{} = user, %Business{id: id}) when is_integer(id) do
+    scopes = Authorization.employment_scopes_query(user, :employment_private_read)
+    allowed = from p in subquery(scopes), where: p.business_id == ^id and is_nil(p.shop_id)
+
+    if Repo.exists?(allowed) do
+      {:ok,
+       Repo.all(
+         from e in EmploymentRecord,
+           join: p in subquery(allowed),
+           on: p.business_id == e.business_id,
+           where: e.business_id == ^id and e.status == :ended,
+           distinct: true,
+           order_by: e.id,
+           select: map(e, ^@fields)
+       )}
+    else
+      {:error, :forbidden}
+    end
+  end
+
+  def list_former_employees(_, _), do: {:error, :forbidden}
 
   defp run(action, credential, ref, related, input, opts) do
     with {:ok, now} <- clock(opts) do
