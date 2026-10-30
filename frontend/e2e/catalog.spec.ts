@@ -8,21 +8,20 @@ for (const [name, sizes] of [
   ['Supreme Detail', [['Small', '$129.99', 150], ['Medium', '$159.99', 180], ['Large', '$179.99', 230]]],
 ] as const) {
   for (const [size, price, duration] of sizes) {
-    test(`${name} / ${size} hands off the correct selection, price and duration`, async ({ page, catalog }) => {
+    test(`${name} / ${size} hands off the correct selection, price and duration`, async ({ page, catalog, servicesPage, contactPage }) => {
       const service = catalog.services.find((entry) => entry.name === name)!
       const offering = service.prices.find((entry) => entry.vehicle_size === size)!
-      await page.goto('/services')
-      const card = page.getByRole('heading', { name, exact: true }).locator('..')
-      const option = card.getByRole('button', { name: new RegExp(`^${size}\\b`) })
+      await servicesPage.goto()
+      const option = servicesPage.option(name, size)
       await expect(option).toContainText(price)
       await expect(option).toContainText(`${duration} min`)
       await option.click()
-      await card.getByRole('link', { name: 'Book This Detail' }).click()
+      await servicesPage.bookDetail(name)
       await expect(page).toHaveURL(`/contact?service=${service.id}&size=${offering.vehicle_size_id}`)
-      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-      await expect(page.getByText(`${size} Vehicle`, { exact: true })).toBeVisible()
-      await expect(page.getByText(price, { exact: true })).toBeVisible()
-      await expect(page.getByText(`${duration} min`, { exact: true })).toBeVisible()
+      await expect(contactPage.serviceHeading(name)).toBeVisible()
+      await expect(contactPage.summaryText(`${size} Vehicle`)).toBeVisible()
+      await expect(contactPage.summaryText(price)).toBeVisible()
+      await expect(contactPage.summaryText(`${duration} min`)).toBeVisible()
       await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
     })
   }

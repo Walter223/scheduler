@@ -6,5 +6,5 @@
     "lib": ["ES2023", "DOM"],
     "moduleResolution": "bundler"
   },
-  "include": ["./*.ts", "../playwright.config.ts", "../playwright.auth.config.ts", "../auth-e2e/*.ts"]
+  "include": ["./**/*.ts", "../playwright.config.ts", "../playwright.auth.config.ts", "../auth-e2e/*.ts"]
 }

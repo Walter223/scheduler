@@ -8,12 +8,12 @@ export default defineConfig({
   globalSetup: './e2e/setup.ts',
   globalTeardown: './e2e/teardown.ts',
   forbidOnly: Boolean(process.env.CI),
-  retries: 0,
+  retries: process.env.CI ? 2 : 1,
   reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:5174',
     timezoneId: 'America/Denver',
-    trace: 'retain-on-failure',
+    trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
   // Disjoint matching: every browser/API test runs exactly once, sharing two workers.

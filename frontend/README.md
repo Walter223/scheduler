@@ -136,7 +136,8 @@ sent through Vite's same-origin `/api` proxy to the real isolated test API. Conf
 
 ### API contracts in the anonymous runner
 
-`npm run test:e2e` runs **19 browser tests + 4 API contract tests** once each.
+`npm run test:e2e` runs **19 browser tests + 4 API contract tests** once each
+unless a failed test is automatically retried.
 Disjoint `chromium`/`api` project matchers prevent duplicate execution; both share
 one isolated database, startup/teardown and the same **2-worker** limit.
 `check-full.sh` includes both via its existing `test:e2e` command.
@@ -168,8 +169,9 @@ development data or share this partition between concurrent E2E runs.
 
 The source-controlled catalog is seeded once per invocation, marked with a unique
 owner UUID and shared read-only by the workers. A UUID-owned database sequence
-allocates a distinct future Monday–Saturday date to each test, reserving its
-following-week date too. Prices/durations remain independently asserted.
+allocates a distinct future Monday–Saturday date to each booking-dependent
+attempt, reserving its following-week date too. Read-only catalog/selection tests
+share the catalog without allocating dates. Prices/durations remain independently asserted.
 
 The default is **2 workers**; override with `npm run test:e2e -- --workers=1`
 or `--workers=4`. The browser and API projects share this worker pool. Six browser spec files and
@@ -179,7 +181,8 @@ competing bookings within their own reserved dates. Allocation is capped at 36
 per invocation to stay inside the booking horizon; use separate invocations for
 long stress repetitions rather than unbounded `--repeat-each`.
 
-Per-test cleanup removes only appointments on that test's owned date and prices.
+Per-attempt cleanup closes the page before removing appointments on that attempt's
+owned date and prices; repeated cleanup is safe while the owned catalog exists.
 Global teardown removes the exact run's catalog and allocator after all workers
 finish, retaining foreign-reference guards. Unowned/leftover catalog names cause
 setup to fail rather than deleting another run's data. No reset, development write,
@@ -187,5 +190,29 @@ public test route or scheduling bypass is used; business/default shop remain.
 For ownership-checked recovery after a forcibly interrupted process, see
 [backend verification documentation](../backend/README.md#parallel-anonymous-playwright).
 
-Failed browser runs retain ignored screenshots/traces under `test-results/`.
+### Page objects and automatic retries
+
+`e2e/pages/HomePage.ts` owns `/` links/navigation; `ServicesPage.ts` owns service
+options and booking links at `/services`; `ContactPage.ts` owns `/contact` fields,
+slots, submission and confirmation locators/actions. Page objects contain no
+assertions, inheritance or selector-repair logic. Specs retain UI, accessibility,
+network and saved-data assertions. `booking-helpers.ts` contains only shared
+customer data, date arithmetic and response gates. API tests use no page objects.
+
+Local failures get **1 retry**; CI failures get **2**. Passing tests execute once.
+The default reporter remains `list`: a retry-pass is explicitly **flaky**, while
+exhausted retries are **failed**. Investigate flaky results rather than treating
+them as a clean run; Playwright can return success for a flaky test.
+
+Each attempt has fresh Playwright page/context and page-object fixtures. The nine
+booking-dependent tests reserve fresh dates on retries, even after worker restart;
+at most 27 reservations are needed with two CI retries, within the 36-slot limit.
+No retry can reuse another attempt's dirty slot. Cleanup failures remain errors,
+and invocation teardown also removes all run-owned appointments after workers end.
+Do not increase retries, repetitions or booking-test count beyond allocator capacity
+without revisiting the booking horizon and isolation design.
+
+Ignored screenshots are captured only on failure. Traces use `on-first-retry`,
+so a trace is recorded for the first retry, not every initial test execution.
 Inspect with `npx playwright show-trace test-results/<test-folder>/trace.zip`.
+The separate real-Keycloak config/retry/secret-recording policies are unchanged.

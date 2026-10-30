@@ -1,8 +1,8 @@
 import { test, expect } from './fixtures'
-import { gate, followingWeek, openBooking } from './booking-helpers'
+import { gate, followingWeek } from './booking-helpers'
 
-test('obsolete availability requests are cancelled when the date changes', async ({ page, booking }) => {
-  await openBooking(page, booking)
+test('obsolete availability requests are cancelled when the date changes', async ({ page, booking, contactPage }) => {
+  await contactPage.openBooking(booking)
   const pending = gate()
   const release = gate()
   const finished = gate()
@@ -14,23 +14,23 @@ test('obsolete availability requests are cancelled when the date changes', async
     await route.fulfill({ json: { available_times: [] } })
     finished.release()
   })
-  await page.getByLabel('Choose a Date').fill(oldDate)
+  await contactPage.dateInput.fill(oldDate)
   await pending.promise
   const cancelled = page.waitForEvent('requestfailed', (request) => request.url().includes(`date=${oldDate}`))
-  await page.getByLabel('Choose a Date').fill(booking.date)
+  await contactPage.dateInput.fill(booking.date)
   await cancelled
   release.release()
   await finished.promise
-  await expect(page.getByRole('button', { name: '9:00 AM', exact: true })).toBeVisible()
+  await expect(contactPage.timeSlot('9:00 AM')).toBeVisible()
 })
 
 test.describe('Denver calendar date', () => {
   test.use({ timezoneId: 'Asia/Tokyo' })
-  test('the minimum date follows Denver at midnight boundaries', async ({ page, booking }) => {
+  test('the minimum date follows Denver at midnight boundaries', async ({ page, booking, contactPage }) => {
     // Tokyo is on the following day at this instant, in either Denver DST season.
     const instant = new Date(`${booking.date}T23:30:00Z`)
     await page.clock.setFixedTime(instant)
-    await openBooking(page, booking)
-    await expect(page.getByLabel('Choose a Date')).toHaveAttribute('min', booking.date)
+    await contactPage.openBooking(booking)
+    await expect(contactPage.dateInput).toHaveAttribute('min', booking.date)
   })
 })

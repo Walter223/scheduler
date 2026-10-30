@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures'
-import { customer, openBooking, prepareBooking } from './booking-helpers'
+import { customer } from './booking-helpers'
 
-test('validated fields preserve blur validation, label associations and phone formatting', async ({ page, booking }) => {
-  await openBooking(page, booking)
-  await expect(page.getByRole('button', { name: '9:00 AM', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('button', { name: 'Book Appointment', exact: true })).toBeDisabled()
+test('validated fields preserve blur validation, label associations and phone formatting', async ({ booking, contactPage }) => {
+  await contactPage.openBooking(booking)
+  await expect(contactPage.timeSlot('9:00 AM')).toHaveAttribute('aria-pressed', 'true')
+  await expect(contactPage.submitButton).toBeDisabled()
   const fields = [
     { label: 'First Name', id: 'first-name', type: 'text', invalid: '123', corrected: '  Alex  ', expected: 'Alex', message: 'Please enter a valid first name' },
     { label: 'Last Name', id: 'last-name', type: 'text', invalid: '456', corrected: '  Driver  ', expected: 'Driver', message: 'Please enter a valid last name' },
@@ -15,12 +15,12 @@ test('validated fields preserve blur validation, label associations and phone fo
   ]
 
   for (const field of fields) {
-    const input = page.getByLabel(field.label, { exact: true })
+    const input = contactPage.field(field.label)
     await expect(input).toHaveAttribute('id', field.id)
     await expect(input).toHaveAttribute('type', field.type)
     await expect(input).toHaveAttribute('aria-invalid', 'false')
     expect(await input.getAttribute('aria-describedby')).toBeNull()
-    await expect(page.locator(`[id="${field.id}-error"]`)).toHaveCount(0)
+    await expect(contactPage.fieldError(field.id)).toHaveCount(0)
     expect(await input.evaluate((element) => {
       return element.previousElementSibling?.getAttribute('for') === element.id &&
         element.parentElement?.className === 'booking-form-section'
@@ -28,10 +28,10 @@ test('validated fields preserve blur validation, label associations and phone fo
   }
 
   for (const field of fields) {
-    const input = page.getByLabel(field.label, { exact: true })
+    const input = contactPage.field(field.label)
     const errorId = `${field.id}-error`
-    const error = page.locator(`[id="${errorId}"]`)
-    await page.getByText(field.label, { exact: true }).click()
+    const error = contactPage.fieldError(field.id)
+    await contactPage.fieldLabel(field.label).click()
     await expect(input).toBeFocused()
     await input.fill(field.invalid)
     await expect(input).toHaveAttribute('aria-invalid', 'false')
@@ -49,24 +49,26 @@ test('validated fields preserve blur validation, label associations and phone fo
     expect(await input.getAttribute('aria-describedby')).toBeNull()
   }
 
-  const phone = page.getByLabel('Phone', { exact: true })
+  const phone = contactPage.field('Phone')
   await phone.fill('18015551234')
   await expect(phone).toHaveValue('1-801-555-1234')
   await phone.fill('+44 20 1234 5678')
   await expect(phone).toHaveValue('+442012345678')
   await phone.blur()
   await expect(phone).toHaveAttribute('aria-invalid', 'false')
-  await expect(page.getByRole('button', { name: 'Book Appointment', exact: true })).toBeEnabled()
+  await expect(contactPage.submitButton).toBeEnabled()
 })
 
 
-test('backend customer field errors identify the field and preserve the form', async ({ page, booking }) => {
-  await prepareBooking(page, booking)
+test('backend customer field errors identify the field and preserve the form', async ({ booking, contactPage }) => {
+  await contactPage.openBooking(booking)
+  await contactPage.fillCustomer(customer)
+  await expect(contactPage.submitButton).toBeEnabled()
   const make = 'T'.repeat(256)
-  await page.getByLabel('Make', { exact: true }).fill(make)
-  await page.getByRole('button', { name: 'Book Appointment', exact: true }).click()
-  await expect(page.getByRole('alert')).toContainText('Vehicle make: should be at most 255 character(s)')
-  await expect(page.getByLabel('Make', { exact: true })).toHaveValue(make)
-  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(customer.Email)
+  await contactPage.field('Make').fill(make)
+  await contactPage.submitButton.click()
+  await expect(contactPage.alert).toContainText('Vehicle make: should be at most 255 character(s)')
+  await expect(contactPage.field('Make')).toHaveValue(make)
+  await expect(contactPage.field('Email')).toHaveValue(customer.Email)
 })
 
