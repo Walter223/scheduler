@@ -460,3 +460,10 @@ from `backend/` only after its workers stop. Never delete broadly by name/prefix
 cleanup validates the exact UUID's sequence ownership and catalog marker. Existing
 unowned catalog names cause setup to refuse overwriting data. No migration or
 reset is involved in allocator creation/removal.
+
+## Employment persistence
+
+See [EMPLOYMENT.md](EMPLOYMENT.md) for Milestone 4A employment/shop-assignment
+persistence, nullable identity links, terminal lifecycle, tenant constraints and
+focused verification. Employment classification and assignments grant no RBAC
+permissions and do not change public scheduling.
