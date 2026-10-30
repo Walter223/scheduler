@@ -1,10 +1,8 @@
-import { execFile } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
+import { readFile } from 'node:fs/promises'
+import { fixtures } from './runner'
 import { test as base, expect } from '@playwright/test'
 import type { Service } from '../src/types/booking'
 
-const exec = promisify(execFile)
 export const apiURL = 'http://127.0.0.1:4002'
 
 export type BookingData = {
@@ -21,15 +19,6 @@ export type BookingData = {
 
 export type CatalogData = { services: Service[]; date: string; starts_at: string }
 
-async function fixtures(command: 'seed' | 'cleanup') {
-  const { stdout } = await exec('mix', ['run', '--no-start', 'scripts/e2e.exs', command], {
-    cwd: fileURLToPath(new URL('../../backend', import.meta.url)),
-    env: { ...process.env, MIX_ENV: 'test', MIX_TEST_PARTITION: '_e2e', PORT: '4002' },
-    timeout: 30_000,
-  })
-  return stdout.trim().split('\n').at(-1) ?? ''
-}
-
 export const test = base.extend<{
   catalog: CatalogData
   booking: BookingData
@@ -39,13 +28,15 @@ export const test = base.extend<{
   packageName: ['Mid Detail', { option: true }],
   vehicleSize: ['Small', { option: true }],
   catalog: async ({ page }, run) => {
-    const catalog = JSON.parse(await fixtures('seed')) as CatalogData
+    const path = process.env.MAGNUM_E2E_MANIFEST
+    if (!path) throw new Error('Missing invocation-owned E2E manifest')
+    const shared = JSON.parse(await readFile(path, 'utf8')) as { runId: string; services: Service[] }
+    const slot = JSON.parse(await fixtures('allocate', shared.runId)) as { slot_id: number; date: string; starts_at: string }
     try {
-      // Vite proxies same-origin API requests to the isolated test server.
-      await run(catalog)
+      await run({ services: shared.services, date: slot.date, starts_at: slot.starts_at })
     } finally {
       await page.close()
-      await fixtures('cleanup')
+      await fixtures('cleanup-slot', shared.runId, String(slot.slot_id))
     }
   },
   booking: async ({ catalog, packageName, vehicleSize }, run) => {

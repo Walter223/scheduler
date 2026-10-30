@@ -2,9 +2,11 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  // The application has one shared scheduling resource; keep fixtures serial.
-  workers: 1,
+  // One catalog per invocation; distinct dates per test. CLI --workers still overrides.
+  workers: 2,
   fullyParallel: false,
+  globalSetup: './e2e/setup.ts',
+  globalTeardown: './e2e/teardown.ts',
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: 'list',

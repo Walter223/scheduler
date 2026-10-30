@@ -5,7 +5,7 @@ unless Mix.env() == :test and
   raise "E2E helpers require MIX_ENV=test and MIX_TEST_PARTITION=_e2e"
 end
 
-[command] = System.argv()
+[command | args] = System.argv()
 endpoint = SchedulerApiWeb.Endpoint
 config = Application.fetch_env!(:scheduler_api, endpoint)
 
@@ -29,7 +29,8 @@ defmodule SchedulerApi.E2EFixtures do
   @size_names ["Small", "Medium", "Large"]
   @marker "Playwright-owned fixture: "
 
-  def cleanup do
+  def cleanup(run_id) do
+    sequence_info!(run_id)
     shop = Organizations.default_shop!()
 
     Repo.transaction(fn ->
@@ -37,7 +38,7 @@ defmodule SchedulerApi.E2EFixtures do
         from s in Service,
           where:
             s.business_id == ^shop.business_id and s.name in @service_names and
-              like(s.description, ^"#{@marker}%"),
+              like(s.description, ^"#{@marker}#{run_id}: %"),
           select: s.id
 
       service_ids = Repo.all(services)
@@ -68,11 +69,13 @@ defmodule SchedulerApi.E2EFixtures do
       Repo.delete_all(
         from v in VehicleSize, where: v.id in ^size_ids and v.business_id == ^shop.business_id
       )
+
+      Repo.query!("DROP SEQUENCE #{sequence(run_id)}")
     end)
   end
 
-  def seed do
-    cleanup()
+  def seed(run_id) do
+    sequence(run_id)
 
     {:ok, result} =
       Repo.transaction(fn ->
@@ -94,33 +97,110 @@ defmodule SchedulerApi.E2EFixtures do
 
         for service <- Catalog.list_services_with_prices(), service.name in @service_names do
           {:ok, _} =
-            Catalog.update_service(service, %{description: @marker <> service.description})
+            Catalog.update_service(service, %{
+              description: @marker <> run_id <> ": " <> service.description
+            })
         end
 
         date = booking_date()
-        {opens, _} = Availability.business_hours(date)
+        # First Monday on/after tomorrow; base dates use alternating weeks.
+        base = Date.add(date, rem(8 - Date.day_of_week(date), 7))
+        info = Jason.encode!(%{owner: run_id, base: Date.to_iso8601(base)})
+        Repo.query!("CREATE SEQUENCE #{sequence(run_id)}")
+        Repo.query!("COMMENT ON SEQUENCE #{sequence(run_id)} IS '#{info}'")
 
         %{
-          date: Date.to_iso8601(date),
-          starts_at: DateTime.to_iso8601(opens),
           services:
             SchedulerApiWeb.ServiceJSON.index(%{services: Catalog.list_services_with_prices()})
         }
       end)
 
-    IO.puts(Jason.encode!(result))
+    IO.puts("MAGNUM_E2E_JSON:" <> Jason.encode!(result))
+  end
+
+  def allocate(run_id) do
+    info = sequence_info!(run_id)
+    %{rows: [[index]]} = Repo.query!("SELECT nextval('#{sequence(run_id)}')")
+    slot(run_id, index, info)
+  end
+
+  def cleanup_slot(run_id, index) do
+    info = sequence_info!(run_id)
+    data = slot(run_id, index, info)
+    date = Date.from_iso8601!(data.date)
+    {opens, closes} = Availability.business_hours(date)
+    shop = Organizations.default_shop!()
+
+    prices =
+      from p in ServicePrice,
+        join: s in Service,
+        on: s.id == p.service_id,
+        where:
+          p.shop_id == ^shop.id and s.business_id == ^shop.business_id and
+            like(s.description, ^"#{@marker}#{run_id}: %"),
+        select: p.id
+
+    Repo.delete_all(
+      from a in Appointment,
+        where:
+          a.service_price_id in subquery(prices) and
+            a.starts_at >= ^opens and a.starts_at < ^closes
+    )
+  end
+
+  defp slot(_run_id, index, info) when index in 1..36 do
+    offset = index - 1
+    date = Date.from_iso8601!(info["base"]) |> Date.add(div(offset, 6) * 14 + rem(offset, 6))
+    {opens, _} = Availability.business_hours(date)
+    %{slot_id: index, date: Date.to_iso8601(date), starts_at: DateTime.to_iso8601(opens)}
+  end
+
+  defp slot(_, _, _),
+    do: raise("E2E date reservation capacity exceeded; expand allocation deliberately")
+
+  defp sequence(run_id) do
+    unless Regex.match?(
+             ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+             run_id
+           ),
+           do: raise("Invalid E2E owner ID")
+
+    "magnum_e2e_" <> String.replace(run_id, "-", "")
+  end
+
+  defp sequence_info!(run_id) do
+    name = sequence(run_id)
+
+    %{rows: [[comment]]} =
+      Repo.query!(
+        "SELECT obj_description(c.oid, 'pg_class') FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='S' AND c.relname=$1 AND n.nspname=current_schema()",
+        [name]
+      )
+
+    info = Jason.decode!(comment)
+
+    unless info["owner"] == run_id,
+      do: raise("Sequence ownership mismatch; refusing fixture operation")
+
+    info
   end
 end
 
-case command do
-  "server" ->
+case {command, args} do
+  {"server", []} ->
     receive do
       :stop -> :ok
     end
 
-  "seed" ->
-    SchedulerApi.E2EFixtures.seed()
+  {"seed", [run_id]} ->
+    SchedulerApi.E2EFixtures.seed(run_id)
 
-  "cleanup" ->
-    SchedulerApi.E2EFixtures.cleanup()
+  {"allocate", [run_id]} ->
+    IO.puts("MAGNUM_E2E_JSON:" <> Jason.encode!(SchedulerApi.E2EFixtures.allocate(run_id)))
+
+  {"cleanup-slot", [run_id, index]} ->
+    SchedulerApi.E2EFixtures.cleanup_slot(run_id, String.to_integer(index))
+
+  {"cleanup", [run_id]} ->
+    SchedulerApi.E2EFixtures.cleanup(run_id)
 end

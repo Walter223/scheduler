@@ -127,14 +127,12 @@ Application behavior, CSS, routes and API contracts are unchanged.
 Prerequisites: root `mise.toml` runtimes, local PostgreSQL with credentials from
 `backend/config/test.exs`, and installed backend dependencies. Run
 `npm run test:e2e:headed` for a visible browser or
-`npm run test:e2e -- --repeat-each=3` to check repeatability. Test files are
+`for run in 1 2 3; do npm run test:e2e || break; done` for three fresh runs. Test files are
 TypeScript-checked before execution.
 
 Playwright starts Phoenix on **4002** and Vite on **5174**, never reusing existing
 servers. Normal development can continue on 4000/5173. Browser API requests are
-forwarded from the app's fixed 4000 URL to the real isolated test API; the harness
-only supplies the test frontend's CORS origin. Production booking/CORS rules are
-unchanged. Conflict tests use a second real API client, not canned 422 responses.
+sent through Vite's same-origin `/api` proxy to the real isolated test API. Conflict tests use a second real API client, not canned 422 responses.
 
 ### Isolated catalog fixtures and cleanup
 
@@ -142,19 +140,25 @@ The backend helper refuses to run unless `MIX_ENV=test`, `MIX_TEST_PARTITION=_e2
 and the exact database **scheduler_api_test_e2e** are selected. Do not point it at
 development data or share this partition between concurrent E2E runs.
 
-Each test seeds the real `backend/priv/repo/seeds.exs` catalog into this partition,
-with a description marker identifying fixture-owned packages. Dates use the next
-open Denver date, not a fixed calendar date. IDs are obtained from the fixture;
-prices/durations are independently asserted in browser tests. Update those
-expectations intentionally when the real catalog changes.
+The source-controlled catalog is seeded once per invocation, marked with a unique
+owner UUID and shared read-only by the workers. A UUID-owned database sequence
+allocates a distinct future Monday–Saturday date to each test, reserving its
+following-week date too. Prices/durations remain independently asserted.
 
-Cleanup removes only marked fixture services, their prices/appointments and
-associated sizes. It refuses foreign/shared references and refuses to overwrite
-unmarked records with reserved Basic/Mid/Supreme or Small/Medium/Large names.
-Setup cleans interrupted-run leftovers; teardown runs even after assertion
-failure. The business/default shop remain foundation data. No database reset,
-development writes, public test route or scheduling bypass is used. One worker
-keeps the single-shop schedule and fixture lifecycle isolated.
+The default is **2 workers**; override with `npm run test:e2e -- --workers=1`
+or `--workers=4`. Six meaningful spec files run concurrently; tests within each
+file stay sequential (`fullyParallel: false`). Conflict tests still use real
+competing bookings within their own reserved dates. Allocation is capped at 36
+per invocation to stay inside the booking horizon; use separate invocations for
+long stress repetitions rather than unbounded `--repeat-each`.
+
+Per-test cleanup removes only appointments on that test's owned date and prices.
+Global teardown removes the exact run's catalog and allocator after all workers
+finish, retaining foreign-reference guards. Unowned/leftover catalog names cause
+setup to fail rather than deleting another run's data. No reset, development write,
+public test route or scheduling bypass is used; business/default shop remain.
+For ownership-checked recovery after a forcibly interrupted process, see
+[backend verification documentation](../backend/README.md#parallel-anonymous-playwright).
 
 Failed browser runs retain ignored screenshots/traces under `test-results/`.
 Inspect with `npx playwright show-trace test-results/<test-folder>/trace.zip`.

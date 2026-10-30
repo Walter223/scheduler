@@ -416,3 +416,33 @@ test/scheduler_api/owner_bootstrap_concurrency_test.exs` (one command). These us
 sandbox fixtures and positively owned, cleaned test rows only. No actual development
 accounts receive memberships or privileges. Protected admin APIs, owner recovery,
 activation/invitations, verified operator attestation and God Mode remain separate.
+
+## Parallel anonymous Playwright
+
+`npm run test:e2e` defaults to **2 workers**. CLI overrides remain supported, e.g.
+`npm run test:e2e -- --workers=1` or `--workers=4`. Global `fullyParallel` remains
+false: the six catalog, selection, validation, availability, booking and conflict
+specs run concurrently across files; tests within each file remain sequential.
+The same isolated Phoenix/Vite servers and `scheduler_api_test_e2e` database are
+used, with existing no-reuse/port protections. Do not run separate suite invocations
+concurrently against that database. Real-Keycloak `test:auth` is unchanged/separate.
+
+Global setup seeds the source-controlled catalog once and marks it with a fresh
+invocation UUID. An owner-commented, UUID-named PostgreSQL sequence allocates unique
+per-test dates, independent of worker number. Monday–Saturday base dates occupy
+alternating weeks, reserving each test's following-week date too. Up to 36 test
+allocations fit inside the booking horizon; exceeding capacity fails explicitly.
+No scheduling rule, API or retry policy changes are required.
+
+Per-test teardown closes its page and deletes only appointments on that allocated
+date referencing this invocation's marked prices. It cannot delete another test's
+date or shared catalog. Global teardown runs after workers finish and removes only
+this invocation's catalog, appointments, allocator sequence and temporary manifest;
+foreign-reference guards remain. Failures are not hidden by retries or sleeps.
+A forcibly killed run can leave owned fixtures: inspect the preserved manifest in
+an OS temp `magnum-anonymous-e2e-*` directory and use `MIX_ENV=test
+MIX_TEST_PARTITION=_e2e mix run --no-start scripts/e2e.exs cleanup RUN_UUID`
+from `backend/` only after its workers stop. Never delete broadly by name/prefix;
+cleanup validates the exact UUID's sequence ownership and catalog marker. Existing
+unowned catalog names cause setup to refuse overwriting data. No migration or
+reset is involved in allocator creation/removal.
