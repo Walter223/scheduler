@@ -125,8 +125,14 @@ defmodule SchedulerApi.OrganizationsTest do
   end
 
   test "ownership columns reject null and tenant deletion cannot orphan data" do
-    price = service_price_fixture()
-    assert {:ok, appointment} = SchedulerApi.Appointments.create_appointment(booking_attrs(price))
+    # DELETE upgrades the parent row lock and conflicts with foreign-key locks
+    # held by parallel fixtures. Never delete the shared default tenant here.
+    %{price: price, shop: shop} = SchedulerApi.ShopsFixtures.other_business_price_fixture()
+    refute price.business_id == Organizations.default_business!().id
+    refute shop.id == Organizations.default_shop!().id
+
+    assert {:ok, appointment} =
+             SchedulerApi.Appointments.create_appointment(shop, booking_attrs(price))
 
     for {table, id, field} <- [
           {"services", price.service_id, "business_id"},
