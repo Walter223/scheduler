@@ -172,7 +172,7 @@ defmodule SchedulerApi.Authorization.RoleManagement do
       e && membership && e.status == :active && e.business_id == business.id &&
         e.user_id == membership.user_id
 
-    if valid && Authorization.authorize(user, :employment_manage, business) == :ok do
+    if valid && Authorization.authorize(user, :employment_terminate, e) == :ok do
       owner =
         Repo.exists?(
           from r in RoleAssignment,

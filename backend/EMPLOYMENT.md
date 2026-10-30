@@ -3,7 +3,7 @@
 `SchedulerApi.Employment` owns internal employment records and shop assignments.
 Milestone 4A mutation functions remain trusted persistence primitives, not
 authorized HR APIs. Milestone 4B adds the authorized, field-projected reads below.
-Milestone 4C adds [compensation persistence and access](COMPENSATION.md). No HTTP
+Milestone 4C adds [compensation persistence and access](COMPENSATION.md). No
 HR HTTP routes, recurring schedule generation or account-linking workflows are implemented.
 Milestone 4E-1 adds [authorized, audited HR operations](HR_ADMINISTRATION.md).
 Milestone 4D-1 adds [explicit audited work shifts](WORK_SHIFTS.md).
@@ -127,7 +127,8 @@ ownership through these queries. `employment_scopes_query/2` and
 or flatten them into cached role/shop sets. Authentication is still a separate
 caller responsibility: future adapters must take the actor from the authenticated
 session, not HTTP identity parameters. Compensation uses the separate guarded queries in [COMPENSATION.md](COMPENSATION.md);
-explicit shifts use [WORK_SHIFTS.md](WORK_SHIFTS.md); assigned-job resolvers remain denied. Historical raw 4A retrieval helpers are internal only;
+explicit shifts use [WORK_SHIFTS.md](WORK_SHIFTS.md); assigned-job scopes use
+[APPOINTMENT_ASSIGNMENTS.md](APPOINTMENT_ASSIGNMENTS.md). Historical raw 4A retrieval helpers are internal only;
 they are not substitutes for these authorized projections.
 
 Focused access verification: `mix test test/scheduler_api/employment_access_test.exs`.
@@ -138,3 +139,10 @@ history; explicit audited unassignment is separate from ending employment.
 
 Use [secure offboarding](OFFBOARDING.md) for authorized employment termination
 with future-work cleanup and business-scoped access revocation.
+
+## Employment access acceptance matrix
+
+See [employment access scenarios](../docs/employment-access-scenarios.md) for the
+permanent tenant/shop, offboarding, Owner-protection and rehire requirements,
+current test evidence, explicit gaps and future Admin UI acceptance criteria.
+Rehire remains unimplemented; retained history is not proof of rehire privacy.

@@ -12,7 +12,12 @@ Shop Managers/Employees cannot. Eligibility is checked again under locks.
 `RoleManagement.revoke_employment_access/2` is a narrow HR revocation primitive:
 it resolves only the target's persisted active employment and matching membership.
 It does not give Business Managers general role-management permission. Non-Owner
-HR cannot remove protected Owner access; existing last-eligible-Owner protection
+HR cannot terminate current or historically Owner-classified employment, or
+employment linked to current/historical same-business Owner grants. This
+record-specific `employment_terminate` policy is checked after eligibility/grant
+and employment locks; classification changes and Employee grants cannot erase
+protection. Other management classifications alone do not confer Owner protection.
+Existing last-eligible-Owner protection
 always applies. Transfer ownership first if it would leave no eligible Owner.
 
 A linked user's membership and all active grants in this business are revoked

@@ -36,6 +36,11 @@ defmodule SchedulerApi.Employment.Offboarding do
 
            e = Repo.one!(from p in EmploymentRecord, where: p.id == ^e.id, lock: "FOR UPDATE")
 
+           # Recheck the persisted record/history only after business eligibility,
+           # grant and employment locks. Reclassification never erases protection.
+           if Authorization.authorize(actor.user, :employment_terminate, e) != :ok,
+             do: Repo.rollback(:forbidden)
+
            if e.status == :ended do
              unless Repo.exists?(from a in OffboardingAudit, where: a.employment_id == ^e.id),
                do: Repo.rollback(:legacy_termination_requires_review)

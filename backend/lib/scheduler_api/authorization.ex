@@ -39,10 +39,13 @@ defmodule SchedulerApi.Authorization do
     :employment_own_read,
     :compensation_own_read
   ]
+  @hr_record_actions [:employment_terminate]
   @permissions %{
-    business_owner: @business_actions ++ @shop_actions ++ @assigned_staff ++ @own_work,
+    business_owner:
+      @business_actions ++ @shop_actions ++ @assigned_staff ++ @own_work ++ @hr_record_actions,
     business_manager: [
       :employment_manage,
+      :employment_terminate,
       :employment_private_read,
       :compensation_read,
       :compensation_write,
@@ -80,6 +83,22 @@ defmodule SchedulerApi.Authorization do
       join: shop in Shop,
       on: shop.id == a.shop_id and shop.business_id == a.business_id,
       where: a.id == ^id
+    )
+    |> Repo.exists?()
+    |> decision()
+  end
+
+  def authorize(%User{id: user_id}, :employment_terminate, %EmploymentRecord{id: id})
+      when is_integer(user_id) and user_id > 0 and is_integer(id) do
+    protected = management_employments([:business_owner])
+    # One current grant supplies both HR authority and business scope. Current
+    # or historical ownership is a restriction, never a source of permission.
+    from([r, m, u, b] in grants(user_id, :employment_terminate),
+      join: e in EmploymentRecord,
+      on: e.business_id == b.id,
+      where:
+        e.id == ^id and is_nil(r.shop_id) and
+          (r.role == :business_owner or e.id not in subquery(protected))
     )
     |> Repo.exists?()
     |> decision()
