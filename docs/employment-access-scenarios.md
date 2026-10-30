@@ -91,3 +91,8 @@ selector races and self-service HTTP surfaces remain separate acceptance gaps.
 CSRF, field/tenant spoofing, Owner restrictions, atomic rollback and repeated
 lifecycle mutations. Simultaneous HTTP races remain deferred; existing
 independent-connection domain tests are the concurrency evidence.
+
+4F-3 adds [protected scheduling APIs](../backend/SCHEDULING_API.md): scoped
+appointment/team/shift and own-period reads, secure writes, and independent-connection
+HTTP addition/lead races. Remaining browser and cross-lifecycle HTTP race gaps are
+listed in that contract; domain concurrency coverage remains in force.

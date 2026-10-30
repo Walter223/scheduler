@@ -24,6 +24,10 @@ defmodule SchedulerApi.JobAssignmentConcurrencyTest do
   alias SchedulerApi.Accounts.WebSession
   alias SchedulerApi.Catalog.{Service, VehicleSize, ServicePrice}
 
+  import Plug.Conn
+  import Phoenix.ConnTest
+  @endpoint SchedulerApiWeb.Endpoint
+
   setup do
     c =
       Sandbox.unboxed_run(Repo, fn ->
@@ -360,5 +364,75 @@ defmodule SchedulerApi.JobAssignmentConcurrencyTest do
                &1
              )
            ) == 1
+  end
+
+  test "independent HTTP additions and lead transfers preserve a complete multi-member team", c do
+    raw = SchedulerApi.Accounts.SessionCredential.reveal(c.credential)
+
+    auth = fn ->
+      build_conn() |> put_req_cookie(SchedulerApiWeb.BrowserSession.session_name(), raw)
+    end
+
+    csrf =
+      Sandbox.unboxed_run(Repo, fn ->
+        auth.() |> get("/api/me") |> json_response(200) |> Map.fetch!("csrf_token")
+      end)
+
+    path =
+      "/api/admin/businesses/#{c.business.id}/shops/#{c.shop.id}/appointments/#{c.booking.id}/team"
+
+    request = fn url, body ->
+      auth.()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("origin", "http://localhost:5173")
+      |> put_req_header("x-csrf-token", csrf)
+      |> post(url, Jason.encode!(body))
+    end
+
+    responses =
+      compete(
+        c,
+        for(
+          a <- [c.assignment, c.next.assignment],
+          do: fn ->
+            request.(path, %{
+              employee_id: a.employment_id,
+              period_id: a.employment_id,
+              assignment_id: a.id
+            })
+          end
+        )
+      )
+
+    members = Enum.map(responses, fn r -> json_response(r, 201)["data"] end)
+    leads = compete(c, for(m <- members, do: fn -> request.(path <> "/#{m["id"]}/lead", %{}) end))
+    assert Enum.all?(leads, &(&1.status == 200))
+
+    duplicates =
+      compete(
+        c,
+        for(
+          _ <- 1..2,
+          do: fn ->
+            request.(path, %{
+              employee_id: c.employment.id,
+              period_id: c.employment.id,
+              assignment_id: c.assignment.id
+            })
+          end
+        )
+      )
+
+    assert Enum.all?(duplicates, &(json_response(&1, 409)["error"] == "already_assigned"))
+
+    Sandbox.unboxed_run(Repo, fn ->
+      active =
+        Repo.all(
+          from j in JobAssignment, where: j.business_id == ^c.business.id and j.status == :active
+        )
+
+      assert length(active) == 2
+      assert Enum.count(active, & &1.is_lead) == 1
+    end)
   end
 end

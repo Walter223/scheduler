@@ -76,6 +76,40 @@ defmodule SchedulerApiWeb.Router do
       log: false
   end
 
+  scope "/api/admin/businesses/:business_id", SchedulerApiWeb do
+    pipe_through :admin_api
+    get "/shops/:shop_id/appointments", SchedulingController, :appointments, log: false
+
+    get "/shops/:shop_id/appointments/:appointment_id/team", SchedulingController, :team,
+      log: false
+
+    get "/shops/:shop_id/shifts", SchedulingController, :shifts, log: false
+
+    get "/shops/:shop_id/employees/:employee_id/periods/:period_id/shifts",
+        SchedulingController,
+        :employee_shifts, log: false
+
+    get "/me/shifts", SchedulingController, :own_shifts, log: false
+    get "/me/work", SchedulingController, :own_jobs, log: false
+  end
+
+  scope "/api/admin/businesses/:business_id/shops/:shop_id", SchedulerApiWeb do
+    pipe_through :admin_write
+    post "/shifts", SchedulingController, :create_shift, log: false
+    post "/shifts/:shift_id/cancel", SchedulingController, :cancel_shift, log: false
+    post "/shifts/:shift_id/reschedule", SchedulingController, :reschedule_shift, log: false
+    post "/appointments/:appointment_id/team", SchedulingController, :add, log: false
+
+    post "/appointments/:appointment_id/team/:job_id/remove", SchedulingController, :remove,
+      log: false
+
+    post "/appointments/:appointment_id/team/:job_id/lead", SchedulingController, :lead,
+      log: false
+
+    post "/appointments/:appointment_id/team/clear-lead", SchedulingController, :clear_lead,
+      log: false
+  end
+
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:scheduler_api, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put

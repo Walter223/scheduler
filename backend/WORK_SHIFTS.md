@@ -107,3 +107,6 @@ is added.
 ```sh
 mix test test/scheduler_api/work_schedules_test.exs test/scheduler_api/work_shift_audit_test.exs test/scheduler_api/work_shift_concurrency_test.exs
 ```
+
+Milestone 4F-3 exposes the existing operations through
+[protected scheduling HTTP APIs](SCHEDULING_API.md), with no booking-rule changes.

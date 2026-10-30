@@ -138,3 +138,6 @@ to positively owned business/user IDs. Development data is never migrated by tes
 ```sh
 mix test test/scheduler_api/appointment_team*_test.exs test/scheduler_api/job_assignment*_test.exs
 ```
+
+Milestone 4F-3 exposes the existing operations through
+[protected scheduling HTTP APIs](SCHEDULING_API.md), with no booking-rule changes.

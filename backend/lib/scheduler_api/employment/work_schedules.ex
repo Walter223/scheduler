@@ -361,7 +361,12 @@ defmodule SchedulerApi.Employment.WorkSchedules do
 
   defp clock(_), do: {:error, :invalid_options}
 
-  defp list(user, action, {field, id}, opts) do
+  def list_employee_shifts(user, %Shop{} = shop, %EmploymentRecord{} = employment, opts),
+    do: list(user, :schedule_manage, {:shop_id, shop.id}, opts, employment.id)
+
+  defp list(user, action, scope, opts), do: list(user, action, scope, opts, nil)
+
+  defp list(user, action, {field, id}, opts, period_id) do
     scopes =
       from p in subquery(Authorization.work_shift_scopes_query(user, action)),
         where: field(p, ^field) == ^id
@@ -377,6 +382,7 @@ defmodule SchedulerApi.Employment.WorkSchedules do
           order_by: [asc: w.starts_at, asc: w.id],
           limit: ^(options.limit + 1)
 
+      query = if period_id, do: where(query, [w], w.employment_id == ^period_id), else: query
       query = if options.from, do: where(query, [w], w.ends_at > ^options.from), else: query
       query = if options.until, do: where(query, [w], w.starts_at < ^options.until), else: query
 

@@ -55,11 +55,18 @@ defmodule SchedulerApi.Appointments do
   @doc "Session-backed admin read. Current session and complete grants are SQL predicates, never cached scopes."
   def list_authorized_upcoming_appointments(session, opts \\ [])
 
-  def list_authorized_upcoming_appointments(
-        %SchedulerApi.Accounts.WebSession{id: id, user_id: user_id},
-        opts
-      )
-      when is_integer(id) and is_integer(user_id) do
+  def list_authorized_upcoming_appointments(session, opts),
+    do: authorized_upcoming(session, opts, nil)
+
+  def list_authorized_shop_appointments(session, %Shop{} = shop, opts),
+    do: authorized_upcoming(session, opts, shop)
+
+  defp authorized_upcoming(
+         %SchedulerApi.Accounts.WebSession{id: id, user_id: user_id},
+         opts,
+         shop_filter
+       )
+       when is_integer(id) and is_integer(user_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     sessions =
@@ -86,6 +93,16 @@ defmodule SchedulerApi.Appointments do
         on: true,
         select: %{id: shop.id, business_id: shop.business_id}
 
+    scopes =
+      if shop_filter,
+        do:
+          where(
+            scopes,
+            [s],
+            s.id == ^shop_filter.id and s.business_id == ^shop_filter.business_id
+          ),
+        else: scopes
+
     cond do
       not Repo.exists?(sessions) ->
         {:error, :unauthenticated}
@@ -103,7 +120,7 @@ defmodule SchedulerApi.Appointments do
     end
   end
 
-  def list_authorized_upcoming_appointments(_, _), do: {:error, :unauthenticated}
+  defp authorized_upcoming(_, _, _), do: {:error, :unauthenticated}
 
   defp paginate_upcoming(scoped_query, opts) do
     if is_list(opts) and Keyword.keyword?(opts) do
