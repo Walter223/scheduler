@@ -31,9 +31,14 @@ defmodule SchedulerApi.Authorization do
     :shop_staff_manage
   ]
   # Contact and own-employment reads now resolve actual employment records.
-  # Compensation, jobs and schedules remain deferred; no broad shop fallback.
+  # Pay has separate record-level guards below; jobs/schedules remain deferred.
   @assigned_staff [:assigned_employee_contact_read, :assigned_employee_compensation_read]
-  @own_work [:jobs_assigned_read, :schedule_own_read, :employment_own_read]
+  @own_work [
+    :jobs_assigned_read,
+    :schedule_own_read,
+    :employment_own_read,
+    :compensation_own_read
+  ]
   @permissions %{
     business_owner: @business_actions ++ @shop_actions ++ @assigned_staff ++ @own_work,
     business_manager: [
@@ -92,6 +97,21 @@ defmodule SchedulerApi.Authorization do
     |> decision()
   end
 
+  def authorize(%User{} = user, action, %EmploymentRecord{id: id})
+      when is_integer(id) and
+             action in [
+               :compensation_read,
+               :compensation_write,
+               :assigned_employee_compensation_read,
+               :compensation_own_read
+             ] do
+    from(e in subquery(authorized_compensation_employment_ids_query(user, action)),
+      where: e.id == ^id
+    )
+    |> Repo.exists?()
+    |> decision()
+  end
+
   def authorize(_, _, _), do: {:error, :forbidden}
 
   @doc """
@@ -115,7 +135,8 @@ defmodule SchedulerApi.Authorization do
   @employment_reads [
     :employment_private_read,
     :assigned_employee_contact_read,
-    :employment_own_read
+    :employment_own_read,
+    :compensation_own_read
   ]
 
   @doc """
@@ -142,7 +163,7 @@ defmodule SchedulerApi.Authorization do
           select: %{business_id: b.id, shop_id: s.id, user_id: u.id},
           distinct: true
 
-      :employment_own_read ->
+      own when own in [:employment_own_read, :compensation_own_read] ->
         from [r, m, u, b] in query,
           left_join: s in Shop,
           on: s.id == r.shop_id and s.business_id == b.id and s.status == :active,
@@ -192,7 +213,7 @@ defmodule SchedulerApi.Authorization do
         distinct: true,
         select: %{id: e.id, business_id: e.business_id, shop_id: p.shop_id}
 
-    if action == :employment_own_read,
+    if action in [:employment_own_read, :compensation_own_read],
       do: where(query, [e, p], e.user_id == p.user_id),
       else: query
   end
@@ -203,6 +224,84 @@ defmodule SchedulerApi.Authorization do
         where: false,
         select: %{id: e.id, business_id: e.business_id, shop_id: fragment("NULL::bigint")}
       )
+
+  @doc """
+  Record-specific compensation authority, never inferred from classification.
+  HR history access includes ended employment. Owner pay is restricted even if a
+  linked Owner was misclassified; management-role history is scoped to this business.
+  Shop reads require an active/current Detailer and an assigned active shop.
+  """
+  def authorized_compensation_employment_ids_query(user, action, now \\ DateTime.utc_now())
+
+  def authorized_compensation_employment_ids_query(
+        %User{id: id} = user,
+        action,
+        %DateTime{} = now
+      )
+      when is_integer(id) and id > 0 and
+             action in [
+               :compensation_read,
+               :compensation_write,
+               :assigned_employee_compensation_read,
+               :compensation_own_read
+             ] do
+    case action do
+      :compensation_own_read ->
+        from e in subquery(authorized_employment_ids_query(user, action, now)),
+          distinct: true,
+          select: %{id: e.id}
+
+      hr when hr in [:compensation_read, :compensation_write] ->
+        owners = management_employments([:business_owner])
+
+        from [r, m, u, b] in grants(id, hr),
+          join: e in EmploymentRecord,
+          on: e.business_id == b.id,
+          where:
+            is_nil(r.shop_id) and
+              (r.role == :business_owner or
+                 (e.classification != :business_owner and e.id not in subquery(owners))),
+          distinct: true,
+          select: %{id: e.id}
+
+      :assigned_employee_compensation_read ->
+        management = management_employments([:business_owner, :business_manager, :shop_manager])
+        now = now |> DateTime.to_unix(:second) |> DateTime.from_unix!(:second)
+
+        from [r, m, u, b] in grants(id, action),
+          join: s in Shop,
+          on: s.business_id == b.id,
+          join: a in ShopAssignment,
+          on: a.shop_id == s.id and a.business_id == b.id,
+          join: e in EmploymentRecord,
+          on: e.id == a.employment_id and e.business_id == b.id,
+          where:
+            s.status == :active and (is_nil(r.shop_id) or r.shop_id == s.id) and
+              a.status == :active and e.status == :active and e.classification == :detailer and
+              a.starts_on <=
+                fragment("(?::timestamptz AT TIME ZONE 'America/Denver')::date", ^now) and
+              e.starts_on <=
+                fragment("(?::timestamptz AT TIME ZONE 'America/Denver')::date", ^now) and
+              e.id not in subquery(management),
+          distinct: true,
+          select: %{id: e.id}
+    end
+  end
+
+  def authorized_compensation_employment_ids_query(_, _, _),
+    do: from(e in EmploymentRecord, where: false, select: %{id: e.id})
+
+  defp management_employments(roles) do
+    # Deliberately include revoked grants: a past management role must not expose
+    # management compensation through a later Employee grant or misclassification.
+    from e in EmploymentRecord,
+      join: m in BusinessMembership,
+      on: m.user_id == e.user_id and m.business_id == e.business_id,
+      join: r in RoleAssignment,
+      on: r.membership_id == m.id and r.business_id == e.business_id,
+      where: r.role in ^roles,
+      select: e.id
+  end
 
   defp grants(user_id, action) do
     roles = for {role, actions} <- @permissions, action in actions, do: role

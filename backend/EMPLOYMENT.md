@@ -3,7 +3,8 @@
 `SchedulerApi.Employment` owns internal employment records and shop assignments.
 Milestone 4A mutation functions remain trusted persistence primitives, not
 authorized HR APIs. Milestone 4B adds the authorized, field-projected reads below.
-No HTTP routes, contact mutations, compensation, schedules or jobs are implemented.
+Milestone 4C adds [compensation persistence and access](COMPENSATION.md). No HTTP
+routes, contact mutations, schedules or jobs are implemented.
 
 ## Identity and ownership
 
@@ -122,8 +123,8 @@ ownership through these queries. `employment_scopes_query/2` and
 `authorized_employment_ids_query/3` retain complete grant scopes; never materialize
 or flatten them into cached role/shop sets. Authentication is still a separate
 caller responsibility: future adapters must take the actor from the authenticated
-session, not HTTP identity parameters. Compensation and assigned-job/schedule
-resolvers remain denied. Historical raw 4A retrieval helpers are internal only;
+session, not HTTP identity parameters. Compensation uses the separate guarded queries in [COMPENSATION.md](COMPENSATION.md);
+assigned-job/schedule resolvers remain denied. Historical raw 4A retrieval helpers are internal only;
 they are not substitutes for these authorized projections.
 
 Focused access verification: `mix test test/scheduler_api/employment_access_test.exs`.

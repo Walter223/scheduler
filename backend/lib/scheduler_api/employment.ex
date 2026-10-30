@@ -168,8 +168,15 @@ defmodule SchedulerApi.Employment do
 
   def assign_shop(%EmploymentRecord{id: id}, %Shop{id: shop_id}, attrs) do
     Repo.transaction(fn ->
+      # Compensation/role writes lock business first. Match that order before
+      # locking employment so assignment creation cannot form a lock cycle.
+      reference =
+        Repo.one(
+          from e in EmploymentRecord, where: e.id == ^id, select: %{business_id: e.business_id}
+        ) || Repo.rollback(:employment_not_found)
+
+      active_business!(reference.business_id)
       employment = lock_employment!(id)
-      active_business!(employment.business_id)
       if employment.status != :active, do: Repo.rollback(:employment_ended)
       shop = Repo.one(from s in Shop, where: s.id == ^shop_id, lock: "FOR SHARE")
 

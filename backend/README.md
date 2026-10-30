@@ -294,8 +294,9 @@ Business Managers have business-wide employment, compensation, payroll and finan
 actions, but no access-management or shop operations. Shop Managers have shop
 appointment, schedule, assignment, customer and operational actions only at their
 assigned shops. Employment own-read and assigned-contact reads now resolve active
-employment/shop assignments through [EMPLOYMENT.md](EMPLOYMENT.md). Assigned-job,
-schedule and employee-compensation resolvers remain denied. Broad compensation actions never grant
+employment/shop assignments through [EMPLOYMENT.md](EMPLOYMENT.md). Assigned-job and
+schedule resolvers remain denied. Compensation reads/writes now use the guarded
+record-level policies in [COMPENSATION.md](COMPENSATION.md). Broad compensation actions never grant
 Shop Managers employee pay access. No permission enables payroll record storage,
 role-management APIs or platform administration in this milestone.
 
@@ -467,3 +468,11 @@ See [EMPLOYMENT.md](EMPLOYMENT.md) for Milestone 4A employment/shop-assignment
 persistence, nullable identity links, terminal lifecycle, tenant constraints and
 focused verification. Employment classification and assignments grant no RBAC
 permissions and do not change public scheduling.
+
+
+## Employment compensation
+
+See [COMPENSATION.md](COMPENSATION.md) for exact USD hourly/annual-salary rates,
+effective-period constraints, Owner-pay restrictions, Detailer-only shop access,
+explicit own-pay reads, transactional audit and retained former-employee history.
+No financial HTTP endpoints or payroll processing are implemented.
