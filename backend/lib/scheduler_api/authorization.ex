@@ -306,14 +306,26 @@ defmodule SchedulerApi.Authorization do
     do: from(e in EmploymentRecord, where: false, select: %{id: e.id})
 
   defp management_employments(roles) do
-    # Deliberately include revoked grants: a past management role must not expose
-    # management compensation through a later Employee grant or misclassification.
+    # Both revoked management grants AND any past management classification stay
+    # sensitive. A later Employee grant/reclassification never downgrades pay privacy.
+    role_history =
+      from e in EmploymentRecord,
+        join: m in BusinessMembership,
+        on: m.user_id == e.user_id and m.business_id == e.business_id,
+        join: r in RoleAssignment,
+        on: r.membership_id == m.id and r.business_id == e.business_id,
+        where: r.role in ^roles,
+        select: e.id
+
+    classifications =
+      from h in SchedulerApi.Employment.ClassificationHistory,
+        where: h.classification in ^roles or h.previous_classification in ^roles,
+        select: h.employment_id
+
     from e in EmploymentRecord,
-      join: m in BusinessMembership,
-      on: m.user_id == e.user_id and m.business_id == e.business_id,
-      join: r in RoleAssignment,
-      on: r.membership_id == m.id and r.business_id == e.business_id,
-      where: r.role in ^roles,
+      where:
+        e.classification in ^roles or e.id in subquery(role_history) or
+          e.id in subquery(classifications),
       select: e.id
   end
 

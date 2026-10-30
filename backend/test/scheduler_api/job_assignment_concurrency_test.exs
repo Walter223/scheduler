@@ -39,6 +39,12 @@ defmodule SchedulerApi.JobAssignmentConcurrencyTest do
         Repo.delete_all(from a in WorkShiftAuditEvent, where: a.business_id == ^c.business.id)
         Repo.delete_all(from w in WorkShift, where: w.business_id == ^c.business.id)
         Repo.delete_all(from a in ShopAssignment, where: a.business_id == ^c.business.id)
+
+        Repo.delete_all(
+          from h in SchedulerApi.Employment.ClassificationHistory,
+            where: h.business_id == ^c.business.id
+        )
+
         Repo.delete_all(from e in EmploymentRecord, where: e.business_id == ^c.business.id)
         Repo.delete_all(from a in Appointment, where: a.business_id == ^c.business.id)
         Repo.delete_all(from p in ServicePrice, where: p.business_id == ^c.business.id)

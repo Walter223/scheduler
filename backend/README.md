@@ -491,3 +491,9 @@ See [APPOINTMENT_ASSIGNMENTS.md](APPOINTMENT_ASSIGNMENTS.md) for internal audite
 multi-member assignment/lead APIs, covering-shift policy, scope/field allowlists
 and locking. Legacy single-member operations reject ambiguous team changes.
 Assignments remain independent of public customer booking availability.
+
+## HR administration
+
+See [HR_ADMINISTRATION.md](HR_ADMINISTRATION.md) for session-authorized employment
+creation, contact edits, classification changes and shop-assignment lifecycle.
+All changes are audited; classification history preserves management-pay privacy.

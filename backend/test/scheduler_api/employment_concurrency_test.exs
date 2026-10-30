@@ -18,6 +18,12 @@ defmodule SchedulerApi.EmploymentConcurrencyTest do
     on_exit(fn ->
       Sandbox.unboxed_run(Repo, fn ->
         Repo.delete_all(from a in ShopAssignment, where: a.employment_id == ^record.id)
+
+        Repo.delete_all(
+          from h in SchedulerApi.Employment.ClassificationHistory,
+            where: h.employment_id == ^record.id
+        )
+
         Repo.delete_all(from e in EmploymentRecord, where: e.id == ^record.id)
         Repo.delete_all(from s in Shop, where: s.id == ^shop.id)
         Repo.delete_all(from b in Business, where: b.id == ^record.business_id)

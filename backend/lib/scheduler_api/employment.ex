@@ -2,6 +2,7 @@ defmodule SchedulerApi.Employment do
   @moduledoc """
   Employment persistence and authorized read projections. Mutations remain trusted
   internal persistence primitives, NOT authorized HR/account-linking APIs.
+  Authorized HR writes use SchedulerApi.Employment.HR.
   Read callers must authenticate actors separately; current persisted RBAC scopes
   govern all projections. No account, grant or scheduling effects.
   """

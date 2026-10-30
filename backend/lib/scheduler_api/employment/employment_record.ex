@@ -10,7 +10,7 @@ defmodule SchedulerApi.Employment.EmploymentRecord do
     belongs_to :user, SchedulerApi.Accounts.User
     field :first_name, :string
     field :last_name, :string
-    # Business-specific contact data. No profile fallback or write API in 4B.
+    # Business-specific contact data; never fall back to identity-provider profiles.
     field :phone, :string, redact: true
     field :email, :string, redact: true
     field :home_address, :string, redact: true
@@ -35,6 +35,32 @@ defmodule SchedulerApi.Employment.EmploymentRecord do
     |> validate_length(:first_name, max: 100)
     |> validate_length(:last_name, max: 100)
     |> add_constraints()
+  end
+
+  @doc false
+  def contact_changeset(record_or_changeset, attrs) do
+    record_or_changeset
+    |> cast(attrs, [:first_name, :last_name, :phone, :email, :home_address])
+    |> then(fn cs ->
+      Enum.reduce([:first_name, :last_name, :phone, :email, :home_address], cs, fn field, acc ->
+        update_change(acc, field, fn value ->
+          if is_binary(value),
+            do:
+              (case String.trim(value) do
+                 "" -> nil
+                 trimmed -> trimmed
+               end),
+            else: value
+        end)
+      end)
+    end)
+    |> validate_required([:first_name, :last_name])
+    |> validate_length(:first_name, max: 100)
+    |> validate_length(:last_name, max: 100)
+    |> validate_length(:phone, max: 32)
+    |> validate_length(:email, max: 320)
+    |> validate_length(:home_address, max: 1000)
+    |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
   end
 
   @doc false

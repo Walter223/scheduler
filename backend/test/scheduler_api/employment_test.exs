@@ -246,13 +246,19 @@ defmodule SchedulerApi.EmploymentTest do
 
     management = employment_fixture(%{classification: :business_owner}, business: c.business)
 
-    reject(
-      "UPDATE employments SET classification='detailer' WHERE id=$1",
-      [management.id],
-      :check_violation
-    )
+    assert {:ok, _} =
+             Repo.query("UPDATE employments SET classification='detailer' WHERE id=$1", [
+               management.id
+             ])
 
-    assert Repo.reload!(management).classification == :business_owner
+    assert Repo.reload!(management).classification == :detailer
+    # Reclassification is now allowed, but DB history preserves management privacy.
+    assert Repo.exists?(
+             from h in SchedulerApi.Employment.ClassificationHistory,
+               where:
+                 h.employment_id == ^management.id and
+                   h.previous_classification == :business_owner and h.classification == :detailer
+           )
   end
 
   test "archived shops/businesses and missing references are rejected", c do
@@ -278,7 +284,7 @@ defmodule SchedulerApi.EmploymentTest do
           {"status", "unknown", :check_violation},
           {"first_name", " ", :check_violation},
           {"first_name", nil, :not_null_violation},
-          {"classification", nil, :check_violation}
+          {"classification", nil, :not_null_violation}
         ] do
       reject("UPDATE employments SET #{field}=$1 WHERE id=$2", [value, c.record.id], code)
     end

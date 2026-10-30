@@ -53,13 +53,14 @@ positively owned and cleaned in dependency order.
   a coarse business permission or classification. Only active employment accepts
   new rates. No Shop Manager/Employee write authority is introduced.
 
-Owner classification OR any same-business Owner grant history prevents Business
-Manager access. Shop reads require Detailer classification AND no same-business
-Owner/Business Manager/Shop Manager grant history on the linked user. Revoked
+Current or historical Owner classification OR any same-business Owner grant
+history prevents Business Manager access. Shop reads require Detailer classification AND no same-business
+Owner/Business Manager/Shop Manager classification history or grant history on
+the linked user. Revoked
 management grants are deliberately included to avoid exposing historical
 management pay after an Employee grant; unrelated-business roles do not block
-legitimate Detailer pay. This conservative restriction may need future audited
-reclassification policy. Classifications never grant privileges.
+legitimate Detailer pay. This conservative restriction remains after audited HR reclassification, including
+later rates; see [HR_ADMINISTRATION.md](HR_ADMINISTRATION.md). Classifications never grant privileges.
 
 Each decision uses a complete current role assignment and persisted business/shop
 relationships. Account eligibility, email verification, membership/grant revocation

@@ -4,7 +4,8 @@
 Milestone 4A mutation functions remain trusted persistence primitives, not
 authorized HR APIs. Milestone 4B adds the authorized, field-projected reads below.
 Milestone 4C adds [compensation persistence and access](COMPENSATION.md). No HTTP
-routes, contact mutations, recurring schedules or jobs are implemented.
+HR HTTP routes, recurring schedule generation or account-linking workflows are implemented.
+Milestone 4E-1 adds [authorized, audited HR operations](HR_ADMINISTRATION.md).
 Milestone 4D-1 adds [explicit audited work shifts](WORK_SHIFTS.md).
 
 ## Identity and ownership
@@ -30,8 +31,9 @@ Milestone 4D-1 adds [explicit audited work shifts](WORK_SHIFTS.md).
 
 Required primary classifications are `detailer`, `shop_manager`,
 `business_manager`, `business_owner`. They grant **zero permissions** and never
-follow RBAC grants. Classification, business and start date are immutable in this
-foundation; audited classification corrections/promotions are future work.
+follow RBAC grants. Business and start date remain immutable. Classification changes now use
+[HR administration](HR_ADMINISTRATION.md), with durable DB history and sticky
+management-pay protection.
 Employee grants cannot downgrade a management classification.
 
 Employment and assignments use explicit `active` / `ended` statuses. `starts_on`
@@ -59,7 +61,7 @@ not authorization decisions or safe customer-facing projections.
 ## Integrity and verification
 
 Database checks, composite/restrictive foreign keys and triggers retain ownership,
-linked identity, classification and ended history. Assignment creation and
+linked identity, classification history and ended history. Assignment creation and
 termination serialize on the employment row, including direct SQL insertion;
 there are no sleep/retry mechanisms. Lifecycle operations lock parent before child.
 
