@@ -46,6 +46,12 @@ defmodule SchedulerApi.Employment.HR do
   def end_shop_assignment(credential, assignment, date, opts \\ []),
     do: run(:end_shop, credential, assignment, nil, date, opts)
 
+  def rehire_employment(credential, employment, starts_on),
+    do: SchedulerApi.Employment.Rehire.rehire(credential, employment, starts_on)
+
+  def list_employment_history(user, employment),
+    do: SchedulerApi.Employment.Rehire.history(user, employment)
+
   def terminate_employment(credential, employment),
     do: SchedulerApi.Employment.Offboarding.terminate(credential, employment)
 

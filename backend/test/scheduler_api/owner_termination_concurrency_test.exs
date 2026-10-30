@@ -36,6 +36,11 @@ defmodule SchedulerApi.OwnerTerminationConcurrencyTest do
     on_exit(fn ->
       Sandbox.unboxed_run(Repo, fn ->
         Repo.delete_all(from a in OffboardingAudit, where: a.business_id == ^c.business.id)
+
+        Repo.delete_all(
+          from a in SchedulerApi.Employment.RehireAudit, where: a.business_id == ^c.business.id
+        )
+
         Repo.delete_all(from a in HrAuditEvent, where: a.business_id == ^c.business.id)
         Repo.delete_all(from a in AuditEvent, where: a.business_id == ^c.business.id)
         Repo.delete_all(from h in ClassificationHistory, where: h.business_id == ^c.business.id)
@@ -140,5 +145,53 @@ defmodule SchedulerApi.OwnerTerminationConcurrencyTest do
                )
       end
     end)
+  end
+
+  test "rehire racing explicit membership reactivation does not restore any old grant", c do
+    Sandbox.unboxed_run(Repo, fn ->
+      assert {:ok, _} = HR.terminate_employment(c.credential, c.target)
+    end)
+
+    [rehire, activation] =
+      compete(c, [
+        fn -> HR.rehire_employment(c.credential, c.target, Date.add(Date.utc_today(), 1)) end,
+        fn -> RoleManagement.reactivate_membership(c.credential, c.business, c.member) end
+      ])
+
+    assert {:ok, _} = rehire
+    assert {:ok, _} = activation
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert Repo.reload!(c.member).status == :active
+
+      refute Repo.exists?(
+               from r in RoleAssignment,
+                 where: r.membership_id == ^c.member.id and r.status == :active
+             )
+    end)
+  end
+
+  test "rehire rechecks HR grant while concurrent Owner revocation serializes", c do
+    role =
+      Sandbox.unboxed_run(Repo, fn ->
+        {:ok, _} = HR.terminate_employment(c.credential, c.target)
+
+        Repo.one!(
+          from r in RoleAssignment,
+            join: m in BusinessMembership,
+            on: m.id == r.membership_id,
+            where: m.user_id == ^c.manager.id and r.role == :business_manager
+        )
+      end)
+
+    [rehire, revocation] =
+      compete(c, [
+        fn -> HR.rehire_employment(c.token, c.target, Date.add(Date.utc_today(), 1)) end,
+        fn -> RoleManagement.revoke_role(c.credential, c.business, role) end
+      ])
+
+    assert {:ok, _} = revocation
+    assert match?({:ok, _}, rehire) or rehire == {:error, :forbidden}
+    Sandbox.unboxed_run(Repo, fn -> assert Repo.reload!(c.member).status == :revoked end)
   end
 end

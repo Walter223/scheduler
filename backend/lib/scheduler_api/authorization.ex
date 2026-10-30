@@ -39,13 +39,14 @@ defmodule SchedulerApi.Authorization do
     :employment_own_read,
     :compensation_own_read
   ]
-  @hr_record_actions [:employment_terminate]
+  @hr_record_actions [:employment_terminate, :employment_rehire]
   @permissions %{
     business_owner:
       @business_actions ++ @shop_actions ++ @assigned_staff ++ @own_work ++ @hr_record_actions,
     business_manager: [
       :employment_manage,
       :employment_terminate,
+      :employment_rehire,
       :employment_private_read,
       :compensation_read,
       :compensation_write,
@@ -88,12 +89,12 @@ defmodule SchedulerApi.Authorization do
     |> decision()
   end
 
-  def authorize(%User{id: user_id}, :employment_terminate, %EmploymentRecord{id: id})
-      when is_integer(user_id) and user_id > 0 and is_integer(id) do
+  def authorize(%User{id: user_id}, action, %EmploymentRecord{id: id})
+      when is_integer(user_id) and user_id > 0 and is_integer(id) and action in @hr_record_actions do
     protected = management_employments([:business_owner])
     # One current grant supplies both HR authority and business scope. Current
     # or historical ownership is a restriction, never a source of permission.
-    from([r, m, u, b] in grants(user_id, :employment_terminate),
+    from([r, m, u, b] in grants(user_id, action),
       join: e in EmploymentRecord,
       on: e.business_id == b.id,
       where:
@@ -338,8 +339,12 @@ defmodule SchedulerApi.Authorization do
 
     classifications =
       from h in SchedulerApi.Employment.ClassificationHistory,
+        join: old in EmploymentRecord,
+        on: old.id == h.employment_id and old.business_id == h.business_id,
+        join: current in EmploymentRecord,
+        on: current.employee_id == old.employee_id and current.business_id == old.business_id,
         where: h.classification in ^roles or h.previous_classification in ^roles,
-        select: h.employment_id
+        select: current.id
 
     from e in EmploymentRecord,
       where:

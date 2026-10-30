@@ -29,6 +29,10 @@ defmodule SchedulerApi.EmploymentHRConcurrencyTest do
             where: a.business_id == ^c.business.id
         )
 
+        Repo.delete_all(
+          from a in SchedulerApi.Employment.RehireAudit, where: a.business_id == ^c.business.id
+        )
+
         Repo.delete_all(from a in HrAuditEvent, where: a.business_id == ^c.business.id)
         Repo.delete_all(from a in WorkShiftAuditEvent, where: a.business_id == ^c.business.id)
         Repo.delete_all(from w in WorkShift, where: w.business_id == ^c.business.id)
@@ -234,6 +238,42 @@ defmodule SchedulerApi.EmploymentHRConcurrencyTest do
       refute Repo.exists?(
                from w in WorkShift, where: w.business_id == ^c.business.id and w.status == :active
              )
+    end)
+  end
+
+  test "concurrent rehire requests create one new period and one audit", c do
+    Sandbox.unboxed_run(Repo, fn ->
+      assert {:ok, _} = HR.terminate_employment(c.credential, c.employment)
+    end)
+
+    results =
+      compete(
+        c,
+        for(
+          _ <- 1..2,
+          do: fn ->
+            HR.rehire_employment(c.credential, c.employment, Date.add(Date.utc_today(), 1))
+          end
+        )
+      )
+
+    assert Enum.count(results, &match?({:ok, _}, &1)) == 1
+    assert Enum.count(results, &match?({:error, :not_latest_ended_period}, &1)) == 1
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert Repo.aggregate(
+               from(e in EmploymentRecord,
+                 where: e.business_id == ^c.business.id and e.status == :active
+               ),
+               :count
+             ) == 1
+
+      assert Repo.aggregate(
+               from(a in SchedulerApi.Employment.RehireAudit,
+                 where: a.business_id == ^c.business.id
+               ),
+               :count
+             ) == 1
     end)
   end
 end

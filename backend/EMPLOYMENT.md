@@ -13,7 +13,7 @@ Milestone 4D-1 adds [explicit audited work shifts](WORK_SHIFTS.md).
 - `employments` belongs to one business; first/last names are independently supplied
   employment data, not synchronized account profile fields.
 - `user_id` is nullable. Multiple unlinked records are allowed. A linked user has
-  one durable record per business, including ended records; the same user can
+  one stable employee identity per business, with distinct retained period rows; the same user can
   have separate records in multiple businesses.
 - `create_employment(business, attrs, user: user)` is the only current operation
   accepting a user reference. It reloads persisted eligibility through a database
@@ -51,8 +51,8 @@ shop again creates a new row. `end_employment(employment, date)` locks the paren
 closes active assignments and ends employment atomically. Invalid dates, including
 an end before a future assignment starts or before historical assignment ends,
 reject the entire operation. Ending again with the same date is idempotent;
-changing ended history or reactivating it is rejected. Rehire and future-assignment
-cancellation require separate future lifecycle design, not implicit restoration.
+changing ended history or reactivating it is rejected. Rehire creates a distinct period through [REHIRE.md](REHIRE.md); future-assignment
+cancellation still needs separate lifecycle design, not implicit restoration.
 
 `get_employment(business, id)`, `list_employments(business)` and
 `list_shop_assignments(business, employment)` are business-filtered internal reads,
@@ -145,4 +145,5 @@ with future-work cleanup and business-scoped access revocation.
 See [employment access scenarios](../docs/employment-access-scenarios.md) for the
 permanent tenant/shop, offboarding, Owner-protection and rehire requirements,
 current test evidence, explicit gaps and future Admin UI acceptance criteria.
-Rehire remains unimplemented; retained history is not proof of rehire privacy.
+Rehire and period privacy are implemented in [REHIRE.md](REHIRE.md); browser/HTTP
+acceptance remains separate.

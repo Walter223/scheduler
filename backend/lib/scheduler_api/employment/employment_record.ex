@@ -6,6 +6,8 @@ defmodule SchedulerApi.Employment.EmploymentRecord do
   def classifications, do: @classifications
 
   schema "employments" do
+    belongs_to :employee, __MODULE__, define_field: false
+    field :employee_id, :id, read_after_writes: true
     belongs_to :business, SchedulerApi.Organizations.Business
     belongs_to :user, SchedulerApi.Accounts.User
     field :first_name, :string
