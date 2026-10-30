@@ -4,7 +4,8 @@
 Milestone 4A mutation functions remain trusted persistence primitives, not
 authorized HR APIs. Milestone 4B adds the authorized, field-projected reads below.
 Milestone 4C adds [compensation persistence and access](COMPENSATION.md). No HTTP
-routes, contact mutations, schedules or jobs are implemented.
+routes, contact mutations, recurring schedules or jobs are implemented.
+Milestone 4D-1 adds [explicit audited work shifts](WORK_SHIFTS.md).
 
 ## Identity and ownership
 
@@ -124,7 +125,7 @@ ownership through these queries. `employment_scopes_query/2` and
 or flatten them into cached role/shop sets. Authentication is still a separate
 caller responsibility: future adapters must take the actor from the authenticated
 session, not HTTP identity parameters. Compensation uses the separate guarded queries in [COMPENSATION.md](COMPENSATION.md);
-assigned-job/schedule resolvers remain denied. Historical raw 4A retrieval helpers are internal only;
+explicit shifts use [WORK_SHIFTS.md](WORK_SHIFTS.md); assigned-job resolvers remain denied. Historical raw 4A retrieval helpers are internal only;
 they are not substitutes for these authorized projections.
 
 Focused access verification: `mix test test/scheduler_api/employment_access_test.exs`.

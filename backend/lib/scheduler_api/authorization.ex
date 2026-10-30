@@ -9,7 +9,7 @@ defmodule SchedulerApi.Authorization do
   alias SchedulerApi.Accounts.User
   alias SchedulerApi.Organizations.{Business, Shop, BusinessMembership, RoleAssignment}
   alias SchedulerApi.Appointments.Appointment
-  alias SchedulerApi.Employment.{EmploymentRecord, ShopAssignment}
+  alias SchedulerApi.Employment.{EmploymentRecord, ShopAssignment, WorkShift}
 
   @business_actions [
     :business_manage,
@@ -31,7 +31,7 @@ defmodule SchedulerApi.Authorization do
     :shop_staff_manage
   ]
   # Contact and own-employment reads now resolve actual employment records.
-  # Pay has separate record-level guards below; jobs/schedules remain deferred.
+  # Pay and explicit shifts have separate guards below; assigned jobs remain deferred.
   @assigned_staff [:assigned_employee_contact_read, :assigned_employee_compensation_read]
   @own_work [
     :jobs_assigned_read,
@@ -108,6 +108,13 @@ defmodule SchedulerApi.Authorization do
     from(e in subquery(authorized_compensation_employment_ids_query(user, action)),
       where: e.id == ^id
     )
+    |> Repo.exists?()
+    |> decision()
+  end
+
+  def authorize(%User{} = user, action, %WorkShift{id: id})
+      when is_integer(id) and action in [:schedule_manage, :schedule_own_read] do
+    from(w in subquery(authorized_work_shift_ids_query(user, action)), where: w.id == ^id)
     |> Repo.exists?()
     |> decision()
   end
@@ -301,6 +308,55 @@ defmodule SchedulerApi.Authorization do
       on: r.membership_id == m.id and r.business_id == e.business_id,
       where: r.role in ^roles,
       select: e.id
+  end
+
+  @doc "Complete current grant scopes for management or linked own-shift reads."
+  def work_shift_scopes_query(%User{id: id}, action)
+      when is_integer(id) and id > 0 and action in [:schedule_manage, :schedule_own_read] do
+    scopes =
+      from [r, m, u, b] in grants(id, action),
+        join: s in Shop,
+        on: s.business_id == b.id,
+        where: s.status == :active and (is_nil(r.shop_id) or r.shop_id == s.id)
+
+    if action == :schedule_manage do
+      from [r, m, u, b, s] in scopes,
+        distinct: true,
+        select: %{business_id: b.id, shop_id: s.id, assignment_id: fragment("NULL::bigint")}
+    else
+      from [r, m, u, b, s] in scopes,
+        join: e in EmploymentRecord,
+        on: e.business_id == b.id and e.user_id == u.id,
+        join: a in ShopAssignment,
+        on: a.employment_id == e.id and a.business_id == b.id and a.shop_id == s.id,
+        where: e.status == :active and a.status == :active,
+        distinct: true,
+        select: %{business_id: b.id, shop_id: s.id, assignment_id: a.id}
+    end
+  end
+
+  def work_shift_scopes_query(_, _),
+    do:
+      from(s in Shop,
+        where: false,
+        select: %{
+          business_id: s.business_id,
+          shop_id: s.id,
+          assignment_id: fragment("NULL::bigint")
+        }
+      )
+
+  @doc "SQL shift scope; full assignment identity stays joined to its qualifying role grant."
+  def authorized_work_shift_ids_query(user, action) do
+    scopes = work_shift_scopes_query(user, action)
+
+    from w in WorkShift,
+      join: p in subquery(scopes),
+      on:
+        w.business_id == p.business_id and w.shop_id == p.shop_id and
+          (is_nil(p.assignment_id) or w.assignment_id == p.assignment_id),
+      distinct: true,
+      select: %{id: w.id, business_id: w.business_id, shop_id: w.shop_id}
   end
 
   defp grants(user_id, action) do

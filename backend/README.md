@@ -294,8 +294,8 @@ Business Managers have business-wide employment, compensation, payroll and finan
 actions, but no access-management or shop operations. Shop Managers have shop
 appointment, schedule, assignment, customer and operational actions only at their
 assigned shops. Employment own-read and assigned-contact reads now resolve active
-employment/shop assignments through [EMPLOYMENT.md](EMPLOYMENT.md). Assigned-job and
-schedule resolvers remain denied. Compensation reads/writes now use the guarded
+employment/shop assignments through [EMPLOYMENT.md](EMPLOYMENT.md). Assigned-job resolvers remain denied; explicit shift access is described in
+[WORK_SHIFTS.md](WORK_SHIFTS.md). Compensation reads/writes now use the guarded
 record-level policies in [COMPENSATION.md](COMPENSATION.md). Broad compensation actions never grant
 Shop Managers employee pay access. No permission enables payroll record storage,
 role-management APIs or platform administration in this milestone.
@@ -476,3 +476,11 @@ See [COMPENSATION.md](COMPENSATION.md) for exact USD hourly/annual-salary rates,
 effective-period constraints, Owner-pay restrictions, Detailer-only shop access,
 explicit own-pay reads, transactional audit and retained former-employee history.
 No financial HTTP endpoints or payroll processing are implemented.
+
+
+## Employee work shifts
+
+See [WORK_SHIFTS.md](WORK_SHIFTS.md) for explicit UTC employee shifts, persisted
+shop timezone/DST handling, assignment eligibility, cross-shop overlap protection,
+scoped management/own reads and atomic audit/history. Shifts are independent of
+public appointment capacity; no recurring generation, job assignment or UI is added.
