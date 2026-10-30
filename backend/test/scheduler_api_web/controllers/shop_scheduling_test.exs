@@ -158,16 +158,25 @@ defmodule SchedulerApiWeb.ShopSchedulingTest do
     assert Enum.map(Appointments.list_appointments(), & &1.id) == [first.id, second.id]
     assert Enum.map(Appointments.list_appointments(context.other.shop), & &1.id) == [foreign.id]
 
+    user = SchedulerApi.AccountsFixtures.active_user_fixture()
+    SchedulerApi.AdminAccessFixtures.grant_fixture(user, context.shop, :shop_manager)
+    {_, token} = SchedulerApi.AdminAccessFixtures.session_fixture(user)
+    conn = put_req_cookie(context.conn, SchedulerApiWeb.BrowserSession.session_name(), token)
+
+    assert conn
+           |> get("/api/admin/appointments", %{shop_id: context.other.shop.id})
+           |> json_response(403) == %{"error" => "forbidden"}
+
     page1 =
-      context.conn
-      |> get("/api/admin/appointments", %{limit: "1", shop_id: context.other.shop.id})
+      conn
+      |> get("/api/admin/appointments", %{limit: "1"})
       |> json_response(200)
 
     assert Enum.map(page1["appointments"], & &1["id"]) == [first.id]
     assert page1["meta"]["has_more"]
 
     page2 =
-      context.conn
+      conn
       |> recycle()
       |> get("/api/admin/appointments", %{limit: "1", cursor: page1["meta"]["next_cursor"]})
       |> json_response(200)

@@ -9,10 +9,27 @@ defmodule SchedulerApiWeb.AdminAppointmentsTest do
 
   @path "/api/admin/appointments"
 
-  setup do
+  setup %{conn: conn} do
+    user = SchedulerApi.AccountsFixtures.active_user_fixture()
+
+    SchedulerApi.AdminAccessFixtures.grant_fixture(
+      user,
+      SchedulerApi.Organizations.default_shop!(),
+      :business_owner
+    )
+
+    {_, token} = SchedulerApi.AdminAccessFixtures.session_fixture(user)
+    conn = put_req_cookie(conn, SchedulerApiWeb.BrowserSession.session_name(), token)
     price = service_price_fixture(%{price_cents: 8999, duration_minutes: 90})
     now = DateTime.utc_now() |> DateTime.truncate(:second)
-    %{price: price, attrs: booking_attrs(price), future: DateTime.add(now, 86_400), now: now}
+
+    %{
+      conn: conn,
+      price: price,
+      attrs: booking_attrs(price),
+      future: DateTime.add(now, 86_400),
+      now: now
+    }
   end
 
   test "successful list has the exact fields, current catalog names, UTC time and stored snapshots",

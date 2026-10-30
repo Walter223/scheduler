@@ -94,16 +94,30 @@ before it can succeed; the migration does not silently change bookings.
 and committed, isolated fixtures with cleanup. Public availability and booking endpoints retain their existing frontend contracts.
 
 
-## Upcoming appointments API — development only
+## Protected upcoming appointments API
 
-`GET /api/admin/appointments` lists upcoming pending/confirmed appointments in
-`starts_at`, then ID ascending order. **This endpoint is not production-ready:**
-it exposes customer names, contact details, and notes without authentication or
-authorization. `/api/admin` is only a URL prefix, not access control. The route
-is currently registered in all environments; development-only use is a policy,
-not an environment restriction. Do not expose it publicly or deploy it for real
-customer access until server-side admin authentication and authorization exist.
-No frontend secret or cursor grants access control.
+`GET /api/admin/appointments` requires a valid Magnum browser session and the
+code-owned `appointments.read` permission (`:appointments_read`). Missing,
+expired, revoked or ineligible sessions receive `401 {"error":"authentication_required"}`;
+valid sessions without an effective grant receive `403 {"error":"forbidden"}`.
+All responses are `Cache-Control: no-store`. This read-only GET needs no CSRF token.
+
+Business Owners can read active shops within their businesses; Shop Managers
+can read explicitly assigned active shops. Business Managers, Employees and
+login alone grant no access. Current account eligibility, membership/grant
+lifecycle and business/shop status are checked server-side on every request.
+One complete assignment must supply both permission and scope.
+
+The list now covers the union of authorized shops rather than the configured
+default shop. Ownership is joined from persisted records in SQL **before** upcoming
+filtering, `(starts_at, id)` ordering and cursor pagination. Unauthorized rows
+cannot affect page contents or metadata. `shop_id`, `business_id` and `user_id`
+query selectors are rejected with 403; they cannot select authority. Cursors
+remain positions, never authorization credentials. Internal default/explicit-shop
+context functions remain available to trusted scheduling code; HTTP uses
+`Appointments.list_authorized_upcoming_appointments(session, opts)` exclusively.
+
+Mandatory staff MFA and production deployment hardening remain outstanding.
 
 Optional query parameters:
 
@@ -111,10 +125,10 @@ Optional query parameters:
 - `cursor`: the opaque `meta.next_cursor` from the preceding response. Pass it
   unchanged, URL-encoded. Pagination uses `(starts_at, id)`, not offsets.
 
-Example local request:
+Example from an authenticated browser's same-origin developer console:
 
-```sh
-curl 'http://localhost:4000/api/admin/appointments?limit=25'
+```js
+fetch('/api/admin/appointments?limit=25').then(response => response.json())
 ```
 
 The `200` response contains `appointments` and `meta`:
@@ -214,9 +228,9 @@ and appointment rows/IDs/data/timestamps are untouched. Allow time for constrain
 validation/index building on a large table. Rollback to global scheduling fails
 safely if cross-shop overlaps now exist; review data rather than deleting bookings.
 
-HTTP authentication, memberships, employees, frontend shop selection, and admin
-authorization remain out of scope. `/api/admin/appointments` is still development
-only and unauthenticated; shop filtering is not a replacement for access control.
+The scheduling milestone did not add authorization. The admin listing now uses
+the session and RBAC boundary described above; employee scheduling and frontend
+shop selection remain out of scope.
 
 ## Account identity and session primitives
 

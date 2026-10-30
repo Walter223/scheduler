@@ -25,7 +25,7 @@ Root instructions apply. Run Mix commands from `backend/`.
 - Preserve immutable issuer/subject identity, pending-account denial, email-verification requirements and account-status eligibility.
 - Preserve revocable opaque server-side sessions, cookie/CSRF protections, one-time login transactions and provider-token non-persistence.
 - Never treat successful authentication as business/shop authorization. Role and shop scope must be established and enforced server-side.
-- Existing admin APIs are not yet protected by RBAC and must not be publicly deployed until server-side authentication, authorization and tenant-scope enforcement are implemented and verified.
+- Preserve the admin appointments session/RBAC boundary and database-level tenant scoping. Authentication alone never authorizes admin data; production privileged access still requires MFA/deployment hardening.
 - Do not weaken authentication controls or introduce bypasses for development convenience.
 
 ## Relevant references

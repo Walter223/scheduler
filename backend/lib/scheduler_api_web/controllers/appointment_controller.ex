@@ -3,13 +3,29 @@ defmodule SchedulerApiWeb.AppointmentController do
 
   alias SchedulerApi.Appointments
 
-  # Development-only: this action exposes PII and has no admin access controls yet.
   def index(conn, params) do
     opts = [limit: parse_limit(Map.get(params, "limit", 50)), cursor: Map.get(params, "cursor")]
 
-    case Appointments.list_upcoming_appointments(opts) do
+    result =
+      case conn.assigns[:magnum_session] do
+        %SchedulerApi.Accounts.WebSession{} = session ->
+          if Enum.any?(["shop_id", "business_id", "user_id"], &Map.has_key?(params, &1)),
+            do: {:error, :forbidden},
+            else: Appointments.list_authorized_upcoming_appointments(session, opts)
+
+        _ ->
+          {:error, :unauthenticated}
+      end
+
+    case result do
       {:ok, page} ->
         render(conn, :index, page: page)
+
+      {:error, :unauthenticated} ->
+        conn |> put_status(401) |> json(%{error: "authentication_required"})
+
+      {:error, :forbidden} ->
+        conn |> put_status(403) |> json(%{error: "forbidden"})
 
       {:error, error} ->
         conn

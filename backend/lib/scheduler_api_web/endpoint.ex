@@ -64,6 +64,13 @@ defmodule SchedulerApiWeb.Endpoint do
   defp browser_auth_boundary(%{path_info: ["api", "me"]} = conn, _),
     do: private_dispatch(conn) |> Plug.Conn.halt()
 
+  defp browser_auth_boundary(%{path_info: ["api", "admin" | _]} = conn, _),
+    do:
+      conn
+      |> Plug.Conn.put_resp_header("cache-control", "no-store")
+      |> private_dispatch()
+      |> Plug.Conn.halt()
+
   defp browser_auth_boundary(conn, _), do: conn
 
   defp private_dispatch(conn) do
@@ -88,11 +95,17 @@ defmodule SchedulerApiWeb.Endpoint do
         |> Plug.Conn.put_resp_header("location", origin <> "/admin?auth_error=login_failed")
         |> Plug.Conn.send_resp(302, "")
       else
-        Plug.Conn.send_resp(
-          conn,
-          503,
-          "Authentication is temporarily unavailable. Start a new login."
-        )
+        if match?(["api", "admin" | _], conn.path_info) do
+          conn
+          |> Plug.Conn.put_status(503)
+          |> Phoenix.Controller.json(%{error: "service_unavailable"})
+        else
+          Plug.Conn.send_resp(
+            conn,
+            503,
+            "Authentication is temporarily unavailable. Start a new login."
+          )
+        end
       end
   end
 end

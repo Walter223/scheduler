@@ -21,12 +21,15 @@ defmodule SchedulerApiWeb.Router do
     post "/appointments", AppointmentController, :create
   end
 
-  # Development-only use until real admin authentication/authorization exists.
-  # The URL prefix provides no access control; do not expose this API publicly.
-  scope "/api/admin", SchedulerApiWeb do
-    pipe_through :api
+  pipeline :admin_api do
+    plug SchedulerApiWeb.RequireBrowserSession
+    plug :accepts, ["json"]
+  end
 
-    get "/appointments", AppointmentController, :index
+  scope "/api/admin", SchedulerApiWeb do
+    pipe_through :admin_api
+
+    get "/appointments", AppointmentController, :index, log: false
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

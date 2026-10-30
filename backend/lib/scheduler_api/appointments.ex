@@ -46,13 +46,72 @@ defmodule SchedulerApi.Appointments do
     do: list_upcoming_appointments(Organizations.default_shop!(), opts)
 
   def list_upcoming_appointments(%Shop{} = shop, opts) do
+    query =
+      from a in Appointment, where: a.shop_id == ^shop.id and a.business_id == ^shop.business_id
+
+    paginate_upcoming(query, opts)
+  end
+
+  @doc "Session-backed admin read. Current session and complete grants are SQL predicates, never cached scopes."
+  def list_authorized_upcoming_appointments(session, opts \\ [])
+
+  def list_authorized_upcoming_appointments(
+        %SchedulerApi.Accounts.WebSession{id: id, user_id: user_id},
+        opts
+      )
+      when is_integer(id) and is_integer(user_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    sessions =
+      from s in SchedulerApi.Accounts.WebSession,
+        join: u in SchedulerApi.Accounts.User,
+        on: u.id == s.user_id,
+        where:
+          s.id == ^id and s.user_id == ^user_id and is_nil(s.revoked_at) and
+            s.idle_expires_at > ^now and s.absolute_expires_at > ^now and
+            u.status == :active and u.email_verified == true,
+        select: %{id: s.id}
+
+    allowed =
+      SchedulerApi.Authorization.authorized_shop_ids_query(
+        %SchedulerApi.Accounts.User{id: user_id},
+        :appointments_read
+      )
+
+    scopes =
+      from shop in Shop,
+        join: permitted in subquery(allowed),
+        on: permitted.id == shop.id,
+        join: session in subquery(sessions),
+        on: true,
+        select: %{id: shop.id, business_id: shop.business_id}
+
+    cond do
+      not Repo.exists?(sessions) ->
+        {:error, :unauthenticated}
+
+      not Repo.exists?(scopes) ->
+        {:error, :forbidden}
+
+      true ->
+        query =
+          from a in Appointment,
+            join: scope in subquery(scopes),
+            on: a.shop_id == scope.id and a.business_id == scope.business_id
+
+        paginate_upcoming(query, opts)
+    end
+  end
+
+  def list_authorized_upcoming_appointments(_, _), do: {:error, :unauthenticated}
+
+  defp paginate_upcoming(scoped_query, opts) do
     if is_list(opts) and Keyword.keyword?(opts) do
       with {:ok, limit} <- upcoming_limit(Keyword.get(opts, :limit, 50)),
            {:ok, cursor} <- upcoming_cursor(Keyword.get(opts, :cursor)),
            {:ok, now} <- upcoming_now(Keyword.get_lazy(opts, :now, &DateTime.utc_now/0)) do
         query =
-          from a in Appointment,
-            where: a.shop_id == ^shop.id and a.business_id == ^shop.business_id,
+          from a in scoped_query,
             where: a.starts_at >= ^now and a.status in [:pending, :confirmed],
             order_by: [asc: a.starts_at, asc: a.id],
             limit: ^(limit + 1),

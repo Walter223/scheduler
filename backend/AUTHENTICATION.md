@@ -3,8 +3,11 @@
 Keycloak authenticates identity. Phoenix authorizes Magnum access. Browser login,
 callback, revocable opaque sessions, session-bound CSRF, status and local logout
 are implemented. Authentication grants **no business/shop authorization**.
-`/api/admin/appointments` remains unauthenticated, development-only and unsafe for
-production privileged access. Mandatory staff MFA is not enforced yet.
+`/api/admin/appointments` now requires a valid browser session and current
+`appointments.read` authorization, with database-level business/shop scoping.
+Login alone grants no access. Private responses are not cached or captured by
+the development request logger. See [README.md](README.md#protected-upcoming-appointments-api).
+Mandatory staff MFA and production privileged-access hardening remain outstanding.
 
 ## Dependencies and transport
 
