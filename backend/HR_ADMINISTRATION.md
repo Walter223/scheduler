@@ -123,3 +123,6 @@ The earlier low-level termination helper remains a trusted persistence primitive
 
 Milestone 4E-2B adds [secure rehire and period history](REHIRE.md), with no
 automatic restoration of access, pay, private contacts or work.
+
+See [protected HR write APIs](HR_WRITE_API.md) for the 4F-2 HTTP adapters,
+session-bound CSRF requirements, payload allowlists and safe error contract.

@@ -86,3 +86,8 @@ current/former and rehire timelines; prior-period admin denial for Employees;
 stable-ID/period-ID mismatches; and scope-bound cursor isolation. These are actual
 Phoenix HTTP/session tests, not a real Keycloak browser login. Future browser/UI
 selector races and self-service HTTP surfaces remain separate acceptance gaps.
+
+4F-2 adds [protected HR writes](../backend/HR_WRITE_API.md) with HTTP tests of
+CSRF, field/tenant spoofing, Owner restrictions, atomic rollback and repeated
+lifecycle mutations. Simultaneous HTTP races remain deferred; existing
+independent-connection domain tests are the concurrency evidence.

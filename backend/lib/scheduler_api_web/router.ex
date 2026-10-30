@@ -42,6 +42,40 @@ defmodule SchedulerApiWeb.Router do
         :period, log: false
   end
 
+  pipeline :admin_write do
+    plug SchedulerApiWeb.RequireBrowserSession
+    plug :accepts, ["json"]
+    plug SchedulerApiWeb.SessionCSRF
+    plug SchedulerApiWeb.AdminJSONBody
+  end
+
+  scope "/api/admin/businesses/:business_id", SchedulerApiWeb do
+    pipe_through :admin_write
+    post "/employees", EmployeeWriteController, :create, log: false
+
+    patch "/employees/:employee_id/periods/:period_id/contact", EmployeeWriteController, :contact,
+      log: false
+
+    patch "/employees/:employee_id/periods/:period_id/classification",
+          EmployeeWriteController,
+          :classification, log: false
+
+    post "/employees/:employee_id/periods/:period_id/shop-assignments",
+         EmployeeWriteController,
+         :assign_shop, log: false
+
+    post "/employees/:employee_id/periods/:period_id/shop-assignments/:assignment_id/end",
+         EmployeeWriteController,
+         :end_shop, log: false
+
+    post "/employees/:employee_id/periods/:period_id/terminate",
+         EmployeeWriteController,
+         :terminate, log: false
+
+    post "/employees/:employee_id/periods/:period_id/rehire", EmployeeWriteController, :rehire,
+      log: false
+  end
+
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:scheduler_api, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put

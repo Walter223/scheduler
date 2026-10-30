@@ -84,3 +84,6 @@ appointment contracts are unchanged.
 mix test test/scheduler_api_web/controllers/employee_controller_test.exs test/scheduler_api_web/controllers/admin_appointment_security_test.exs test/scheduler_api_web/controllers/admin_appointments_test.exs
 mix precommit
 ```
+
+See [protected HR write APIs](HR_WRITE_API.md) for the 4F-2 HTTP adapters,
+session-bound CSRF requirements, payload allowlists and safe error contract.
