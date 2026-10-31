@@ -250,3 +250,30 @@ changing credentials, expiry or consumption. Apply migrations before deployment.
 Production must serve the frontend for direct `/admin` loads while proxying
 `/auth/*` and `/api/*` to Phoenix. No Keycloak callback URI changes are needed.
 This page proves identity only and grants no business/shop permission.
+
+## Local host-process launcher
+
+`python3 scripts/dev-backend.py --check` (from the repository root) validates that
+ignored `infra/auth/.env` can supply the confidential client secret without printing
+it or starting anything. `python3 scripts/dev-backend.py` starts Phoenix in development
+on port 4000 with the canonical issuer, magnum-web client and exact localhost:5173
+origin/callback. It refuses an occupied port and never stops another process.
+Stop an existing development backend only with its owner's explicit approval.
+The running backend does not automatically pick up environment changes; a launcher
+cannot enable OIDC in an already-running auth-disabled process. Vite need not restart.
+This launcher does not activate users, provision grants or change production policy.
+
+### Explicit local operator activation exception
+
+For the personally requested local Admin setup, the operator may activate only
+an explicitly approved existing pending identity in `MIX_ENV=dev` against
+`scheduler_api_dev`, after rechecking the local magnum realm account is enabled,
+email-verified and free of required actions. Resolve the synchronized Magnum user
+by the exact canonical issuer and Keycloak subject, never by email alone. Recheck
+pending/verified state under a user row lock and call `Accounts.set_user_status/3`;
+do not create an HTTP activation endpoint or relax normal callback eligibility.
+This is a one-account operator action, not an automatic signup/activation policy.
+Suspended/deactivated or unrelated identities are excluded. Accounts has no separate
+activation-audit primitive; first-Owner provisioning uses the existing durable,
+audited `magnum.bootstrap_owner` dry-run/apply workflow and all ownership-history
+checks. Production restrictions and isolated browser-test behavior are unchanged.
