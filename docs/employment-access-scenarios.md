@@ -101,3 +101,30 @@ listed in that contract; domain concurrency coverage remains in force.
 restricted current/history reads, own-period pay, exact audited writes, Owner
 history protection across rehire and an independent-connection HTTP rate race.
 Remaining browser and cross-lifecycle HTTP race gaps are documented there.
+
+
+## 4F-4B delegated staff access
+
+[Protected role-management APIs](../backend/ROLE_MANAGEMENT_API.md) centralize explicit
+Owner inheritance of every Manager capability without a duplicate grant or changed
+employment classification. Active grants confer authority; current/historical Owner
+classifications and Owner grants constrain delegation and never confer permission.
+Managers can grant/revoke only Employee and Shop Manager access for eligible non-self,
+non-Owner-protected targets. They cannot manage memberships, higher roles or erase
+Owner history through Employee grants. Owners retain last-eligible-Owner safeguards.
+Termination plus membership reactivation cannot bypass employment eligibility; rehire
+still restores no grants. Same-person/multiple-business grants remain independent.
+
+Coverage: [role policy tests](../backend/test/scheduler_api/role_management_test.exs),
+[access HTTP tests](../backend/test/scheduler_api_web/controllers/access_controller_test.exs),
+and [independent-connection races][role-races] check delegation, protected history,
+revocation, no resurrection, scope-bound pagination and audit rollback. Simultaneous
+HTTP lifecycle/role races and future Admin UI selector tests remain separate gaps.
+Future role UI must offer only authorized delegation targets/roles; it may never
+infer authority from classification, chosen business/shop or a hidden URL.
+
+5A adds the [Admin shell/discovery contract](../backend/ADMIN_CONTEXT.md).
+Server-verified discovery exposes authorized management workspaces without role
+labels. Component tests cover context switching and revoked-access clearing;
+anonymous browser coverage checks direct mobile entry. Authenticated multi-role
+browser and future HR timeline/action acceptance criteria above remain pending.

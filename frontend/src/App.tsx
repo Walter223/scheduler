@@ -26,7 +26,7 @@ const App = () => {
 
   return (
     <>
-      <NavBar />
+      {location.pathname !== '/admin' && <NavBar />}
 
       <Routes>
         <Route path="/" element={<HomePage />} />

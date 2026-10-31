@@ -35,6 +35,138 @@ defmodule SchedulerApi.RoleManagementTest do
     }
   end
 
+  defp shop(b),
+    do:
+      Repo.insert!(%Shop{
+        business_id: b.id,
+        name: "Delegation",
+        slug: "delegation",
+        timezone: "America/Denver"
+      })
+
+  defp manager(c) do
+    {:ok, _} =
+      RoleManagement.grant_role(c.credential, c.business, c.membership, :business_manager)
+
+    {:ok, _, credential} = Accounts.create_session(c.target)
+    credential
+  end
+
+  test "Owner inheritance is explicit and independently scoped across grants and tenants", c do
+    assert Authorization.permissions(:business_manager) --
+             Authorization.permissions(:business_owner) == []
+
+    assert {:ok, r} =
+             RoleManagement.grant_role(
+               c.credential,
+               c.business,
+               c.owner_membership,
+               :business_manager
+             )
+
+    assert {:ok, _} = RoleManagement.revoke_role(c.credential, c.business, r)
+
+    for action <-
+          Authorization.permissions(:business_manager) --
+            [:employment_terminate, :employment_rehire] do
+      assert :ok = Authorization.authorize(c.owner, action, c.business)
+    end
+
+    assert Repo.aggregate(from(r in RoleAssignment, where: r.status == :active), :count) == 1
+    other = Repo.insert!(%Business{name: "Other", slug: "other"})
+    m = member(c.owner, other)
+
+    Repo.insert!(%RoleAssignment{
+      membership_id: m.id,
+      business_id: other.id,
+      role: :business_manager
+    })
+
+    assert :ok = Authorization.authorize(c.owner, :staff_access_manage, other)
+    assert {:error, :forbidden} = Authorization.authorize(c.owner, :access_manage, other)
+    {:ok, _} = RoleManagement.grant_role(c.credential, c.business, c.membership, :business_owner)
+    assert {:ok, _} = RoleManagement.revoke_role(c.credential, c.business, c.owner_role)
+    assert {:error, :forbidden} = Authorization.authorize(c.owner, :access_manage, c.business)
+    # Removing Owner never manufactures authority from a revoked Manager grant.
+    assert {:error, :forbidden} = Authorization.authorize(c.owner, :finance_manage, c.business)
+  end
+
+  test "Manager delegates lower roles, never self higher roles or membership lifecycle", c do
+    credential = manager(c)
+    target = member(active_user_fixture(), c.business)
+    shop = shop(c.business)
+
+    for role <- [:employee, :shop_manager] do
+      assert {:ok, r} = RoleManagement.grant_role(credential, c.business, target, role, shop)
+      assert {:ok, _} = RoleManagement.revoke_role(credential, c.business, r)
+
+      assert {:error, :forbidden} =
+               RoleManagement.grant_role(credential, c.business, c.membership, role, shop)
+    end
+
+    for role <- [:business_manager, :business_owner] do
+      assert {:error, :forbidden} =
+               RoleManagement.grant_role(credential, c.business, target, role)
+
+      {:ok, r} = RoleManagement.grant_role(c.credential, c.business, target, role)
+      assert {:error, :forbidden} = RoleManagement.revoke_role(credential, c.business, r)
+      assert {:ok, _} = RoleManagement.revoke_role(c.credential, c.business, r)
+    end
+
+    assert {:error, :forbidden} = RoleManagement.revoke_membership(credential, c.business, target)
+    assert {:ok, _} = RoleManagement.revoke_membership(c.credential, c.business, target)
+
+    assert {:error, :forbidden} =
+             RoleManagement.reactivate_membership(credential, c.business, target)
+  end
+
+  test "Manager cannot modify current or historical Owner targets even through Employee grants",
+       c do
+    credential = manager(c)
+    shop = shop(c.business)
+
+    for history <- [:classification, :grant] do
+      u = active_user_fixture()
+      m = member(u, c.business)
+
+      e =
+        SchedulerApi.EmploymentFixtures.employment_fixture(
+          %{classification: if(history == :classification, do: :business_owner, else: :detailer)},
+          business: c.business,
+          user: u
+        )
+
+      if history == :classification do
+        assert {:ok, _} =
+                 SchedulerApi.Employment.HR.change_classification(c.credential, e, :detailer)
+      else
+        {:ok, r} = RoleManagement.grant_role(c.credential, c.business, m, :business_owner)
+        assert {:ok, _} = RoleManagement.revoke_role(c.credential, c.business, r)
+      end
+
+      {:ok, lower} = RoleManagement.grant_role(c.credential, c.business, m, :employee, shop)
+      assert {:error, :forbidden} = RoleManagement.revoke_role(credential, c.business, lower)
+
+      assert {:error, :forbidden} =
+               RoleManagement.grant_role(credential, c.business, m, :shop_manager, shop)
+    end
+  end
+
+  test "terminated employment cannot gain fresh grants after membership-only reactivation", c do
+    credential = manager(c)
+    u = active_user_fixture()
+    m = member(u, c.business)
+    e = SchedulerApi.EmploymentFixtures.employment_fixture(%{}, business: c.business, user: u)
+    assert {:ok, _} = SchedulerApi.Employment.HR.terminate_employment(c.credential, e)
+    assert {:ok, _} = RoleManagement.reactivate_membership(c.credential, c.business, m)
+    shop = shop(c.business)
+
+    for actor <- [credential, c.credential] do
+      assert {:error, :ineligible_target} =
+               RoleManagement.grant_role(actor, c.business, m, :employee, shop)
+    end
+  end
+
   defp member(u, b), do: Repo.insert!(%BusinessMembership{user_id: u.id, business_id: b.id})
 
   test "authorized scoped grant, duplicate denial, revocation and audit details", c do
@@ -138,7 +270,7 @@ defmodule SchedulerApi.RoleManagementTest do
     assert Repo.aggregate(RoleAssignment, :count) == 1
   end
 
-  test "Business Managers and scoped Shop Managers cannot assign roles", c do
+  test "Managers cannot grant Owner roles or bypass scope validation", c do
     assert {:ok, _} =
              RoleManagement.grant_role(c.credential, c.business, c.membership, :business_manager)
 

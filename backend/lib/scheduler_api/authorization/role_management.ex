@@ -77,7 +77,14 @@ defmodule SchedulerApi.Authorization.RoleManagement do
         outcome =
           cond do
             is_nil(business) or is_nil(actor) or
-                not authorized_change?(actor.user, business, membership, employment_id) ->
+                not authorized_change?(
+                  actor.user,
+                  business,
+                  membership,
+                  employment_id,
+                  action,
+                  if(assignment, do: assignment.role, else: role)
+                ) ->
               {:error, :forbidden}
 
             is_nil(membership) ->
@@ -162,10 +169,10 @@ defmodule SchedulerApi.Authorization.RoleManagement do
       {:error, :persistence_failed}
   end
 
-  defp authorized_change?(user, business, _, nil),
-    do: Authorization.authorize(user, :access_manage, business) == :ok
+  defp authorized_change?(user, business, membership, nil, action, role),
+    do: Authorization.authorize_role_change(user, business, membership, action, role) == :ok
 
-  defp authorized_change?(user, business, membership, employment_id) do
+  defp authorized_change?(user, business, membership, employment_id, _, _) do
     e = Repo.get(SchedulerApi.Employment.EmploymentRecord, employment_id)
 
     valid =
@@ -279,7 +286,8 @@ defmodule SchedulerApi.Authorization.RoleManagement do
       role in [:shop_manager, :employee] and is_nil(shop) ->
         {:error, :invalid_scope}
 
-      m.status != :active or not eligible?(Repo.get!(User, m.user_id)) ->
+      m.status != :active or not eligible?(Repo.get!(User, m.user_id)) or
+          not Authorization.access_target_employment_eligible?(m) ->
         {:error, :ineligible_target}
 
       true ->

@@ -291,14 +291,14 @@ validation, and it does not protect existing admin endpoints automatically.
 `Authorization.permissions(role)` lists fixed policy names, not effective access.
 Business Owners have the explicit business/HR/finance and shop-operation actions;
 Business Managers have business-wide employment, compensation, payroll and finance
-actions, but no access-management or shop operations. Shop Managers have shop
+actions plus restricted staff-access delegation, but no Owner membership control or shop operations. Shop Managers have shop
 appointment, schedule, assignment, customer and operational actions only at their
 assigned shops. Employment own-read and assigned-contact reads now resolve active
 employment/shop assignments through [EMPLOYMENT.md](EMPLOYMENT.md). Assigned-job resolvers remain denied; explicit shift access is described in
 [WORK_SHIFTS.md](WORK_SHIFTS.md). Compensation reads/writes now use the guarded
 record-level policies in [COMPENSATION.md](COMPENSATION.md). Broad compensation actions never grant
 Shop Managers employee pay access. No permission enables payroll record storage,
-role-management APIs or platform administration in this milestone.
+platform administration. Protected role APIs follow [ROLE_MANAGEMENT_API.md](ROLE_MANAGEMENT_API.md).
 
 `Authorization.authorized_shop_ids_query(user, action)` selects `%{id: shop_id}`
 for supported shop actions. Compose it as a subquery into protected reads before
@@ -313,8 +313,8 @@ read/manage actions; new resource types need explicit persisted resolvers.
 These are current-statement decisions, not durable capabilities. Do not cache
 materialized IDs or reuse an earlier `:ok` for a later write. Future sensitive
 mutations must coordinate authoritative authorization/revocation checks with their
-transaction/lock strategy. Field-level HR projections, protected controllers,
-audited role changes and first-owner provisioning remain later milestones.
+transaction/lock strategy. Current HR, scheduling, compensation and protected access
+APIs retain these checks; see [ROLE_MANAGEMENT_API.md](ROLE_MANAGEMENT_API.md).
 
 Focused checks: `mix test test/scheduler_api/authorization_test.exs`.
 
@@ -329,10 +329,14 @@ Internal entry points in `Authorization.RoleManagement`:
 
 Actor credentials are existing inspect-redacted `Accounts.SessionCredential`
 values, not user structs, user IDs or claims. A live session and eligible same-business
-Owner assignment are verified inside every transaction using Authorization.
+Owner or restricted Manager assignment is verified inside every transaction using
+Authorization. Owners explicitly inherit all Manager capabilities without another
+grant; Manager delegation excludes self, higher roles and protected Owner targets.
+See [ROLE_MANAGEMENT_API.md](ROLE_MANAGEMENT_API.md) for the complete matrix.
 Targets are persisted schema references: membership identity and assignment scope
 must match persisted values. Grant targets must be active, verified accounts with
-active membership; shop grants require an active shop in the business. No operation
+active membership and, when linked employment exists, an active period; shop grants
+require an active shop in the business. No operation
 creates a membership, activates a user, bootstraps ownership or grants platform access.
 
 All four operations lock the business row, then its member users (in ID order),
@@ -346,7 +350,7 @@ metadata with a `noop` event. Reactivation never restores revoked grants.
 `authorization_audit_events` records only validated actor/target IDs, business,
 membership/assignment, fixed role/shop, action, outcome, bounded reason and UTC time.
 Membership revocation records its parent action and each cascaded grant revocation.
-Foreign keys restrict history loss by cascading deletion. There is no public audit
+Restrictive foreign keys prevent cascading history loss. There is no public audit
 mutation API, arbitrary payload or credential/profile field. Deployment database
 privileges/retention must separately prevent unauthorized direct audit alterations.
 
@@ -364,8 +368,8 @@ These are the required application-level management entry points. Older
 `Organizations.Memberships` helpers and raw Repo writes remain trusted persistence
 mechanics, not authorized/audited management workflows. No database can prevent its
 privileged operator bypassing application policy. Global account suspension/recovery,
-first-Owner provisioning, audited membership creation and protected HTTP APIs remain
-separate workflows; do not route them through an unaudited production bypass.
+audited membership creation remains a separate workflow; first-Owner provisioning
+is operator-only and protected HTTP APIs delegate to these operations; do not route them through an unaudited production bypass.
 God Mode remains separate and unimplemented.
 
 Focused checks: `mix test test/scheduler_api/role_management_test.exs

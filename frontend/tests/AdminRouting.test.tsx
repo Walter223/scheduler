@@ -32,7 +32,7 @@ test('direct admin entry owns login error and retry without querying privileged 
   })
   vi.stubGlobal('fetch', fetcher)
   mount('/admin?auth_error=provider_unavailable')
-  expect(screen.getByRole('heading', { name: 'Staff account' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Magnum Command Center' })).toBeTruthy()
   await screen.findByRole('link', { name: 'Try signing in again' })
   expect(screen.getByRole('status').textContent).toContain('Sign-in is temporarily unavailable')
   expect(screen.getByRole('link', { name: 'Try signing in again' }).getAttribute('href')).toBe('/auth/login')
@@ -40,16 +40,16 @@ test('direct admin entry owns login error and retry without querying privileged 
   expect(fetcher.mock.calls[0]?.[0]).toBe('/api/me')
 })
 
-test('signed-in admin entry shows identity without implying authorization', async () => {
+test('signed-in admin entry discovers capabilities without implying authorization', async () => {
   const fetcher = vi.fn(async (url: string) => {
-    if (url !== '/api/me') throw new Error('Unexpected privileged API request')
+    if (url === '/api/admin/context') return Response.json({ businesses: [] })
     return Response.json({ authenticated: true, user: { id: 1, email: 'staff@example.invalid', first_name: 'Alex' }, csrf_token: 'synthetic' })
   })
   vi.stubGlobal('fetch', fetcher)
   mount('/admin')
   await screen.findByText('Signed in as Alex')
-  expect(screen.getByText(/does not grant business or shop access/)).toBeTruthy()
+  await screen.findByText(/No management workspaces are available/)
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
-  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(fetcher).toHaveBeenCalledTimes(2)
   expect(screen.queryByRole('link', { name: /staff sign in/i })).toBeNull()
 })

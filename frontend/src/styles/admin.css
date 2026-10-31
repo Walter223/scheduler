@@ -1,0 +1,18 @@
+.admin-shell { max-width: 1440px; margin: auto; padding: 1.5rem; }
+.admin-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid #39e7ff; padding-bottom: 1rem; }
+.admin-header h1 { font-size: clamp(1.4rem, 3vw, 2.2rem); }
+.admin-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 2rem; margin-top: 1.5rem; }
+.admin-sidebar { display: flex; flex-direction: column; gap: .75rem; }
+.admin-sidebar select { width: 100%; padding: .7rem; background: #161029; color: white; border: 1px solid #39e7ff; border-radius: .4rem; }
+.admin-sidebar nav { display: flex; flex-direction: column; gap: .5rem; }
+.admin-sidebar nav button { text-align: left; background: #211331; color: white; border: 1px solid #8253a6; padding: .8rem; border-radius: .4rem; cursor: pointer; }
+.admin-sidebar nav button[aria-current] { border-color: #39e7ff; color: #39e7ff; }
+.admin-shell :focus-visible { outline: 3px solid #ff72dc; outline-offset: 3px; }
+.admin-content { min-width: 0; overflow-wrap: anywhere; }
+.admin-menu-toggle { display: none; }
+@media (max-width: 700px) {
+  .admin-layout { display: block; }
+  .admin-menu-toggle { display: inline-block; margin-top: 1rem; }
+  .admin-sidebar { display: none; margin-bottom: 1.5rem; }
+  .admin-sidebar.is-open { display: flex; }
+}

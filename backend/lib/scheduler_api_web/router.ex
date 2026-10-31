@@ -29,6 +29,7 @@ defmodule SchedulerApiWeb.Router do
   scope "/api/admin", SchedulerApiWeb do
     pipe_through :admin_api
 
+    get "/context", AdminContextController, :index, log: false
     get "/appointments", AppointmentController, :index, log: false
     get "/businesses/:business_id/employees", EmployeeController, :index, log: false
     get "/businesses/:business_id/shops/:shop_id/employees", EmployeeController, :shop, log: false
@@ -130,6 +131,22 @@ defmodule SchedulerApiWeb.Router do
     post "/employees/:employee_id/periods/:period_id/compensation/rates",
          CompensationController,
          :create, log: false
+  end
+
+  scope "/api/admin/businesses/:business_id", SchedulerApiWeb do
+    pipe_through :admin_api
+    get "/memberships", AccessController, :memberships, log: false
+    get "/role-grants", AccessController, :role_grants, log: false
+  end
+
+  scope "/api/admin/businesses/:business_id", SchedulerApiWeb do
+    pipe_through :admin_write
+    post "/role-grants", AccessController, :grant, log: false
+    post "/role-grants/:grant_id/revoke", AccessController, :revoke, log: false
+    post "/memberships/:membership_id/revoke", AccessController, :revoke_membership, log: false
+
+    post "/memberships/:membership_id/reactivate", AccessController, :reactivate_membership,
+      log: false
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

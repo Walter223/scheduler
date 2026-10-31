@@ -14,6 +14,8 @@ defmodule SchedulerApi.Authorization do
   @business_actions [
     :business_manage,
     :access_manage,
+    :staff_access_read,
+    :staff_access_manage,
     :employment_manage,
     :employment_private_read,
     :compensation_read,
@@ -40,19 +42,27 @@ defmodule SchedulerApi.Authorization do
     :compensation_own_read
   ]
   @hr_record_actions [:employment_terminate, :employment_rehire]
+  @manager_permissions [
+    :employment_manage,
+    :employment_terminate,
+    :employment_rehire,
+    :employment_private_read,
+    :compensation_read,
+    :compensation_write,
+    :payroll_manage,
+    :finance_manage,
+    :staff_access_read,
+    :staff_access_manage
+  ]
   @permissions %{
     business_owner:
-      @business_actions ++ @shop_actions ++ @assigned_staff ++ @own_work ++ @hr_record_actions,
-    business_manager: [
-      :employment_manage,
-      :employment_terminate,
-      :employment_rehire,
-      :employment_private_read,
-      :compensation_read,
-      :compensation_write,
-      :payroll_manage,
-      :finance_manage
-    ],
+      Enum.uniq(
+        @manager_permissions ++
+          @business_actions ++
+          @shop_actions ++
+          @assigned_staff ++ @own_work ++ @hr_record_actions
+      ),
+    business_manager: @manager_permissions,
     shop_manager: @shop_actions ++ @assigned_staff,
     employee: @own_work
   }
@@ -325,6 +335,80 @@ defmodule SchedulerApi.Authorization do
   def authorized_compensation_employment_ids_query(_, _, _),
     do: from(e in EmploymentRecord, where: false, select: %{id: e.id})
 
+  @doc "Complete business-scoped access grants and permitted target memberships, for SQL scoping."
+  def staff_access_scopes_query(user, business_id, action \\ :staff_access_read)
+
+  def staff_access_scopes_query(%User{id: id}, business_id, action)
+      when is_integer(id) and id > 0 and action in [:staff_access_read, :staff_access_manage] do
+    protected_employment = management_employments([:business_owner])
+
+    protected_users =
+      from e in EmploymentRecord,
+        where: e.business_id == ^business_id and e.id in subquery(protected_employment),
+        select: e.user_id
+
+    owner_memberships =
+      from r in RoleAssignment,
+        where: r.business_id == ^business_id and r.role == :business_owner,
+        select: r.membership_id
+
+    from [r, m, u, b] in grants(id, action),
+      join: target in BusinessMembership,
+      on: target.business_id == b.id,
+      join: person in User,
+      on: person.id == target.user_id,
+      where: b.id == ^business_id and is_nil(r.shop_id),
+      where:
+        r.role == :business_owner or
+          (target.user_id != u.id and target.status == :active and is_nil(target.revoked_at) and
+             person.status == :active and person.email_verified and
+             target.id not in subquery(owner_memberships) and
+             target.user_id not in subquery(
+               from p in subquery(protected_users), where: not is_nil(p.user_id)
+             )),
+      distinct: true,
+      select: %{membership_id: target.id, owner: r.role == :business_owner}
+  end
+
+  def staff_access_scopes_query(_, _, _),
+    do: from(m in BusinessMembership, where: false, select: %{membership_id: m.id, owner: false})
+
+  @doc "Transaction callers must lock business/eligibility rows first; selectors supply no authority."
+  def authorize_role_change(%User{} = user, %Business{} = business, membership, action, role)
+      when action in [:grant_role, :revoke_role, :revoke_membership, :reactivate_membership] do
+    cond do
+      authorize(user, :access_manage, business) == :ok ->
+        :ok
+
+      action not in [:grant_role, :revoke_role] or role not in [:employee, :shop_manager] ->
+        {:error, :forbidden}
+
+      not match?(%BusinessMembership{}, membership) ->
+        {:error, :forbidden}
+
+      true ->
+        from(s in subquery(staff_access_scopes_query(user, business.id, :staff_access_manage)),
+          where: s.membership_id == ^membership.id
+        )
+        |> Repo.exists?()
+        |> decision()
+    end
+  end
+
+  def authorize_role_change(_, _, _, _, _), do: {:error, :forbidden}
+
+  @doc false
+  def access_target_employment_eligible?(membership) do
+    periods =
+      from e in EmploymentRecord,
+        where: e.user_id == ^membership.user_id and e.business_id == ^membership.business_id
+
+    # An explicitly created new period may start in the future. Fresh grants may
+    # be prepared, but period-specific reads still enforce their effective dates.
+    # A terminated-only identity cannot regain access by reactivating membership.
+    not Repo.exists?(periods) or Repo.exists?(from e in periods, where: e.status == :active)
+  end
+
   defp management_employments(roles) do
     # Both revoked management grants AND any past management classification stay
     # sensitive. A later Employee grant/reclassification never downgrades pay privacy.
@@ -458,6 +542,86 @@ defmodule SchedulerApi.Authorization do
     if action == :jobs_assigned_read,
       do: where(query, [j, p, a], j.status == :active and a.status in [:pending, :confirmed]),
       else: query
+  end
+
+  @doc "Minimal current management contexts; no role labels or employee self-service elevation."
+  def admin_contexts(%User{id: id} = user) do
+    areas = [
+      dashboard: :employment_private_read,
+      employees: :employment_private_read,
+      compensation: :compensation_read,
+      access: :staff_access_read,
+      settings: :business_manage,
+      appointments: :appointments_read,
+      schedules: :schedule_manage
+    ]
+
+    # Candidate discovery is still restricted by live complete grants, including
+    # shop-only operational grants. Candidates never authorize a capability.
+    candidates =
+      from r in RoleAssignment,
+        join: m in BusinessMembership,
+        on: m.id == r.membership_id and m.business_id == r.business_id,
+        join: u in User,
+        on: u.id == m.user_id,
+        join: b in Business,
+        on: b.id == m.business_id,
+        where:
+          u.id == ^id and u.status == :active and u.email_verified and
+            m.status == :active and is_nil(m.revoked_at) and r.status == :active and
+            is_nil(r.revoked_at) and b.status == :active,
+        distinct: true,
+        order_by: b.id,
+        select: b
+
+    for b <- Repo.all(candidates), reduce: [] do
+      result ->
+        capabilities =
+          for {area, action} <- areas,
+              Repo.exists?(
+                from [r, m, u, business] in grants(id, action),
+                  where: business.id == ^b.id and is_nil(r.shop_id)
+              ),
+              do: area
+
+        shops =
+          for shop <-
+                Repo.all(
+                  from s in Shop,
+                    where: s.business_id == ^b.id and s.status == :active,
+                    order_by: s.id
+                ),
+              reduce: [] do
+            shops ->
+              allowed =
+                for {area, action} <- areas,
+                    action in @shop_actions,
+                    authorize(user, action, shop) == :ok,
+                    do: area
+
+              if allowed == [],
+                do: shops,
+                else: shops ++ [%{id: shop.id, name: shop.name, capabilities: allowed}]
+          end
+
+        if capabilities == [] and shops == [],
+          do: result,
+          else:
+            result ++
+              [
+                %{
+                  id: b.id,
+                  name: b.name,
+                  capabilities:
+                    Enum.uniq(
+                      capabilities ++
+                        if(shops != [], do: [:dashboard], else: [])
+                    ),
+                  all_shops: Enum.filter(capabilities, &(&1 in [:appointments, :schedules])),
+                  shops: shops
+                }
+              ]
+    end
   end
 
   defp grants(user_id, action) do

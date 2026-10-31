@@ -14,7 +14,7 @@ const errors: Record<string, string> = {
   login_failed: 'Sign-in could not be completed. Please start a new login.',
 }
 
-function SessionControls() {
+function SessionControls({ onAuthenticationChange }: { onAuthenticationChange?: (authenticated: boolean) => void }) {
   const [session, setSession] = useState<Session>(anonymous)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -43,6 +43,10 @@ function SessionControls() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    onAuthenticationChange?.(session.authenticated)
+  }, [session.authenticated, onAuthenticationChange])
 
   async function logout() {
     if (!session.csrf_token || busy) return
