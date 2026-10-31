@@ -24,7 +24,7 @@ extra backend checks or dependency installation are added. Review resulting diff
 The fast script is a feedback loop, not a replacement for full regression.
 
 Real-Keycloak verification remains separate: from `frontend/`, run
-`npm run test:auth` with **4000/5173 free**, Docker available, and the local auth
+`npm run test:auth` with **4002/5174 free**, Docker available, and the local auth
 prerequisites in [AUTHENTICATION.md](AUTHENTICATION.md) satisfied. It uses isolated
 test identities/data; do not stop user-owned servers or reset Keycloak to run it.
 

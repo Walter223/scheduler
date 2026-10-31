@@ -218,16 +218,18 @@ OIDCC validation; HTTP-boundary tests use an isolated signed-token provider.
 `npm run test:e2e` retains all anonymous workflows on `scheduler_api_test_e2e`.
 
 For real Keycloak integration, from `frontend/` run `npm run test:auth` with Docker
-on PATH. Stop your ordinary 4000/5173 dev servers first; the runner refuses occupied
-ports. It uses the exact browser origin/callback, real Keycloak forms and signed
-tokens, and `scheduler_api_test_auth_e2e` exclusively. It creates two randomly
-named temporary Keycloak identities with verified fixture emails and strong random
-passwords, activates only the corresponding **issuer/subject-mapped test user** in
-the isolated DB, and proves pending denial for the other identity. No roles are
-granted and no production login bypass exists. Fixtures live in a mode-0600 file
-in an OS temporary directory; browser traces/screenshots/video are disabled to
-avoid recording credentials. Owned users, sessions and login rows are removed in
-finally cleanup. No existing realm users or development application data are used.
+on PATH. The runner requires free **4002/5174**, never stops or reuses 4000/5173,
+and runs exclusively against `scheduler_api_test_auth_e2e`. It creates a temporary
+confidential Keycloak client with exact localhost:5174 callback/origin and a fresh
+memory-only secret; magnum-web and normal production/development configuration
+remain unchanged. Eight owned Keycloak identities cover active/pending login and
+Admin roles. Accounts are mapped by exact issuer/subject only; explicit test grants
+and tenants exist solely in the isolated database. All nine browser cases use real
+Keycloak forms, authorization codes and signed tokens, never a login bypass.
+Fixtures are mode-0600 temporary files; traces/screenshots/video are disabled.
+Owned client/users, account/session/login/RBAC/employment fixtures and managed
+servers are cleaned in finally. See [ADMIN_CONTEXT.md](ADMIN_CONTEXT.md) for the
+complete isolated-origin security contract, scenarios and results.
 Do not manually activate real users merely to demonstrate login; use this runner
 until the invitation/activation policy is implemented.
 

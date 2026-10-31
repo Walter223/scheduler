@@ -128,3 +128,12 @@ Server-verified discovery exposes authorized management workspaces without role
 labels. Component tests cover context switching and revoked-access clearing;
 anonymous browser coverage checks direct mobile entry. Authenticated multi-role
 browser and future HR timeline/action acceptance criteria above remain pending.
+
+5A-B adds real-Keycloak test definitions and owned RBAC fixtures for the Admin
+capability matrix, mixed-role/two-Owner business switching, live revocation and
+expiry. See [the acceptance status](../backend/ADMIN_CONTEXT.md#5a-b-authenticated-acceptance-infrastructure).
+Fixture lifecycle verification with synthetic subjects is not real authentication.
+The isolated per-run client and test-only 4002/5174 configuration now close this
+blocker: all nine real-Keycloak browser cases passed without changing user-owned
+4000/5173 servers. Future HR timeline/action and production-hardening acceptance
+criteria remain separate.

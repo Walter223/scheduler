@@ -22,7 +22,7 @@ async function login(page: Page, kind: string) {
 test('active verified staff can log in, receive session-bound CSRF, and log out locally', async ({ page, context }) => {
   await login(page, 'active')
   await expect(page.getByText('Signed in as E2E', { exact: true })).toBeVisible()
-  const cookies = await context.cookies('http://localhost:5173')
+  const cookies = await context.cookies('http://localhost:5174')
   const session = cookies.find((cookie) => cookie.name === 'magnum_session_dev')
   expect(Boolean(session?.httpOnly && session.sameSite === 'Lax' && session.path === '/')).toBe(true)
   expect(cookies.some((cookie) => cookie.name === 'magnum_login_dev')).toBe(false)
@@ -36,7 +36,7 @@ test('active verified staff can log in, receive session-bound CSRF, and log out 
   expect(metadata).toEqual({ authenticated: true, hasCSRF: true, noStore: 'no-store', missingCSRFStatus: 403 })
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('Signed out of Magnum')
-  expect((await context.cookies('http://localhost:5173')).some((cookie) => cookie.name === 'magnum_session_dev')).toBe(false)
+  expect((await context.cookies('http://localhost:5174')).some((cookie) => cookie.name === 'magnum_session_dev')).toBe(false)
   const status = await page.evaluate(async () => (await fetch('/api/me')).json())
   expect(status).toEqual({ authenticated: false, user: null, csrf_token: null })
 })
@@ -44,7 +44,7 @@ test('active verified staff can log in, receive session-bound CSRF, and log out 
 test('unknown verified identity remains pending and never receives a Magnum session', async ({ page, context }) => {
   await login(page, 'pending')
   await expect(page.getByRole('status')).toHaveText('Your Magnum account is not available for sign-in. Contact your administrator.')
-  expect((await context.cookies('http://localhost:5173')).some((cookie) => cookie.name === 'magnum_session_dev')).toBe(false)
+  expect((await context.cookies('http://localhost:5174')).some((cookie) => cookie.name === 'magnum_session_dev')).toBe(false)
   const status = await page.evaluate(async () => (await fetch('/api/me')).json())
   expect(status).toEqual({ authenticated: false, user: null, csrf_token: null })
 })

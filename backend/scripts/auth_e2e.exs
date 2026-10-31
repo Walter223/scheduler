@@ -7,26 +7,46 @@ end
 
 [command] = System.argv()
 fixture = System.fetch_env!("BFF_E2E_FIXTURE") |> File.read!() |> Jason.decode!()
-unless Enum.all?(fixture["users"], &String.starts_with?(&1["username"], fixture["run_id"])),
-  do: raise("Invalid owned auth fixture")
+
+unless Regex.match?(~r/^magnum-bff-e2e-[0-9a-f]{32}$/, fixture["run_id"]) and
+         Enum.all?(fixture["users"], &String.starts_with?(&1["username"], fixture["run_id"])),
+       do: raise("Invalid owned auth fixture")
 
 if command == "server" do
-  {:ok, provider} = SchedulerApi.Authentication.Config.new([
+  # Fixed alternate origin, only after the test DB/run-ownership guards above.
+  # Production/development constructors remain unchanged; the real protocol still
+  # verifies this exact per-run audience, issuer, callback, nonce and PKCE.
+  client_id = System.fetch_env!("BFF_E2E_CLIENT_ID")
+  unless client_id == fixture["run_id"], do: raise("Invalid owned test client")
+
+  provider = %SchedulerApi.Authentication.Config{
     issuer: "http://auth.magnum.test:8080/realms/magnum",
-    callback_url: "http://localhost:5173/auth/callback",
-    client_secret: System.fetch_env!("MAGNUM_WEB_CLIENT_SECRET")
-  ], :dev)
+    callback_url: "http://localhost:5174/auth/callback",
+    client_id: client_id,
+    client_secret: System.fetch_env!("MAGNUM_WEB_CLIENT_SECRET"),
+    local_http: true
+  }
+
   Application.put_env(:scheduler_api, :oidc, provider)
-  {:ok, browser} = SchedulerApi.Authentication.BrowserConfig.new("http://localhost:5173", :dev)
-  Application.put_env(:scheduler_api, :browser_auth, browser)
+
+  Application.put_env(:scheduler_api, :browser_auth, %{
+    origin: "http://localhost:5174",
+    secure: false
+  })
 end
 
 endpoint = SchedulerApiWeb.Endpoint
 config = Application.fetch_env!(:scheduler_api, endpoint)
-Application.put_env(:scheduler_api, endpoint,
-  Keyword.merge(config, server: command == "server", http: [ip: {127, 0, 0, 1}, port: 4000]))
+
+Application.put_env(
+  :scheduler_api,
+  endpoint,
+  Keyword.merge(config, server: command == "server", http: [ip: {127, 0, 0, 1}, port: 4002])
+)
+
 {:ok, _} = Application.ensure_all_started(:scheduler_api)
 Ecto.Adapters.SQL.Sandbox.mode(SchedulerApi.Repo, :auto)
+Logger.configure(level: :warning)
 
 import Ecto.Query
 alias SchedulerApi.{Accounts, Repo}
@@ -38,45 +58,268 @@ case command do
     # Never overwrite a database containing other identities or login attempts.
     unless Enum.all?([User, WebSession, LoginTransaction], &(Repo.aggregate(&1, :count) == 0)),
       do: raise("Auth E2E database has existing account data; refusing fixture setup")
-    active = Enum.find(fixture["users"], &(&1["kind"] == "active"))
-    {:ok, user} = Accounts.sync_verified_identity(%VerifiedIdentity{
-      issuer: "http://auth.magnum.test:8080/realms/magnum", subject: active["subject"],
-      email: active["email"], email_verified: true, first_name: "E2E", last_name: "Active"})
-    {:ok, _} = Accounts.set_user_status(user, :active)
+
+    Repo.transaction(fn ->
+      businesses =
+        for suffix <- ["a", "b"] do
+          Repo.insert!(%SchedulerApi.Organizations.Business{
+            name: "Acceptance " <> suffix,
+            slug: fixture["run_id"] <> "-" <> suffix
+          })
+        end
+
+      [a, b] = businesses
+
+      shops =
+        for business <- businesses, n <- 1..2 do
+          Repo.insert!(%SchedulerApi.Organizations.Shop{
+            business_id: business.id,
+            name: business.name <> " shop #{n}",
+            slug: "shop-#{n}",
+            timezone: "America/Denver"
+          })
+        end
+
+      for identity <- fixture["users"], identity["kind"] != "pending" do
+        {:ok, user} =
+          Accounts.sync_verified_identity(%VerifiedIdentity{
+            issuer: "http://auth.magnum.test:8080/realms/magnum",
+            subject: identity["subject"],
+            email: identity["email"],
+            email_verified: true,
+            first_name: "E2E",
+            last_name: identity["kind"]
+          })
+
+        {:ok, user} = Accounts.set_user_status(user, :active)
+
+        roles =
+          case identity["kind"] do
+            "owner" -> [{a, :business_owner}]
+            "manager" -> [{a, :business_manager}]
+            "shop_manager" -> [{a, :shop_manager}]
+            "employee" -> [{a, :employee}]
+            "mixed" -> [{a, :business_owner}, {b, :business_manager}]
+            "multi_owner" -> [{a, :business_owner}, {b, :business_owner}]
+            _ -> []
+          end
+
+        for {business, role} <- roles do
+          m =
+            Repo.insert!(%SchedulerApi.Organizations.BusinessMembership{
+              user_id: user.id,
+              business_id: business.id
+            })
+
+          scopes =
+            if role in [:employee, :shop_manager],
+              do: Enum.filter(shops, &(&1.business_id == business.id)),
+              else: [nil]
+
+          for shop <- scopes do
+            Repo.insert!(%SchedulerApi.Organizations.RoleAssignment{
+              membership_id: m.id,
+              business_id: business.id,
+              role: role,
+              shop_id: shop && shop.id
+            })
+          end
+
+          if identity["kind"] == "employee" do
+            # Classification alone confers no management permission.
+            {:ok, _} =
+              SchedulerApi.Employment.create_employment(
+                business,
+                %{
+                  first_name: "E2E",
+                  last_name: "Classification",
+                  classification: :business_owner,
+                  starts_on: ~D[2026-01-01]
+                },
+                user: user
+              )
+          end
+        end
+      end
+    end)
+
     IO.puts("AUTH_E2E_SEEDED")
 
   "verify" ->
     subjects = Enum.map(fixture["users"], & &1["subject"])
     users = Repo.all(from u in User, where: u.keycloak_subject in ^subjects)
-    unless Enum.sort(Enum.map(users, & &1.status)) == [:active, :pending],
+
+    unless Enum.sort(Enum.map(users, & &1.status)) == List.duplicate(:active, 7) ++ [:pending],
       do: raise("Expected active and denied pending identities")
-    unless Repo.aggregate(from(s in WebSession, where: is_nil(s.revoked_at)), :count) == 0,
-      do: raise("Logout did not durably revoke all issued test sessions")
+
+    expired_identity = Enum.find(fixture["users"], &(&1["kind"] == "shop_manager"))
+    expired_user = Repo.get_by!(User, keycloak_subject: expired_identity["subject"])
+    remaining = Repo.all(from s in WebSession, where: is_nil(s.revoked_at))
+
+    unless length(remaining) == 1 and
+             Enum.all?(remaining, fn s ->
+               s.user_id == expired_user.id and
+                 DateTime.compare(s.idle_expires_at, DateTime.utc_now()) != :gt
+             end),
+           do:
+             raise(
+               "Expected only the explicitly expired fixture session; all logout sessions must be revoked"
+             )
+
     IO.puts("AUTH_E2E_VERIFIED")
 
   "cleanup" ->
     subjects = Enum.map(fixture["users"], & &1["subject"])
-    ids = Repo.all(from u in User, where: u.keycloak_issuer == "http://auth.magnum.test:8080/realms/magnum"
-      and u.keycloak_subject in ^subjects, select: u.id)
+
+    ids =
+      Repo.all(
+        from u in User,
+          where:
+            u.keycloak_issuer == "http://auth.magnum.test:8080/realms/magnum" and
+              u.keycloak_subject in ^subjects,
+          select: u.id
+      )
+
+    businesses =
+      Repo.all(
+        from b in SchedulerApi.Organizations.Business,
+          where: b.slug in ^[fixture["run_id"] <> "-a", fixture["run_id"] <> "-b"],
+          select: b.id
+      )
+
     Repo.transaction(fn ->
+      Repo.delete_all(
+        from e in SchedulerApi.Authorization.AuditEvent, where: e.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from h in SchedulerApi.Employment.ClassificationHistory,
+          where: h.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from e in SchedulerApi.Employment.EmploymentRecord, where: e.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from r in SchedulerApi.Organizations.RoleAssignment, where: r.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from m in SchedulerApi.Organizations.BusinessMembership,
+          where: m.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from s in SchedulerApi.Organizations.Shop, where: s.business_id in ^businesses
+      )
+
+      Repo.delete_all(from b in SchedulerApi.Organizations.Business, where: b.id in ^businesses)
       Repo.delete_all(from s in WebSession, where: s.user_id in ^ids)
       Repo.delete_all(from u in User, where: u.id in ^ids)
       # This dedicated database was verified empty before this exclusive run.
       Repo.delete_all(LoginTransaction)
     end)
+
     IO.puts("AUTH_E2E_CLEANED")
+
+  action when action in ["revoke_mixed", "expire_shop_manager", "check_seed"] ->
+    if action == "check_seed" do
+      unless Repo.aggregate(User, :count) == 7, do: raise("Fixture users missing")
+
+      for identity <- fixture["users"], identity["kind"] != "pending" do
+        user = Repo.get_by!(User, keycloak_subject: identity["subject"])
+
+        expected =
+          case identity["kind"] do
+            k when k in ["active", "employee"] -> 0
+            k when k in ["mixed", "multi_owner"] -> 2
+            _ -> 1
+          end
+
+        unless length(SchedulerApi.Authorization.admin_contexts(user)) == expected,
+          do: raise("Fixture context mismatch")
+      end
+
+      IO.puts("AUTH_E2E_FIXTURES_READY")
+    else
+      kind = if action == "revoke_mixed", do: "mixed", else: "shop_manager"
+      identity = Enum.find(fixture["users"], &(&1["kind"] == kind))
+
+      user =
+        Repo.get_by!(User,
+          keycloak_issuer: "http://auth.magnum.test:8080/realms/magnum",
+          keycloak_subject: identity["subject"]
+        )
+
+      if action == "revoke_mixed" do
+        business =
+          Repo.get_by!(SchedulerApi.Organizations.Business, slug: fixture["run_id"] <> "-a")
+
+        membership =
+          Repo.get_by!(SchedulerApi.Organizations.BusinessMembership,
+            business_id: business.id,
+            user_id: user.id
+          )
+
+        actor_identity = Enum.find(fixture["users"], &(&1["kind"] == "owner"))
+
+        actor =
+          Repo.get_by!(User,
+            keycloak_issuer: "http://auth.magnum.test:8080/realms/magnum",
+            keycloak_subject: actor_identity["subject"]
+          )
+
+        {:ok, session, credential} = Accounts.create_session(actor)
+
+        try do
+          {:ok, _} =
+            SchedulerApi.Authorization.RoleManagement.revoke_membership(
+              credential,
+              business,
+              membership
+            )
+        after
+          {:ok, _} = Accounts.revoke_session(session, :logout)
+        end
+      else
+        # Advance only owned test-session timestamps, without sleeps or browser-token access.
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        Repo.update_all(
+          from(s in WebSession, where: s.user_id == ^user.id and is_nil(s.revoked_at)),
+          set: [
+            inserted_at: DateTime.add(now, -7200),
+            last_seen_at: DateTime.add(now, -3600),
+            idle_expires_at: DateTime.add(now, -1800)
+          ]
+        )
+      end
+    end
 
   "server" ->
     deadline = System.monotonic_time(:millisecond) + 30_000
+
     wait = fn wait ->
       case SchedulerApi.Authentication.Provider.context() do
-        {:ok, _, _} -> :ok
+        {:ok, _, _} ->
+          :ok
+
         _ ->
-          if System.monotonic_time(:millisecond) >= deadline, do: raise("OIDC discovery unavailable")
-          receive do after 100 -> wait.(wait) end
+          if System.monotonic_time(:millisecond) >= deadline,
+            do: raise("OIDC discovery unavailable")
+
+          receive do
+          after
+            100 -> wait.(wait)
+          end
       end
     end
+
     wait.(wait)
     IO.puts("AUTH_E2E_READY")
-    receive do :stop -> :ok end
+
+    receive do
+      :stop -> :ok
+    end
 end
