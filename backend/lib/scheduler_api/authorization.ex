@@ -544,6 +544,31 @@ defmodule SchedulerApi.Authorization do
       else: query
   end
 
+  @doc "One complete operational grant per shop; All Shops requires business-wide scope."
+  def dashboard_shops_query(%User{id: id}, business_id, shop_id) do
+    roles =
+      for {role, actions} <- @permissions,
+          Enum.all?([:appointments_read, :schedule_manage, :jobs_assign], &(&1 in actions)),
+          do: role
+
+    query =
+      from [r, m, u, b] in grants(id, :appointments_read),
+        join: s in Shop,
+        on: s.business_id == b.id,
+        where: b.id == ^business_id and s.status == :active and r.role in ^roles,
+        distinct: true,
+        select: %{id: s.id, name: s.name, timezone: s.timezone}
+
+    if is_nil(shop_id),
+      do: where(query, [r], is_nil(r.shop_id)),
+      else:
+        where(
+          query,
+          [r, m, u, b, s],
+          s.id == ^shop_id and (is_nil(r.shop_id) or r.shop_id == s.id)
+        )
+  end
+
   @doc "Minimal current management contexts; no role labels or employee self-service elevation."
   def admin_contexts(%User{id: id} = user) do
     areas = [

@@ -137,3 +137,9 @@ The isolated per-run client and test-only 4002/5174 configuration now close this
 blocker: all nine real-Keycloak browser cases passed without changing user-owned
 4000/5173 servers. Future HR timeline/action and production-hardening acceptance
 criteria remain separate.
+
+5B adds the [operational dashboard](../backend/DASHBOARD_API.md). Scheduled Detailer
+counts use stable employment identity across shops and active effective assignments;
+Employee grants never substitute for Detailer classification. HR-only Manager roles
+receive no scheduling totals. Dashboard results are cleared on tenant/shop changes,
+revocation errors and logout; existing operational authorization remains server-side.

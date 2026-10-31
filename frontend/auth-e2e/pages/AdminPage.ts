@@ -4,6 +4,7 @@ export class AdminPage {
   constructor(page: Page) { this.page = page }
   get business() { return this.page.getByLabel('Business', { exact: true }) }
   get shop() { return this.page.getByLabel('Shop', { exact: true }) }
+  get dashboard() { return this.page.getByRole('region', { name: 'Operational dashboard' }) }
   get navigation() { return this.page.getByRole('navigation', { name: 'Admin areas' }) }
   async login(identity: { username: string; password: string }) {
     await this.page.goto('/admin')

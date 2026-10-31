@@ -16,3 +16,15 @@
   .admin-sidebar { display: none; margin-bottom: 1.5rem; }
   .admin-sidebar.is-open { display: flex; }
 }
+.dashboard-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.dashboard-title h3 { font-size: 1.6rem; margin-bottom: .3rem; color: #73efff; }
+.dashboard-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.dashboard-metrics > div { display: flex; flex-direction: column; gap: .8rem; padding: 1.2rem; border: 1px solid #8958b4; border-radius: .7rem; background: linear-gradient(135deg, #241739, #151629); }
+.dashboard-metrics strong { font-size: 2.3rem; color: #78f0ff; }
+.dashboard-dates { font-size: .85rem; opacity: .85; }
+.dashboard-appointments { list-style: none; padding: 0; }
+.dashboard-appointments li { display: grid; grid-template-columns: 1fr 2fr 1.5fr; gap: 1rem; padding: 1.2rem 0; border-top: 1px solid #644378; }
+.dashboard-appointments time, .dashboard-appointments span { display: block; }
+.dashboard-appointments h4, .dashboard-appointments p { margin: .25rem 0; }
+.dashboard-status { text-transform: capitalize; display: inline !important; }
+@media (max-width: 700px) { .dashboard-appointments li { grid-template-columns: 1fr; gap: .5rem; } }

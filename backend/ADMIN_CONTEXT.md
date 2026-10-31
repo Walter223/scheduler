@@ -88,3 +88,8 @@ keyboard operation, expiry, CSRF/local logout and pending denial. The preceding
 synthetic fixture lifecycle check was not counted as real authentication evidence.
 No full management screens, exhaustive accessibility audit, MFA/passkey hardening
 or production readiness claim is included in this milestone.
+
+5B replaces the operational Dashboard placeholder with authorized daily totals and
+appointments. See [DASHBOARD_API.md](DASHBOARD_API.md) for scope, per-shop date/DST,
+counting semantics and privacy. HR-only workspaces retain their permitted navigation
+without operational scheduling data. Other areas remain placeholders.

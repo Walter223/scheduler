@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import OperationalDashboard from '../components/OperationalDashboard'
 import SessionControls from '../components/SessionControls'
 
 type Shop = { id: number; name: string; capabilities: string[] }
@@ -88,7 +89,7 @@ export default function AdminPage() {
             {state && <p role="status">{state}</p>}
             {state.startsWith('Access is unavailable') && <a href="/auth/login">Sign in again</a>}
             <button className="secondary-button" onClick={() => setRevision(v => v + 1)}>Refresh access</button>
-            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2><p>{area === 'dashboard' ? 'Welcome to your authorized workspace.' : 'This area is planned. Management screens are not available yet.'}</p></>}
+            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={`${business.id}:${shopId}`} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : <p>This area is planned. Management screens are not available yet.</p>}</>}
           </section>
         </div>
       </>}

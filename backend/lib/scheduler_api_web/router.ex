@@ -29,6 +29,7 @@ defmodule SchedulerApiWeb.Router do
   scope "/api/admin", SchedulerApiWeb do
     pipe_through :admin_api
 
+    get "/businesses/:business_id/dashboard", DashboardController, :show, log: false
     get "/context", AdminContextController, :index, log: false
     get "/appointments", AppointmentController, :index, log: false
     get "/businesses/:business_id/employees", EmployeeController, :index, log: false

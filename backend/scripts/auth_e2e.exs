@@ -141,6 +141,97 @@ case command do
           end
         end
       end
+
+      # Today's operational read-model fixtures, owned entirely by this run.
+      shop = hd(shops)
+
+      service =
+        Repo.insert!(%SchedulerApi.Catalog.Service{
+          business_id: a.id,
+          name: "Acceptance service",
+          description: "Isolated dashboard fixture"
+        })
+
+      size =
+        Repo.insert!(%SchedulerApi.Catalog.VehicleSize{
+          business_id: a.id,
+          name: "Fixture",
+          sort_order: 1
+        })
+
+      price =
+        Repo.insert!(%SchedulerApi.Catalog.ServicePrice{
+          business_id: a.id,
+          shop_id: shop.id,
+          service_id: service.id,
+          vehicle_size_id: size.id,
+          price_cents: 5000,
+          duration_minutes: 60
+        })
+
+      %{rows: [[starts]]} =
+        Repo.query!(
+          "SELECT ((CURRENT_TIMESTAMP AT TIME ZONE 'America/Denver')::date + time '09:00') AT TIME ZONE 'America/Denver'",
+          [],
+          log: false
+        )
+
+      starts = DateTime.truncate(starts, :second)
+
+      attrs = %SchedulerApi.Appointments.Appointment{
+        business_id: a.id,
+        shop_id: shop.id,
+        service_price_id: price.id,
+        starts_at: starts,
+        duration_minutes: 60,
+        price_cents: 5000,
+        customer_first_name: "Fixture",
+        customer_last_name: "Customer",
+        customer_email: "fixture@example.invalid",
+        customer_phone: "303-555-0100",
+        vehicle_make: "Test",
+        vehicle_model: "Vehicle"
+      }
+
+      appointment = Repo.insert!(attrs)
+      Repo.insert!(%{attrs | starts_at: DateTime.add(starts, 10800), status: :cancelled})
+
+      {:ok, employee} =
+        SchedulerApi.Employment.create_employment(
+          a,
+          %{
+            first_name: "Fixture",
+            last_name: "Detailer",
+            classification: :detailer,
+            starts_on: ~D[2026-01-01]
+          }
+        )
+
+      {:ok, assignment} =
+        SchedulerApi.Employment.assign_shop(employee, shop, %{starts_on: ~D[2026-01-01]})
+
+      shift =
+        Repo.insert!(%SchedulerApi.Employment.WorkShift{
+          employment_id: employee.id,
+          assignment_id: assignment.id,
+          business_id: a.id,
+          shop_id: shop.id,
+          timezone: shop.timezone,
+          starts_at: starts,
+          ends_at: DateTime.add(starts, 28800)
+        })
+
+      Repo.insert!(%SchedulerApi.Appointments.JobAssignment{
+        appointment_id: appointment.id,
+        employment_id: employee.id,
+        assignment_id: assignment.id,
+        work_shift_id: shift.id,
+        business_id: a.id,
+        shop_id: shop.id,
+        starts_at: starts,
+        ends_at: DateTime.add(starts, 5400),
+        is_lead: true
+      })
     end)
 
     IO.puts("AUTH_E2E_SEEDED")
@@ -190,6 +281,32 @@ case command do
     Repo.transaction(fn ->
       Repo.delete_all(
         from e in SchedulerApi.Authorization.AuditEvent, where: e.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from j in SchedulerApi.Appointments.JobAssignment, where: j.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from w in SchedulerApi.Employment.WorkShift, where: w.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from sa in SchedulerApi.Employment.ShopAssignment, where: sa.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from ap in SchedulerApi.Appointments.Appointment, where: ap.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from p in SchedulerApi.Catalog.ServicePrice, where: p.business_id in ^businesses
+      )
+
+      Repo.delete_all(from s in SchedulerApi.Catalog.Service, where: s.business_id in ^businesses)
+
+      Repo.delete_all(
+        from v in SchedulerApi.Catalog.VehicleSize, where: v.business_id in ^businesses
       )
 
       Repo.delete_all(

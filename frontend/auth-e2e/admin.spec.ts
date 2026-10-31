@@ -94,3 +94,27 @@ test('expired real-login session loses workspace on the next request', async ({ 
   const status = await page.evaluate(async () => (await fetch('/api/me')).json())
   expect(status.authenticated).toBe(false)
 })
+test('real Owner dashboard shows operational totals, crew/lead, empty shop and All Shops', async ({ page }) => {
+  const admin = new AdminPage(page)
+  await admin.login(users.find(u => u.kind === 'owner')!)
+  const dashboard = admin.dashboard
+  await expect(dashboard.getByRole('heading', { name: 'Acceptance service' })).toHaveCount(2)
+  await expect(dashboard.getByText('Lead: Fixture Detailer', { exact: true })).toBeVisible()
+  await expect(dashboard.getByText('1 Detailer', { exact: true })).toBeVisible()
+  for (const [label, count] of [['Appointments today', '1'], ['Awaiting staffing', '0'], ['Detailers scheduled', '1'], ['Active shifts today', '1']]) {
+    await expect(dashboard.getByRole('group', { name: label, exact: true }).getByText(count, { exact: true })).toBeVisible()
+  }
+  await expect(dashboard.getByText('cancelled', { exact: true })).toBeVisible()
+  await admin.shop.selectOption({ label: 'Acceptance a shop 2' })
+  await expect(dashboard.getByText('No appointments scheduled today.')).toBeVisible()
+  await expect(dashboard.getByText('Lead: Fixture Detailer', { exact: true })).toHaveCount(0)
+  await admin.shop.selectOption({ label: 'All Shops' })
+  await expect(dashboard.getByText('Lead: Fixture Detailer', { exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  const refresh = dashboard.getByRole('button', { name: 'Refresh dashboard' })
+  await refresh.focus()
+  await page.keyboard.press('Enter')
+  await expect(dashboard.getByText('Lead: Fixture Detailer', { exact: true })).toBeVisible()
+  await admin.logout()
+  await expect(dashboard).toHaveCount(0)
+})
