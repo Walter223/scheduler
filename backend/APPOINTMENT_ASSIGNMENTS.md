@@ -141,3 +141,7 @@ mix test test/scheduler_api/appointment_team*_test.exs test/scheduler_api/job_as
 
 Milestone 4F-3 exposes the existing operations through
 [protected scheduling HTTP APIs](SCHEDULING_API.md), with no booking-rule changes.
+
+5D-1 surfaces existing active crew counts/Lead Detailer through the
+[read-only Admin calendar](CALENDAR_API.md). This adds no crew mutation, capacity
+rule, implicit assignment, lead promotion or employee authorization.

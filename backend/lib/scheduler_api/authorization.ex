@@ -628,7 +628,16 @@ defmodule SchedulerApi.Authorization do
 
               if allowed == [],
                 do: shops,
-                else: shops ++ [%{id: shop.id, name: shop.name, capabilities: allowed}]
+                else:
+                  shops ++
+                    [
+                      %{
+                        id: shop.id,
+                        name: shop.name,
+                        timezone: shop.timezone,
+                        capabilities: allowed
+                      }
+                    ]
           end
 
         if capabilities == [] and shops == [],

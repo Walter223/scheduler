@@ -161,3 +161,8 @@ offboarding/no-restoration confirmations, inclusive rehire-date validation and
 authorized refreshes. Real-Keycloak cases cover Owner/Manager lifecycle actions and
 Owner-protected denial; linked multi-business/stale-cookie, future-team and rollback
 behavior retain their backend HTTP/domain coverage. No permission is restored by UI.
+
+5D-1 adds the [read-only Admin calendar](../backend/CALENDAR_API.md). Team counts
+and lead names stay within complete operational business/shop grants; Employee
+self-service and HR classifications never grant calendar access. Existing period,
+offboarding, work and tenant constraints are unchanged.

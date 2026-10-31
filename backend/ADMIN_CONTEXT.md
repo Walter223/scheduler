@@ -107,3 +107,8 @@ from operational shops and do not grant scheduling authority. See
 5C-2B adds separate [termination and rehire confirmations](HR_LIFECYCLE_UI.md),
 using the same current HR capability hints and existing record-specific protected
 endpoints. No lifecycle or authorization policy is implemented in the frontend.
+
+5D-1 implements [read-only appointments/calendar](CALENDAR_API.md): chronological
+list, local day/seven-day agendas and minimal detail panels. Discovery shop metadata
+now includes the configured timezone; existing operational capabilities continue to
+control navigation and API authorization. No appointment/team mutations are added.

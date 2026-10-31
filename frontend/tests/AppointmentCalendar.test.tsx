@@ -1,0 +1,63 @@
+import { afterEach, expect, test, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import AppointmentCalendar from '../src/components/AppointmentCalendar'
+afterEach(cleanup)
+const appointment = (id = 1, status = 'pending', crew_size = 0) => ({ id, shop_id: 1, shop_name: 'Shop A', timezone: 'America/Denver', starts_at: '2026-11-01T16:00:00Z', ends_at: '2026-11-01T17:00:00Z', duration_minutes: 60, service_name: `Detail ${id}`, vehicle_make: 'Toyota', vehicle_model: 'Camry', vehicle_size: 'Small', status, crew_size, lead_detailer: crew_size ? 'Alex Detailer' : null })
+const data = (appointments = [appointment()], more = false) => ({ appointments, shops: [{ id: 1, name: 'Shop A', timezone: 'America/Denver' }], meta: { has_more: more, next_cursor: more ? 'position' : null } })
+test('list and detail display local time, staffing and multiple crew without private fields', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: data([appointment(), appointment(2, 'confirmed', 2), appointment(3, 'cancelled')]) })))
+  render(<AppointmentCalendar businessId={1} shopId={1} timezone="America/Denver" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'View Detail 2 · 9:00 AM · Shop A' }))
+  expect(screen.getByRole('region', { name: 'Appointment details' }).textContent).toContain('Toyota Camry')
+  expect(screen.getByRole('region', { name: 'Appointment details' }).textContent).toContain('Alex Detailer')
+  expect(screen.getAllByText('Needs staffing')).toHaveLength(1)
+  expect(screen.queryByText(/customer_email/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Close appointment' }))
+  expect(screen.queryByRole('region', { name: 'Appointment details' })).toBeNull()
+})
+test('week view, date/status changes and page cursors use bounded server requests', async () => {
+  const fetcher = vi.fn(async () => Response.json({ data: data([], true) }))
+  vi.stubGlobal('fetch', fetcher)
+  render(<AppointmentCalendar businessId={1} shopId={0} timezone="America/Denver" />)
+  await screen.findByText(/0 appointment\(s\) on this page/)
+  fireEvent.change(screen.getByLabelText('Calendar view'), { target: { value: 'week' } })
+  await waitFor(() => expect(fetcher.mock.calls.at(-1)?.length).toBeGreaterThan(0))
+  fireEvent.change(screen.getByLabelText('Calendar date'), { target: { value: '2026-11-01' } })
+  await waitFor(() => expect((fetcher.mock.calls as unknown as [string][]).at(-1)?.[0]).toContain('days=7'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+  await waitFor(() => expect((fetcher.mock.calls as unknown as [string][]).at(-1)?.[0]).toContain('cursor=position'))
+  fireEvent.change(screen.getByLabelText('Appointment status'), { target: { value: 'cancelled' } })
+  await waitFor(() => expect((fetcher.mock.calls as unknown as [string][]).at(-1)?.[0]).toContain('status=cancelled'))
+  expect((fetcher.mock.calls as unknown as [string][]).at(-1)?.[0]).not.toContain('cursor=')
+})
+test('old private responses cannot overwrite a new business context', async () => {
+  let finish!: (value: Response) => void
+  vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('/1/calendar') ? new Promise<Response>(r => { finish = r }) : Promise.resolve(Response.json({ data: data([]) }))))
+  const view = render(<AppointmentCalendar key="1" businessId={1} shopId={1} timezone="America/Denver" />)
+  view.rerender(<AppointmentCalendar key="2" businessId={2} shopId={2} timezone="America/Denver" />)
+  await screen.findByText('No appointments on this page.')
+  await act(async () => finish(Response.json({ data: data() })))
+  expect(screen.queryByRole('button', { name: /View Detail/ })).toBeNull()
+})
+test.each([401, 403, 503])('failure %s clears appointment and detail data', async status => {
+  const fetcher = vi.fn(async () => Response.json({ data: data() }))
+  vi.stubGlobal('fetch', fetcher)
+  render(<AppointmentCalendar businessId={1} shopId={1} timezone="America/Denver" />)
+  fireEvent.click(await screen.findByRole('button', { name: /View Detail/ }))
+  fetcher.mockImplementation(async () => Response.json({ error: 'denied' }, { status }))
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh appointments' }))
+  await screen.findByRole('alert')
+  expect(screen.queryByRole('region', { name: 'Appointment details' })).toBeNull()
+})
+test('calendar keeps simultaneous appointments in separate timezone-labelled shop lanes', async () => {
+  const east = { ...appointment(2, 'confirmed', 1), shop_id: 2, shop_name: 'Shop B', timezone: 'America/New_York' }
+  const value = { ...data([appointment(), east]), shops: [{ id: 1, name: 'Shop A', timezone: 'America/Denver' }, { id: 2, name: 'Shop B', timezone: 'America/New_York' }] }
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: value })))
+  render(<AppointmentCalendar businessId={1} shopId={0} timezone="America/Denver" />)
+  await screen.findByRole('button', { name: 'View Detail 1 · 9:00 AM · Shop A' })
+  fireEvent.change(screen.getByLabelText('Calendar date'), { target: { value: '2026-11-01' } })
+  fireEvent.change(screen.getByLabelText('Calendar view'), { target: { value: 'day' } })
+  await screen.findByRole('region', { name: 'Shop A 2026-11-01' })
+  expect(screen.getByRole('region', { name: 'Shop B 2026-11-01' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'View Detail 2 · 11:00 AM · Shop B' })).toBeTruthy()
+})

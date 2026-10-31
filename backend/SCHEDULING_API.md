@@ -87,3 +87,7 @@ existing locks/exclusion constraints and historical records remain unchanged.
 mix test test/scheduler_api_web/controllers/scheduling_controller_test.exs test/scheduler_api/job_assignment_concurrency_test.exs test/scheduler_api_web/controllers/admin_appointment_security_test.exs
 mix precommit
 ```
+
+5D-1 adds a separate [bounded calendar read](CALENDAR_API.md) for local day/week
+windows, all existing statuses and complete crew metadata. The existing upcoming
+appointment endpoint, response shape, booking and staffing workflows are unchanged.

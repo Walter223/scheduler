@@ -46,3 +46,12 @@
 .employee-hr-dialog input, .employee-hr-dialog select, .employee-hr-dialog textarea { padding: .65rem; color: white; background: #161029; border: 1px solid #8958b4; border-radius: .3rem; max-width: 100%; }
 .employee-hr-dialog input[type=checkbox] { align-self: start; }
 .employee-hr-dialog :focus-visible { outline: 3px solid #ff72dc; outline-offset: 3px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.calendar-day { border: 1px solid #8958b4; border-radius: .6rem; padding: 1rem; background: #1d1430; min-width: 0; }
+.calendar-day h3 { color: #78f0ff; }
+.calendar-day section { border-top: 1px solid #644378; margin-top: 1rem; }
+.calendar-list { list-style: none; padding: 0; }
+.calendar-entry { border-left: 3px solid #39e7ff; padding: .8rem; margin: .8rem 0; background: #161029; overflow-wrap: anywhere; }
+.calendar-entry p { margin: .5rem 0; }
+.calendar-entry strong { color: #ffb3ed; }
+.appointment-calendar nav { display: flex; flex-wrap: wrap; gap: .5rem; }

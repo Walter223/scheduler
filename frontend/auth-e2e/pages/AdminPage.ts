@@ -7,6 +7,8 @@ export class AdminPage {
   get employees() { return this.page.getByRole('region', { name: 'Employee directory', exact: true }) }
   get roster() { return this.page.getByRole('region', { name: 'Current shop roster' }) }
   async openEmployees() { await this.navigation.getByRole('button', { name: 'Employees and HR' }).click() }
+  get calendar() { return this.page.getByRole('region', { name: 'Appointment calendar', exact: true }) }
+  async openCalendar() { await this.navigation.getByRole('button', { name: 'Appointments and calendar' }).click() }
   get dashboard() { return this.page.getByRole('region', { name: 'Operational dashboard' }) }
   get navigation() { return this.page.getByRole('navigation', { name: 'Admin areas' }) }
   async login(identity: { username: string; password: string }) {
