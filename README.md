@@ -127,6 +127,7 @@ The roadmap is directional; features listed as upcoming should not be considered
 ## Documentation
 
 - [Repository guidance](AGENTS.md)
+- [SaaS onboarding and white-label readiness roadmap](docs/saas-onboarding-white-label-roadmap.md)
 - [Employment model](backend/EMPLOYMENT.md)
 - [Employment/access scenarios](docs/employment-access-scenarios.md)
 - [Work shifts](backend/WORK_SHIFTS.md)
