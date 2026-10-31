@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AppointmentCalendar from '../components/AppointmentCalendar'
 import EmployeeDirectory from '../components/EmployeeDirectory'
 import OperationalDashboard from '../components/OperationalDashboard'
@@ -32,6 +32,8 @@ export default function AdminPage() {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState('')
   const [revision, setRevision] = useState(0)
+  const selection = useRef({ businessId, shopId, area })
+  useEffect(() => { selection.current = { businessId, shopId, area } }, [businessId, shopId, area])
 
   const accountChanged = useCallback((value: boolean) => {
     setAuthenticated(value)
@@ -42,15 +44,12 @@ export default function AdminPage() {
     const controller = new AbortController()
     if (!authenticated) return
     async function load() {
-      setBusinesses([])
-      setBusinessId(0)
-      setShopId(0)
-      setArea('dashboard')
-      setState('Loading authorized workspaces…')
+      setState('Checking authorized workspaces…')
       try {
         const response = await fetch('/api/admin/context', { signal: controller.signal, cache: 'no-store' })
         if (controller.signal.aborted) return
         if (response.status === 401 || response.status === 403) {
+          setBusinesses([])
           setState('Access is unavailable. Please sign in again or contact your administrator.')
           return
         }
@@ -58,12 +57,21 @@ export default function AdminPage() {
         const data = await response.json() as { businesses: Business[] }
         if (!Array.isArray(data.businesses) || !data.businesses.every(validBusiness)) throw new Error('invalid context')
         if (controller.signal.aborted) return
-        setBusinesses(data.businesses)
-        setBusinessId(data.businesses[0]?.id ?? 0)
-        setShopId(data.businesses[0]?.shops[0]?.id ?? 0)
+        const previous = selection.current
+        const selected = data.businesses.find(b => b.id === previous.businessId) ?? data.businesses[0]
+        const sameBusiness = selected?.id === previous.businessId
+        const keepShop = sameBusiness && (selected?.shops.some(s => s.id === previous.shopId) || (previous.shopId === 0 && (!!selected?.all_shops.length || selected?.shops.length === 0)))
+        const nextShopId = keepShop ? previous.shopId : selected?.shops[0]?.id ?? 0
+        const selectedShop = selected?.shops.find(s => s.id === nextShopId)
+        const capabilities = [...(selected?.capabilities ?? []), ...(selectedShop?.capabilities ?? [])]
+        const allowed = areas.filter(([key]) => capabilities.includes(key) || (key === 'employees' && capabilities.includes('roster'))).map(([key]) => key)
+        setBusinesses(current => JSON.stringify(current) === JSON.stringify(data.businesses) ? current : data.businesses)
+        setBusinessId(selected?.id ?? 0)
+        setShopId(nextShopId)
+        setArea(sameBusiness && keepShop && allowed.includes(previous.area) ? previous.area : allowed[0] ?? 'dashboard')
         setState(data.businesses.length ? '' : 'No management workspaces are available. Contact your business administrator.')
       } catch {
-        if (!controller.signal.aborted) setState('Workspaces are temporarily unavailable. Please retry.')
+        if (!controller.signal.aborted) { setBusinesses([]); setState('Workspaces are temporarily unavailable. Please retry.') }
       }
     }
     void load()
@@ -75,6 +83,7 @@ export default function AdminPage() {
   const business = authenticated ? businesses.find(b => b.id === businessId) : undefined
   const shop = business?.shops.find(s => s.id === shopId)
   const available = business ? Array.from(new Set([...business.capabilities, ...(shop?.capabilities ?? [])])) : []
+  const workspaceKey = `${businessId}:${shopId}:${[...available].sort().join(',')}`
   return (
     <main className="admin-shell">
       <header className="admin-header"><h1>Magnum Command Center</h1><SessionControls onAuthenticationChange={accountChanged} /></header>
@@ -97,7 +106,7 @@ export default function AdminPage() {
             {state && <p role="status">{state}</p>}
             {state.startsWith('Access is unavailable') && <a href="/auth/login">Sign in again</a>}
             <button className="secondary-button" onClick={() => setRevision(v => v + 1)}>Refresh access</button>
-            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={`${business.id}:${shopId}`} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : area === 'appointments' ? <AppointmentCalendar key={`${business.id}:${shopId}`} businessId={business.id} shopId={shopId} timezone={shop?.timezone ?? business.shops[0]?.timezone ?? 'America/Denver'} /> : area === 'employees' ? <EmployeeDirectory key={`${business.id}:${shopId}`} businessId={business.id} shopId={shopId} hr={business.capabilities.includes('employees')} canManage={business.capabilities.includes('hr_manage')} shops={business.hr_shops ?? []} /> : <p>This area is planned. Management screens are not available yet.</p>}</>}
+            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={workspaceKey} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : area === 'appointments' ? <AppointmentCalendar key={workspaceKey} businessId={business.id} shopId={shopId} timezone={shop?.timezone ?? business.shops[0]?.timezone ?? 'America/Denver'} /> : area === 'employees' ? <EmployeeDirectory key={workspaceKey} businessId={business.id} shopId={shopId} hr={business.capabilities.includes('employees')} canManage={business.capabilities.includes('hr_manage')} shops={business.hr_shops ?? []} /> : <p>This area is planned. Management screens are not available yet.</p>}</>}
           </section>
         </div>
       </>}

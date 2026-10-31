@@ -302,6 +302,13 @@ for (const kind of ['owner', 'shop_manager']) {
     await expect(appointment).toBeVisible()
     await calendar.getByLabel('Calendar view').selectOption('week')
     await expect(appointment).toBeVisible()
+    for (let refresh = 0; refresh < 2; refresh++) {
+      const response = page.waitForResponse(r => r.url().endsWith('/api/admin/context') && r.status() === 200)
+      await page.evaluate(() => { window.dispatchEvent(new Event('blur')); window.dispatchEvent(new Event('focus')) })
+      await response
+      await expect(calendar.getByLabel('Calendar view')).toHaveValue('week')
+      await expect(appointment).toBeVisible()
+    }
     await calendar.getByLabel('Appointment status').selectOption('cancelled')
     await expect(appointment).toHaveCount(0)
     await expect(calendar.getByRole('button', { name: /View Acceptance service/ })).toHaveCount(1)

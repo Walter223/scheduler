@@ -31,11 +31,18 @@ function SessionControls({ onAuthenticationChange }: { onAuthenticationChange?: 
         if (typeof data !== 'object' || data === null || !('authenticated' in data)) {
           throw new Error('invalid session')
         }
+        if (controller.signal.aborted) return
         const value = data as Session
         if (value.authenticated === false) setSession(anonymous)
         else if (value.authenticated === true && value.user && typeof value.user.email === 'string'
           && typeof value.csrf_token === 'string') setSession(value)
         else throw new Error('invalid session')
+        if (value.authenticated) setMessage('')
+        const url = new URL(window.location.href)
+        if (url.searchParams.has('auth_error')) {
+          url.searchParams.delete('auth_error')
+          window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) setMessage('Account status is temporarily unavailable. Please try signing in again.')

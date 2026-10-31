@@ -52,3 +52,22 @@ test('invalid session responses show a safe error without affecting booking', as
   render(<SessionControls />)
   await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Account status is temporarily unavailable'))
 })
+
+test('authenticated validation clears stale login error and consumes only auth_error without reload', async () => {
+  window.history.replaceState({ keep: true }, '', '/admin?auth_error=login_failed&other=keep#workspace')
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ authenticated: true, user: { id:1, email:'test@example.invalid' }, csrf_token:'synthetic' })))
+  render(<SessionControls />)
+  await screen.findByRole('button', { name: 'Sign out' })
+  expect(screen.queryByText(/Sign-in could not be completed/)).toBeNull()
+  expect(window.location.search).toBe('?other=keep')
+  expect(window.location.hash).toBe('#workspace')
+  expect(window.history.state).toEqual({ keep: true })
+})
+test('genuine login failure remains visible after its URL parameter is consumed', async () => {
+  window.history.replaceState({}, '', '/admin?auth_error=login_failed')
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({authenticated:false})))
+  render(<SessionControls />)
+  await screen.findByText('Sign-in could not be completed. Please start a new login.')
+  expect(window.location.search).toBe('')
+  expect(screen.getByRole('link', { name:'Try signing in again' })).toBeTruthy()
+})

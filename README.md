@@ -1,147 +1,253 @@
 # Magnum
 
-**A multi-tenant platform for running modern detailing businesses.**
+**A multi-tenant detailing operations platform — built with Elixir, Phoenix, React, and PostgreSQL.**
 
-Magnum brings customer booking, shop scheduling, employee management, and day-to-day operations into one system. It is designed for a single detailing shop today and for businesses operating multiple locations and crews as they grow—with a foundation that can eventually accommodate larger jobs such as semis, boats, and aircraft.
+Magnum is an actively developed full-stack application for customer booking, multi-shop operations, employee management, and appointment staffing. The project explores how to build reliable workflows for service businesses where **scheduling conflicts, tenant boundaries, employee access, and historical records** matter as much as the user interface.
 
-> **Project status:** Active development. Customer-facing booking functionality and substantial backend administration capabilities exist; the full Admin Command Center, payments, and Google Calendar integration are not yet complete. Magnum is **not production-ready**.
+> **Status: active development / portfolio project.** Customer booking, authenticated administration, employee HR workflows, appointment calendars, and crew management are implemented. Some management features currently exist only as protected backend APIs. Self-service SaaS onboarding, white-label customer sites, subscriptions, and production deployment are **not** implemented. This is not a production-ready service.
 
-## What Magnum does
+## What works today
 
-### Customer booking
+| Area | Implemented functionality | Current boundary |
+| --- | --- | --- |
+| **Customer booking** | Service catalog, vehicle-size prices and durations, availability selection, validation, booking submission, and confirmation | Public experience currently uses the default Magnum Detailing business/shop |
+| **Booking integrity** | Shop-scoped scheduling rules, UTC persistence, appointment snapshots, conflict prevention, and concurrent booking safeguards | Booking policies are not yet configurable per business |
+| **Admin Command Center** | Keycloak-backed staff sign-in, authenticated sessions, capability-aware navigation, business/shop selection, and operational dashboard | Compensation, access-management, staff-scheduling, and settings screens remain placeholders |
+| **Appointments** | Protected chronological list, day agenda, seven-day view, status filtering, bounded pagination, shop-local time labels, and appointment details | No appointment rescheduling or drag-and-drop UI |
+| **Crews** | View full appointment teams; add/remove eligible Detailers; assign, transfer, or clear an optional Lead Detailer | Work-shift eligibility and overlap rules are enforced server-side |
+| **Employees & HR** | Active/Former Employees directory, employee profiles and employment periods, contact/classification changes, shop assignments, termination, and rehire | HR records and application login accounts are distinct; invitations are not implemented |
+| **Protected operational APIs** | Employee work shifts, effective-dated compensation, memberships, role grants, and audited access changes | These APIs do not yet have complete corresponding Admin management screens |
 
-- Presents detailing services, vehicle-size pricing, and estimated durations.
-- Provides appointment availability and customer booking workflows.
-- Protects bookings against conflicting reservations, including concurrent requests.
-- Uses explicit shop context and shop-local scheduling rules.
+The platform's data model supports separate businesses and shops, scoped access, and employees with distinct employment relationships. **That foundation does not yet mean arbitrary companies can register and publish their own booking sites.** See the [SaaS onboarding roadmap](docs/saas-onboarding-white-label-roadmap.md).
 
-### Business and shop operations
+## Engineering highlights
 
-- Models separate businesses and their shops, with business- and shop-scoped permissions.
-- Supports employees working at multiple shops and, independently, for multiple businesses.
-- Maintains employee shifts, appointment assignments, and multi-Detailer crews.
-- Allows an optional Lead Detailer per appointment.
-- Prevents overlapping employee assignments and enforces the current shift-coverage policy.
-- Retains auditable assignment and schedule history.
+### Tenant isolation and authorization
 
-### Employee and HR management
+- Business/shop ownership is represented explicitly in persistence and checked by Phoenix, not inferred from frontend selectors.
+- Keycloak authenticates the user; Magnum manages application account status, memberships, and business/shop role grants.
+- A complete qualifying grant must authorize each operation. Separate grants cannot be combined to construct broader permissions.
+- Business Owners, Business Managers, Shop Managers, and Employees have deliberately different scopes. A Manager's HR authority does not automatically include shop scheduling.
+- Protected APIs apply authorization and tenant scope **before** filtering, sorting, and pagination.
 
-- Tracks employee records, contact information, classification, and shop assignments.
-- Supports restricted, effective-dated compensation records.
-- Implements audited hiring, HR edits, termination, and rehire workflows.
-- Preserves former employees, historical pay, prior work, and employment periods instead of deleting them.
-- Creates a new employment period on rehire without restoring previous permissions, pay, or assignments automatically.
+### Scheduling and transactional integrity
 
-### Secure administration APIs
+- Public booking uses service-specific duration, shop-aware appointment constraints, and a post-appointment buffer.
+- PostgreSQL constraints and transactional domain operations defend against overlapping bookings and competing assignment changes.
+- Appointment crews can have zero or multiple Detailers and at most one Lead, subject to eligibility, shift coverage, and cross-shop employee overlap rules.
+- Scheduling stores UTC instants and displays local shop times, including explicit timezone handling in the Admin calendar.
 
-- Provides protected HR directory, employment-history, HR mutation, shift, and appointment-team HTTP APIs.
-- Enforces business/shop authorization in the backend; UI controls are not the security boundary.
-- Uses session authentication, CSRF/origin protections for writes, scoped queries, bounded inputs, and explicit response fields.
-- Keeps historical employee self-service data isolated from newer employment periods.
+### HR lifecycle and auditability
+
+- Employee identity is distinguished from an **employment period**, so rehire creates a new period rather than rewriting prior employment.
+- Termination preserves historical data and performs controlled offboarding; it does not silently delete prior jobs, pay, or audits.
+- Compensation uses restricted, effective-dated records. Management interfaces do not automatically expose compensation data.
+- Critical role, HR, assignment, and scheduling operations have domain-level audit behavior and regression coverage.
+
+These are implemented design choices in the repository, **not claims of independent security certification or production-scale performance**.
 
 ## Architecture
 
-| Layer | Technology | Responsibility |
-| --- | --- | --- |
-| Frontend | React, TypeScript, Vite | Customer experience; future Admin Command Center |
-| Backend | Elixir, Phoenix, Ecto | Booking workflows, business rules, REST APIs, authorization |
-| Database | PostgreSQL | Tenant relationships, transactional integrity, scheduling constraints, history |
-| Authentication | Keycloak / OIDC | Identity provider; Phoenix manages server-side sessions |
-| Testing | ExUnit, Playwright | Backend regression, concurrency, browser and API checks |
-
-**Design principles:** Explicit tenant boundaries, least-privilege access, database-enforced integrity, durable audit history, and keeping sensitive business rules out of the frontend.
-
-### Repository layout
-
-```text
-backend/       Phoenix API, domain contexts, database migrations, backend docs
-frontend/      React/TypeScript frontend and Playwright tests
-scripts/       Development checks and smoke-test helpers
-docs/          Cross-cutting product and security requirements
-AGENTS.md      Repository conventions and coding-agent guidance
+```mermaid
+flowchart LR
+    Customer[Customer booking UI] --> React[React / TypeScript / Vite]
+    Staff[Staff Admin UI] --> React
+    React -->|same-origin /api and /auth| Phoenix[Phoenix HTTP API and BFF]
+    Phoenix --> Domain[Domain contexts: booking, HR, scheduling, authorization]
+    Domain --> Ecto[Ecto]
+    Ecto --> AppDB[(Application PostgreSQL)]
+    Phoenix <-->|OIDC authorization code + PKCE| Keycloak[Keycloak identity provider]
+    Keycloak --> AuthDB[(Separate Keycloak PostgreSQL)]
 ```
 
-## Getting started
+**Trust boundary:** React renders server-authorized data. Phoenix owns pricing, availability, mutations, authorization, and session enforcement. Provider tokens are not exposed to the frontend; the backend uses revocable, opaque browser sessions and session-bound CSRF protection for protected writes.
+
+### Technology stack
+
+| Layer | Technologies verified in the repository |
+| --- | --- |
+| Frontend | React 19, TypeScript 6, Vite 8, React Router 7 |
+| Backend | Elixir / Phoenix 1.8, Ecto, Bandit, JSON HTTP APIs |
+| Database | PostgreSQL; Ecto migrations, transactional constraints, tenant-scoped relationships |
+| Identity | Keycloak 26, OpenID Connect, authorization-code flow with S256 PKCE; Phoenix backend-for-frontend sessions |
+| Test automation | ExUnit, Vitest, React Testing Library, Playwright, real-Keycloak browser acceptance |
+| Development tooling | `mise`, Docker Compose for local identity services, Python and shell verification scripts, Mailpit for captured local mail |
+
+Runtime versions pinned by [`mise.toml`](mise.toml): **Elixir 1.20.2**, **Erlang 28.4**, **Node.js 24**. The Keycloak development Compose stack pins its own service image versions; the application's PostgreSQL instance is configured separately.
+
+### Repository map
+
+```text
+backend/
+  lib/scheduler_api/             Domain contexts and persistence
+  lib/scheduler_api_web/         Phoenix routes, controllers, API boundaries
+  priv/repo/migrations/          Database schema evolution
+  test/                          ExUnit and HTTP/domain regression tests
+frontend/
+  src/pages/                    Customer and Admin routes
+  src/components/               Booking, dashboard, HR, calendar, crew UI
+  tests/                        Vitest component tests
+  e2e/                          Anonymous Playwright browser/API tests
+  auth-e2e/                     Real-Keycloak browser acceptance
+infra/auth/                      Local identity realm configuration
+scripts/                         Startup, safety checks, test runners
+docs/                            Cross-cutting design and SaaS roadmap
+AGENTS.md                        Engineering conventions and agent guidance
+```
+
+## Local development
+
+The instructions below reflect checked-in scripts and configurations. **They have been source-checked, not executed as part of writing this README.** The project currently targets a local development environment, not a hosted deployment.
 
 ### Prerequisites
 
-You'll need compatible versions of Elixir/Erlang, PostgreSQL, Node.js, and the local Keycloak configuration. Consult the repository's environment and authentication documentation before starting services. Do not commit secrets or local credentials.
+- Git; [`mise`](https://mise.jdx.dev/) for the pinned Elixir/Erlang/Node runtimes.
+- A running **application PostgreSQL** instance accessible with the development configuration in [`backend/config/dev.exs`](backend/config/dev.exs). This database is **not** started by the included auth Compose profile.
+- Docker with Compose v2 and Python 3 for the optional-but-required-for-Admin local Keycloak environment.
+- Playwright Chromium for browser test runs.
 
-### Development workflow
-
-Start the configured database and Keycloak services, then run the Phoenix backend and Vite frontend using the project's existing configuration. **Verify environment setup and exact start commands against the checked-in project files** before treating this section as a copy/paste installation guide.
-
-Useful verification commands from the repository root:
-
-```bash
-./scripts/check-fast.sh   # Formatting/lint and quick checks
-./scripts/check-full.sh   # Broader backend, frontend, and Playwright checks
-./scripts/dev-smoke.sh    # Read-only local backend/frontend smoke test
-```
-
-Backend verification:
+### 1. Clone and install runtimes
 
 ```bash
-cd backend
-mix precommit
+git clone https://github.com/Walter223/scheduler.git
+cd scheduler
+mise install
 ```
 
-Apply migrations to the **intended** local database only after checking its configuration:
+Ensure your shell uses the `mise`-managed tool versions. Check [`mise.toml`](mise.toml) if tooling is not on `PATH`.
+
+### 2. Set up the application database and backend dependencies
+
+With the development PostgreSQL server running:
 
 ```bash
 cd backend
-mix ecto.migrations
-mix ecto.migrate
+mix setup
+cd ..
 ```
 
-> Some test suites manage isolated databases and ports. Read the scripts before running checks against shared or valuable environments.
+`mix setup` obtains dependencies, creates/migrates the configured **development** database, and runs the source-controlled catalog seeds. Run it only against a database you intend to initialize; **do not use `mix ecto.reset` on valuable data**.
 
-## Access model
+### 3. Start local Keycloak and email capture
 
-Magnum separates **employment classification** from **application permissions**. Business Owners, Business Managers, Shop Managers, and Employees have different authorized capabilities. Permissions must come from a complete qualifying grant for the requested action and business/shop scope; grants cannot be combined to invent broader access.
+From the repository root:
 
-An employee may work for more than one business. Removing access to one employer must not remove the same person's valid access to a different employer. Termination preserves historical records for authorized HR users but revokes the terminated business's access. Rehire creates a fresh employment period with no automatic restoration of old access.
+```bash
+python3 scripts/auth.py init
+```
 
-## Development status and roadmap
+This creates an ignored `infra/auth/.env` containing local credentials. The command refuses to overwrite an existing file. Add the following hostname mapping to your computer's `/etc/hosts`:
 
-**Implemented foundations**
+```text
+127.0.0.1 auth.magnum.test
+```
 
-- Customer services, availability, and booking logic.
-- Multi-business and multi-shop data model and authorization.
-- Keycloak-backed authentication and protected server-side sessions.
-- Employee records, compensation rules, shifts, teams, and employment history.
-- Audited HR/offboarding/rehire domain workflows.
-- Protected HR and scheduling HTTP APIs.
-- Backend and browser/API regression-test infrastructure.
+Then:
 
-**Upcoming work**
+```bash
+python3 scripts/auth.py check
+python3 scripts/auth.py up
+python3 scripts/auth.py smoke
+```
 
-1. Protected compensation and role-management APIs.
-2. Admin Command Center: dashboard, business/shop switching, employee directory, Former Employees, appointments, crews, shifts, and management screens.
-3. Google Calendar appointment synchronization, scoped per connected shop.
-4. Payments, customer communications, additional workflows, reporting, and production/SaaS readiness.
-5. Performance testing and observability, including Grafana/k6, at the end of the current roadmap.
+The local Keycloak administrator console is at `http://auth.magnum.test:8080/admin/master/console/`; captured development emails appear at `http://localhost:8025`. Admin bootstrap credentials live **only** in the ignored local env file. The `master` realm administers Keycloak; Magnum staff identities use the `magnum` realm. See [local auth setup](docs/auth-development.md) and [browser authentication](backend/AUTHENTICATION.md).
 
-The roadmap is directional; features listed as upcoming should not be considered available today.
+**Do not reset Keycloak volumes as a troubleshooting step**: the reset command in the auth tooling intentionally destroys local identity state.
 
-## Documentation
+### 4. Start the app (two terminals)
 
-- [Repository guidance](AGENTS.md)
-- [SaaS onboarding and white-label readiness roadmap](docs/saas-onboarding-white-label-roadmap.md)
-- [Employment model](backend/EMPLOYMENT.md)
-- [Employment/access scenarios](docs/employment-access-scenarios.md)
-- [Work shifts](backend/WORK_SHIFTS.md)
-- [Appointment teams](backend/APPOINTMENT_ASSIGNMENTS.md)
-- [Offboarding](backend/OFFBOARDING.md)
-- [Rehire](backend/REHIRE.md)
-- [HR read API](backend/HR_READ_API.md)
-- [HR write API](backend/HR_WRITE_API.md)
-- [Scheduling API](backend/SCHEDULING_API.md)
+The development launcher injects the existing local OIDC configuration without printing the client secret and refuses to replace an occupied backend port:
 
-## Working on Magnum
+```bash
+# Terminal 1 — repository root
+python3 scripts/dev-backend.py --check
+python3 scripts/dev-backend.py
+```
 
-Read [AGENTS.md](AGENTS.md) before making changes. Prefer scoped milestones, existing authorized domain entry points, additive/data-preserving migrations, explicit tests, and focused commits. Never bypass authorization or rewrite historical employment and audit data for convenience.
+```bash
+# Terminal 2 — repository root
+cd frontend
+npm ci
+npm run dev
+```
+
+| Local page | Address |
+| --- | --- |
+| Customer home | `http://localhost:5173/` |
+| Services | `http://localhost:5173/services` |
+| Customer booking | `http://localhost:5173/contact` |
+| Staff Admin | `http://localhost:5173/admin` |
+| Backend service catalog | `http://localhost:4000/api/services` |
+
+Vite proxies `/api` and `/auth` to the local Phoenix backend. **A verified Keycloak login alone does not grant Admin access**: the local Magnum application account must also be active and have an authorized business membership/role. There is no public self-service first-Owner signup yet. Follow the existing protected [account/Owner setup documentation](backend/AUTHENTICATION.md), rather than directly inserting grants or disabling checks.
+
+## Testing and quality practices
+
+From the repository root:
+
+```bash
+./scripts/check-fast.sh    # Backend format check; frontend lint and component tests
+./scripts/check-full.sh    # Backend precommit, frontend checks, anonymous Playwright
+./scripts/dev-smoke.sh     # Read-only check of already-running dev API and Vite proxy
+```
+
+Or run focused suites explicitly:
+
+```bash
+cd backend
+mix test                  # Backend ExUnit tests (test environment)
+mix precommit             # Compile, lockfile cleanup, format, and tests
+
+cd ../frontend
+npm run test:component
+npm run lint
+npm run build
+npm run test:e2e          # Isolated anonymous browser/API regression
+npm run test:auth         # Separate real-Keycloak browser acceptance
+```
+
+**Test isolation matters:** the Playwright runners use separate test databases and ports **4002/5174**, rather than development ports **4000/5173**. The full and authentication suites have additional PostgreSQL, Docker/Keycloak, browser, and free-port prerequisites. `mix precommit` may format code or modify the lockfile; review the diff. These are available test commands, **not a claim that all suites were executed for this README revision**.
+
+Engineering work emphasizes focused milestones, contract and domain tests, concurrency/revocation cases, accessible component behavior, real-provider authentication checks, reusable test fixtures, and cleanup that preserves developer data.
+
+## How I use OpenAI Codex
+
+I use **OpenAI Codex as a coding collaborator** on this project, with a human-directed engineering workflow:
+
+1. **Define the scope:** Turn a product requirement into a small milestone with explicit acceptance criteria, constraints, and non-goals.
+2. **Preserve architecture:** Use [`AGENTS.md`](AGENTS.md) and nested backend/frontend guides to communicate conventions, tenant and authentication boundaries, and data-safety rules.
+3. **Implement and verify:** Have Codex inspect existing code, make focused changes, extend relevant tests, and report exactly which checks ran and what remains unverified.
+4. **Review before proceeding:** Evaluate code changes and behavioral evidence, keep implemented work separate from future ideas, and iterate on usability and system design.
+
+The goal is to demonstrate **engineering judgment, system design, risk management, and verification**, not to suggest that AI-generated code is automatically correct or production-ready.
+
+## Product UI and screenshots
+
+The repository includes frontend design assets, but **no committed screenshots of the running Admin or booking experience were found** when preparing this README. Screenshots will be added after capturing and reviewing representative views with fictional or redacted customer/employee information. No mockups are presented as product evidence.
+
+## Roadmap — planned, not implemented
+
+- **Complete Admin operations UI:** Work-shift scheduling, compensation and access-management screens, business settings, and deeper calendar/accessibility refinement. Protected backend APIs for several of these workflows already exist.
+- **Self-service SaaS onboarding:** New-business provisioning, verified initial Owner activation, shop creation, and staff invitations with explicit acceptance and role assignment.
+- **Tenant-specific customer experience:** Business-specific public booking routes, configurable hours/availability policies, editable service catalogs, logo/color customization, and eventually optional custom domains.
+- **Integrations and commerce:** Shop-scoped, opt-in one-way Google Calendar publishing; payment and subscription lifecycles; customer communication workflows.
+- **Production readiness:** Privileged-access MFA, deployment and operational hardening, abuse controls, retention/incident procedures, monitoring, and later performance/load testing (including Grafana/k6).
+
+See the [SaaS and white-label architecture roadmap](docs/saas-onboarding-white-label-roadmap.md) for implementation sequencing, security dependencies, and open product decisions. **No public hosted environment, production deployment, billing integration, or scale benchmark is claimed here.**
+
+## Further technical documentation
+
+- [Booking, availability, and backend behavior](backend/README.md)
+- [Authentication and sessions](backend/AUTHENTICATION.md)
+- [Admin permission discovery](backend/ADMIN_CONTEXT.md)
+- [Calendar API](backend/CALENDAR_API.md)
+- [Crew management](backend/CREW_MANAGEMENT_UI.md)
+- [Employment and HR](backend/EMPLOYMENT.md)
+- [Termination and rehire](backend/HR_LIFECYCLE_UI.md)
+- [Scheduling APIs](backend/SCHEDULING_API.md)
+- [Role management API](backend/ROLE_MANAGEMENT_API.md)
+- [SaaS architecture roadmap](docs/saas-onboarding-white-label-roadmap.md)
 
 ---
 
-**Magnum's goal:** Make the operational side of detailing—from booking a car to coordinating a multi-person specialty job—simpler, more reliable, and easier to scale.
+**Magnum is a work in progress, designed to make service-business operations more reliable while keeping permission boundaries, scheduling integrity, and historical accountability explicit.**
