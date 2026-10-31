@@ -48,6 +48,60 @@ defmodule SchedulerApiWeb.SchedulingControllerTest do
     end
   end
 
+  test "crew candidates are scoped, paginated, minimal and exclude assigned or uncovered workers",
+       c do
+    t = token(c.owner)
+    other = second_detailer(c)
+    assert {:ok, _} = SchedulerApi.Appointments.CrewCandidates.list(c.owner, c.booking, limit: 1)
+    url = team(c) <> "/candidates"
+    page = json_response(req(t, :get, url <> "?limit=1"), 200)["data"]
+    assert [first] = page["candidates"]
+    assert first["assignment_id"] == c.assignment.id
+
+    assert Enum.sort(Map.keys(first)) ==
+             ~w(assignment_id employee_id first_name last_name period_id)
+
+    assert page["has_more"]
+
+    next =
+      json_response(req(t, :get, url <> "?limit=1&cursor=" <> page["next_cursor"]), 200)["data"]
+
+    assert [second] = next["candidates"]
+    assert second["assignment_id"] == other.assignment.id
+    assert json_response(req(t, :post, team(c), attrs(c)), 201)
+    assert [remaining] = json_response(req(t, :get, url), 200)["data"]["candidates"]
+    assert remaining["assignment_id"] == other.assignment.id
+
+    {:ok, _} =
+      SchedulerApi.Employment.WorkSchedules.cancel_shift(
+        c.credential,
+        %SchedulerApi.Employment.WorkShift{id: other.shift.id}
+      )
+
+    assert [] == json_response(req(t, :get, url), 200)["data"]["candidates"]
+    assert json_response(req(nil, :get, url), 401)
+    manager = active_user_fixture()
+    grant_fixture(manager, c.shop, :business_manager)
+    assert json_response(req(token(manager), :get, url), 403)
+    shop_manager = active_user_fixture()
+    grant_fixture(shop_manager, c.shop, :shop_manager)
+    assert json_response(req(token(shop_manager), :get, url), 200)
+    foreign = other_business_price_fixture()
+
+    foreign_url =
+      "/api/admin/businesses/#{foreign.shop.business_id}/shops/#{foreign.shop.id}/appointments/#{c.booking.id}/team/candidates"
+
+    assert json_response(req(t, :get, foreign_url), 403)
+    assert json_response(req(t, :get, url <> "?employee_id=1"), 422)
+
+    huge_cursor =
+      Base.url_encode64(Jason.encode!([1, c.owner.id, c.booking.id, 99_999_999_999_999_999_999]),
+        padding: false
+      )
+
+    assert json_response(req(t, :get, url <> "?cursor=" <> huge_cursor), 422)
+  end
+
   test "anonymous expired revoked and stale account sessions deny reads and writes", c do
     for t <- [nil, "bad"] do
       assert json_response(req(t, :get, shop(c) <> "/shifts"), 401)["error"] ==

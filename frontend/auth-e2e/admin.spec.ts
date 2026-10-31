@@ -324,3 +324,43 @@ for (const kind of ['owner', 'shop_manager']) {
     await expect(calendar).toHaveCount(0)
   })
 }
+
+for (const kind of ['owner', 'shop_manager']) {
+  test(`real ${kind} manages individual crew members and optional lead without replacing teammates`, async ({ page }) => {
+    mutate('prepare_crew')
+    const admin = new AdminPage(page)
+    await admin.login(users.find(u => u.kind === kind)!)
+    await admin.openCalendar()
+    await admin.calendar.getByRole('button', { name: 'View Acceptance service · 9:00 AM · Acceptance a shop 1', exact: true }).click()
+    const crew = admin.crew
+    await expect(crew.getByText('Fixture Detailer · Lead', { exact: true })).toBeVisible()
+    // Remove the only member, then add the first and a second independently.
+    await crew.getByRole('button', { name: 'Remove Fixture Detailer', exact: true }).click()
+    await expect(crew.getByText('No Detailers assigned.', { exact: true })).toBeVisible()
+    await crew.getByRole('combobox', { name: 'Eligible Detailer', exact: true }).selectOption({ label: 'Fixture Detailer' })
+    await crew.getByRole('button', { name: 'Add Detailer', exact: true }).click()
+    await expect(crew.getByText('Fixture Detailer', { exact: true })).toBeVisible()
+    await crew.getByRole('combobox', { name: 'Eligible Detailer', exact: true }).selectOption({ label: 'Crew Candidate' })
+    await crew.getByRole('button', { name: 'Add Detailer', exact: true }).click()
+    await expect(crew.getByRole('list', { name: 'Assigned Detailers' }).getByRole('listitem')).toHaveCount(2)
+    await crew.getByRole('button', { name: 'Make Fixture Detailer lead', exact: true }).click()
+    await expect(crew.getByText('Fixture Detailer · Lead', { exact: true })).toBeVisible()
+    await crew.getByRole('button', { name: 'Make Crew Candidate lead', exact: true }).click()
+    await expect(crew.getByText('Crew Candidate · Lead', { exact: true })).toBeVisible()
+    await crew.getByRole('button', { name: 'Clear Lead Detailer', exact: true }).click()
+    await expect(crew.getByText('Crew Candidate', { exact: true })).toBeVisible()
+    await crew.getByRole('button', { name: 'Make Crew Candidate lead', exact: true }).click()
+    await expect(crew.getByText('Crew Candidate · Lead', { exact: true })).toBeVisible()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await crew.getByRole('button', { name: 'Remove Crew Candidate', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    await expect(crew.getByRole('list', { name: 'Assigned Detailers' }).getByRole('listitem')).toHaveCount(1)
+    await expect(crew.getByText('Fixture Detailer', { exact: true })).toBeVisible()
+    // Removing the lead did not promote the remaining worker. Restore fixture metadata explicitly.
+    await expect(crew.getByRole('button', { name: 'Clear Lead Detailer' })).toBeDisabled()
+    await crew.getByRole('button', { name: 'Make Fixture Detailer lead', exact: true }).click()
+    await expect(crew.getByText('Fixture Detailer · Lead', { exact: true })).toBeVisible()
+    await admin.logout()
+    await expect(admin.crew).toHaveCount(0)
+  })
+}

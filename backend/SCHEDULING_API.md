@@ -8,6 +8,7 @@ CSRF, exact Origin/controlled Referer checks and bounded private JSON parser.
 | Method/path | Operation / allowed body |
 |---|---|
 | GET `S/appointments` | Upcoming pending/confirmed shop appointments; existing appointment JSON/meta contract |
+| GET `T/candidates` | Appointment-specific eligible Detailer choices; bounded pages, minimal identity/period/assignment/name projection |
 | GET `T` | Active team and per-member `is_lead`; cursor pagination does not limit crew size |
 | GET `S/shifts` | Authorized shop shift history |
 | GET `S/employees/:employee_id/periods/:period_id/shifts` | Authorized employee-period shift history at this shop |
@@ -91,3 +92,6 @@ mix precommit
 5D-1 adds a separate [bounded calendar read](CALENDAR_API.md) for local day/week
 windows, all existing statuses and complete crew metadata. The existing upcoming
 appointment endpoint, response shape, booking and staffing workflows are unchanged.
+
+5D-2 adds [Admin crew management](CREW_MANAGEMENT_UI.md), reusing the existing
+team mutations and adding only scoped candidate reads and team display names.

@@ -31,7 +31,10 @@ defmodule SchedulerApi.Employment.SchedulingHTTP do
   end
 
   defp permission(:appointments), do: :appointments_read
-  defp permission(a) when a in [:team, :add, :remove, :lead, :clear_lead], do: :jobs_assign
+
+  defp permission(a) when a in [:team, :candidates, :add, :remove, :lead, :clear_lead],
+    do: :jobs_assign
+
   defp permission(_), do: :schedule_manage
 
   defp invoke(:appointments, s, _, shop, _, _, opts),
@@ -57,7 +60,7 @@ defmodule SchedulerApi.Employment.SchedulingHTTP do
   end
 
   defp invoke(a, s, c, shop, path, body, opts)
-       when a in [:team, :add, :remove, :lead, :clear_lead] do
+       when a in [:team, :candidates, :add, :remove, :lead, :clear_lead] do
     with {:ok, id} <- id(path["appointment_id"]),
          %Appointment{} = booking <-
            Repo.one(
@@ -65,6 +68,9 @@ defmodule SchedulerApi.Employment.SchedulingHTTP do
                where: a.id == ^id and a.business_id == ^shop.business_id and a.shop_id == ^shop.id
            ) do
       case a do
+        :candidates ->
+          SchedulerApi.Appointments.CrewCandidates.list(s.user, booking, opts)
+
         :team ->
           JobAssignments.list_team(s.user, booking, opts)
 
@@ -164,7 +170,7 @@ defmodule SchedulerApi.Employment.SchedulingHTTP do
   defp payload(_, _), do: {:error, :invalid_input}
 
   defp options(q, a) do
-    reads = [:appointments, :team, :shifts, :employee_shifts, :own_jobs, :own_shifts]
+    reads = [:appointments, :team, :candidates, :shifts, :employee_shifts, :own_jobs, :own_shifts]
 
     allowed =
       if a in [:shifts, :employee_shifts, :own_shifts],

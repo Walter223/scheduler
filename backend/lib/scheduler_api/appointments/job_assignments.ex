@@ -481,7 +481,19 @@ defmodule SchedulerApi.Appointments.JobAssignments do
             where(query, [j], j.starts_at > ^at or (j.starts_at == ^at and j.id > ^last_id))
         end
 
-      rows = Repo.all(from j in query, select: map(j, ^@fields))
+      query = from j in query, select: map(j, ^@fields)
+
+      query =
+        if field == :appointment_id do
+          from j in query,
+            join: e in EmploymentRecord,
+            on: e.id == j.employment_id and e.business_id == j.business_id,
+            select_merge: %{first_name: e.first_name, last_name: e.last_name}
+        else
+          query
+        end
+
+      rows = Repo.all(query)
       jobs = Enum.take(rows, limit)
       has_more = length(rows) > limit
 

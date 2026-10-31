@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import AppointmentCrew from './AppointmentCrew'
 type Appointment = { id: number; shop_id: number; shop_name: string; timezone: string; starts_at: string; ends_at: string; duration_minutes: number; service_name: string; vehicle_make: string; vehicle_model: string; vehicle_size: string; status: string; crew_size: number; lead_detailer: string | null }
 type Data = { appointments: Appointment[]; shops: { id: number; name: string; timezone: string }[]; meta: { has_more: boolean; next_cursor: string | null } }
 const statuses = ['pending', 'confirmed', 'completed', 'cancelled']
@@ -24,16 +25,19 @@ export default function AppointmentCalendar({ businessId, shopId, timezone }: { 
   const [selected, setSelected] = useState<Appointment | null>(null)
   const [revision, setRevision] = useState(0)
   const trigger = useRef<HTMLButtonElement | null>(null)
+  const [crewRevision, setCrewRevision] = useState(0)
+  const crewDenied = useCallback((message: string) => { setSelected(null); setData(null); setError(message) }, [])
+  const crewChanged = useCallback(() => setCrewRevision(v => v + 1), [])
   const days = view === 'week' ? 7 : 1
   useEffect(() => {
     const controller = new AbortController()
     async function load() {
-      setData(null); setError(''); setSelected(null)
+      setData(null); setError('')
       try {
         const params = new URLSearchParams({ date, days: String(days), status, limit: '50', ...(shopId ? { shop_id: String(shopId) } : {}), ...(cursor ? { cursor } : {}) })
         const response = await fetch(`/api/admin/businesses/${businessId}/calendar?${params}`, { signal: controller.signal, cache: 'no-store' })
         if (controller.signal.aborted) return
-        if (!response.ok) { setError(response.status === 401 ? 'Your session has expired. Sign in again.' : response.status === 403 ? 'Appointment access is no longer available.' : response.status === 422 ? 'Choose a valid date and start from the first page.' : 'Appointments are temporarily unavailable.'); return }
+        if (!response.ok) { setSelected(null); setError(response.status === 401 ? 'Your session has expired. Sign in again.' : response.status === 403 ? 'Appointment access is no longer available.' : response.status === 422 ? 'Choose a valid date and start from the first page.' : 'Appointments are temporarily unavailable.'); return }
         const body = await response.json() as { data: Data }
         const value = body.data
         if (!value || !Array.isArray(value.appointments) || !Array.isArray(value.shops) || !value.meta || typeof value.meta.has_more !== 'boolean' || !(value.meta.next_cursor === null || typeof value.meta.next_cursor === 'string')) throw new Error('invalid page')
@@ -43,11 +47,11 @@ export default function AppointmentCalendar({ businessId, shopId, timezone }: { 
         }
         if (!value.shops.every(s => s && Number.isSafeInteger(s.id) && typeof s.name === 'string' && typeof s.timezone === 'string')) throw new Error('invalid shops')
         if (!controller.signal.aborted) setData(value)
-      } catch { if (!controller.signal.aborted) setError('Appointments are temporarily unavailable.') }
+      } catch { if (!controller.signal.aborted) { setSelected(null); setError('Appointments are temporarily unavailable.') } }
     }
     void load()
     return () => controller.abort()
-  }, [businessId, shopId, date, days, status, cursor, revision])
+  }, [businessId, shopId, date, days, status, cursor, revision, crewRevision])
   function reset() { setData(null); setSelected(null); setCursor('') }
   function changeDate(next: string) { reset(); setDate(next); setRevision(v => v + 1) }
   const entries = (items: Appointment[]) => items.map(a => <li key={a.id} className="calendar-entry">
@@ -72,11 +76,11 @@ export default function AppointmentCalendar({ businessId, shopId, timezone }: { 
       })}</section>)}</div>}
       <nav aria-label="Appointment pagination"><button className="secondary-button" disabled={!cursor} onClick={() => { reset(); setCursor('') }}>First page</button><button className="secondary-button" disabled={!data.meta.has_more || !data.meta.next_cursor} onClick={() => { setData(null); setSelected(null); setCursor(data.meta.next_cursor ?? '') }}>Next page</button></nav>
     </>}
-    {selected && !error && <AppointmentDetail appointment={selected} close={() => { setSelected(null); trigger.current?.focus() }} />}
+    {selected && !error && <AppointmentDetail key={selected.id} businessId={businessId} onChanged={crewChanged} onDenied={crewDenied} appointment={data?.appointments.find(a => a.id === selected.id) ?? selected} close={() => { setSelected(null); trigger.current?.focus() }} />}
   </section>
 }
-function AppointmentDetail({ appointment: a, close }: { appointment: Appointment; close: () => void }) {
+function AppointmentDetail({ appointment: a, close, businessId, onChanged, onDenied }: { appointment: Appointment; close: () => void; businessId: number; onChanged: () => void; onDenied: (message: string) => void }) {
   const panel = useRef<HTMLElement | null>(null)
   useEffect(() => { panel.current?.focus() }, [])
-  return <section ref={panel} tabIndex={-1} aria-label="Appointment details" className="employee-profile"><button className="secondary-button" onClick={close}>Close appointment</button><h3>{a.service_name}</h3><dl className="employee-contact"><dt>Shop</dt><dd>{a.shop_name} · {a.timezone} ({offset(a.starts_at, a.timezone)})</dd><dt>Time</dt><dd>{localDate(new Date(a.starts_at), a.timezone)} {time(a.starts_at, a.timezone)} – {localDate(new Date(a.ends_at), a.timezone)} {time(a.ends_at, a.timezone)}</dd><dt>Duration</dt><dd>{a.duration_minutes} minutes</dd><dt>Status</dt><dd>{a.status}</dd><dt>Vehicle</dt><dd>{a.vehicle_make} {a.vehicle_model} · {a.vehicle_size}</dd><dt>Detailers</dt><dd>{a.crew_size}</dd><dt>Lead Detailer</dt><dd>{a.lead_detailer || 'None designated'}</dd></dl></section>
+  return <section ref={panel} tabIndex={-1} aria-label="Appointment details" className="employee-profile"><button className="secondary-button" onClick={close}>Close appointment</button><h3>{a.service_name}</h3><dl className="employee-contact"><dt>Shop</dt><dd>{a.shop_name} · {a.timezone} ({offset(a.starts_at, a.timezone)})</dd><dt>Time</dt><dd>{localDate(new Date(a.starts_at), a.timezone)} {time(a.starts_at, a.timezone)} – {localDate(new Date(a.ends_at), a.timezone)} {time(a.ends_at, a.timezone)}</dd><dt>Duration</dt><dd>{a.duration_minutes} minutes</dd><dt>Status</dt><dd>{a.status}</dd><dt>Vehicle</dt><dd>{a.vehicle_make} {a.vehicle_model} · {a.vehicle_size}</dd><dt>Detailers</dt><dd>{a.crew_size}</dd><dt>Lead Detailer</dt><dd>{a.lead_detailer || 'None designated'}</dd></dl><AppointmentCrew businessId={businessId} shopId={a.shop_id} appointmentId={a.id} editable={['pending', 'confirmed'].includes(a.status)} onChanged={onChanged} onDenied={onDenied} /></section>
 }

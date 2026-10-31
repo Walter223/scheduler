@@ -79,3 +79,9 @@ accessibility audit and browser-level pagination/DST race combinations. Week vie
 is implemented as a bounded seven-local-date agenda; there is no unlimited history
 fetch or calendar-provider integration. Production MFA/deployment hardening remains
 separate.
+
+## 5D-2 crew controls
+
+Appointment details now include [authorized crew management](CREW_MANAGEMENT_UI.md)
+for pending/confirmed appointments. Calendar date-window reads and public booking
+remain unchanged; the existing team APIs own every mutation and audit.

@@ -371,6 +371,51 @@ case command do
 
     IO.puts("AUTH_E2E_VERIFIED")
 
+  "prepare_crew" ->
+    # Disposable run-owned staff, created only after dashboard-count acceptance.
+    business = Repo.get_by!(SchedulerApi.Organizations.Business, slug: fixture["run_id"] <> "-a")
+
+    existing =
+      Repo.get_by(SchedulerApi.Employment.EmploymentRecord,
+        business_id: business.id,
+        first_name: "Crew",
+        last_name: "Candidate"
+      )
+
+    unless existing do
+      shop =
+        Repo.get_by!(SchedulerApi.Organizations.Shop, business_id: business.id, slug: "shop-1")
+
+      shift =
+        Repo.one!(
+          from w in SchedulerApi.Employment.WorkShift,
+            where: w.shop_id == ^shop.id and w.status == :active,
+            order_by: w.id,
+            limit: 1
+        )
+
+      {:ok, employee} =
+        SchedulerApi.Employment.create_employment(business, %{
+          first_name: "Crew",
+          last_name: "Candidate",
+          classification: :detailer,
+          starts_on: ~D[2026-01-01]
+        })
+
+      {:ok, assignment} =
+        SchedulerApi.Employment.assign_shop(employee, shop, %{starts_on: ~D[2026-01-01]})
+
+      Repo.insert!(%SchedulerApi.Employment.WorkShift{
+        employment_id: employee.id,
+        assignment_id: assignment.id,
+        business_id: business.id,
+        shop_id: shop.id,
+        timezone: shop.timezone,
+        starts_at: shift.starts_at,
+        ends_at: shift.ends_at
+      })
+    end
+
   "cleanup" ->
     subjects = Enum.map(fixture["users"], & &1["subject"])
 
@@ -397,6 +442,16 @@ case command do
 
       Repo.delete_all(
         from e in SchedulerApi.Authorization.AuditEvent, where: e.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from event in SchedulerApi.Appointments.JobAssignmentAuditEvent,
+          where: event.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from event in SchedulerApi.Employment.WorkShiftAuditEvent,
+          where: event.business_id in ^businesses
       )
 
       Repo.delete_all(

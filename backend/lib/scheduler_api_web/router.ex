@@ -86,6 +86,10 @@ defmodule SchedulerApiWeb.Router do
     get "/shops/:shop_id/appointments/:appointment_id/team", SchedulingController, :team,
       log: false
 
+    get "/shops/:shop_id/appointments/:appointment_id/team/candidates",
+        SchedulingController,
+        :candidates, log: false
+
     get "/shops/:shop_id/shifts", SchedulingController, :shifts, log: false
 
     get "/shops/:shop_id/employees/:employee_id/periods/:period_id/shifts",

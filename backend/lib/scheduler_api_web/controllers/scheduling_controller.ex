@@ -6,6 +6,7 @@ defmodule SchedulerApiWeb.SchedulingController do
   for action <- [
         :appointments,
         :team,
+        :candidates,
         :shifts,
         :employee_shifts,
         :own_jobs,
