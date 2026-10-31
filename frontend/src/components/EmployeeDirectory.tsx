@@ -20,6 +20,7 @@ function validPage(value: Page) {
   return value && Array.isArray(value.employees) && value.employees.every(validEmployee) && value.meta && typeof value.meta.has_more === 'boolean' && (value.meta.next_cursor === null || typeof value.meta.next_cursor === 'string')
 }
 export default function EmployeeDirectory({ businessId, shopId, hr, canManage = false, shops = [] }: { businessId: number; shopId: number; hr: boolean; canManage?: boolean; shops?: HRShop[] }) {
+  const [rehireIntent, setRehireIntent] = useState(false)
   const [creating, setCreating] = useState(false)
   const [message, setMessage] = useState('')
   const [status, setStatus] = useState('active')
@@ -33,7 +34,10 @@ export default function EmployeeDirectory({ businessId, shopId, hr, canManage = 
   const trigger = useRef<HTMLButtonElement | null>(null)
   const [employee, setEmployee] = useState<number | null>(null)
   const denied = useCallback((message: string) => { setEmployee(null); setCreating(false); setMessage(''); setPage(null); setError(message) }, [])
-  const changed = useCallback(() => setRevision(v => v + 1), [])
+  const changed = useCallback((action?: HRAction) => {
+    if (action === 'terminate' || action === 'rehire') { setStatus(action === 'terminate' ? 'former' : 'active'); setCursor(''); setSearch(''); setQ(''); setClassification('') }
+    setRevision(v => v + 1)
+  }, [])
   const base = `/api/admin/businesses/${businessId}`
   useEffect(() => {
     const controller = new AbortController()
@@ -49,7 +53,7 @@ export default function EmployeeDirectory({ businessId, shopId, hr, canManage = 
     void load()
     return () => controller.abort()
   }, [base, shopId, hr, status, search, classification, cursor, revision])
-  function reset() { setCursor(''); setEmployee(null); setPage(null) }
+  function reset() { setRehireIntent(false); setCursor(''); setEmployee(null); setPage(null) }
   return <section aria-label={hr ? 'Employee directory' : 'Current shop roster'} className="employee-directory">
     <p>{hr ? 'Business HR directory · retained employment history' : 'Current assigned-shop contacts only. HR history is restricted.'}</p>
     {canManage && hr && !error && <button className="secondary-button" onClick={() => setCreating(true)}>Create employee</button>}
@@ -62,14 +66,15 @@ export default function EmployeeDirectory({ businessId, shopId, hr, canManage = 
     </form>
     <button className="secondary-button" onClick={() => { reset(); setRevision(v => v + 1) }}>Refresh employees</button>
     {error ? <p role="alert">{error}</p> : !page ? <p role="status">Loading employees…</p> : <>
-      {!page.employees.length ? <p>No employees match this view.</p> : <ul className="employee-cards">{page.employees.map(e => <li key={e.employee_id}>
+      {!page.employees.length ? <p>No employees match this view.</p> : <ul className="employee-cards" aria-label="Employees">{page.employees.map(e => <li key={e.employee_id}>
         <h3>{e.first_name} {e.last_name}</h3><p className="employee-classification">{label(e.classification)} · {e.status === 'ended' ? 'Former employee' : 'Active employment'}</p>
         <Contact employee={e} />
-        {hr && <button className="secondary-button" onClick={event => { trigger.current = event.currentTarget; setEmployee(e.employee_id) }}>View profile and history for {e.first_name} {e.last_name}</button>}
+        {hr && <button className="secondary-button" onClick={event => { trigger.current = event.currentTarget; setRehireIntent(false); setEmployee(e.employee_id) }}>View profile and history for {e.first_name} {e.last_name}</button>}
+        {hr && canManage && status === 'former' && e.status === 'ended' && <button className="secondary-button" onClick={event => { trigger.current = event.currentTarget; setRehireIntent(true); setEmployee(e.employee_id) }}>Rehire {e.first_name} {e.last_name}</button>}
       </li>)}</ul>}
       <nav aria-label="Employee pagination"><button className="secondary-button" disabled={!cursor} onClick={() => { reset(); setCursor('') }}>First page</button><button className="secondary-button" disabled={!page.meta.has_more || !page.meta.next_cursor} onClick={() => { setPage(null); setEmployee(null); setCursor(page.meta.next_cursor ?? '') }}>Next page</button></nav>
     </>}
-    {employee !== null && hr && !error && <EmployeeProfile key={employee} base={base} employeeId={employee} businessId={businessId} canManage={canManage} shops={shops} onChanged={changed} onDenied={denied} close={() => { setEmployee(null); trigger.current?.focus() }} />}
+    {employee !== null && hr && !error && <EmployeeProfile key={`${employee}:${rehireIntent}`} initialRehire={rehireIntent} base={base} employeeId={employee} businessId={businessId} canManage={canManage} shops={shops} onChanged={changed} onDenied={denied} close={() => { setEmployee(null); trigger.current?.focus() }} />}
     {creating && canManage && hr && !error && <EmployeeHRForm action="create" businessId={businessId} shops={shops} onClose={() => setCreating(false)} onDenied={denied} onSaved={text => { setCreating(false); reset(); setStatus('active'); setSearch(''); setQ(''); setClassification(''); setMessage(text); changed() }} />}
   </section>
 }
@@ -77,8 +82,8 @@ function Contact({ employee: e }: { employee: Employee }) {
   return <><dl className="employee-contact"><dt>Phone</dt><dd>{e.phone || 'Not provided'}</dd><dt>Email</dt><dd>{e.email || 'Not provided'}</dd><dt>Home address</dt><dd>{e.home_address || 'Not provided'}</dd><dt>Employment period</dt><dd>{e.starts_on} – {e.ends_on || 'Present'}</dd></dl>
     <p>Shop assignments: {e.shops?.length ? e.shops.map(s => `${s.name} (${s.status}, ${s.starts_on} – ${s.ends_on || 'Present'})`).join('; ') : 'None recorded'}</p></>
 }
-function EmployeeProfile({ base, employeeId, close, onDenied, businessId, canManage, shops, onChanged }: { base: string; employeeId: number; close: () => void; onDenied: (message: string) => void; businessId: number; canManage: boolean; shops: HRShop[]; onChanged: () => void }) {
-  const [editing, setEditing] = useState<{ action: HRAction; assignmentId?: number; assignmentName?: string } | null>(null)
+function EmployeeProfile({ base, employeeId, close, onDenied, businessId, canManage, shops, onChanged, initialRehire }: { initialRehire: boolean; base: string; employeeId: number; close: () => void; onDenied: (message: string) => void; businessId: number; canManage: boolean; shops: HRShop[]; onChanged: (action?: HRAction) => void }) {
+  const [editing, setEditing] = useState<{ action: HRAction; assignmentId?: number; assignmentName?: string } | null>(initialRehire ? { action: 'rehire' } : null)
   const [revision, setRevision] = useState(0)
   const [message, setMessage] = useState('')
   const panel = useRef<HTMLElement | null>(null)
@@ -115,12 +120,14 @@ function EmployeeProfile({ base, employeeId, close, onDenied, businessId, canMan
       <h3>{profile.first_name} {profile.last_name}</h3><p>Stable employee #{employeeId} · Period #{profile.period_id} · {profile.status === 'ended' ? 'Historical / former period' : 'Active period'}</p>
       <Contact employee={profile} />
       {canManage && period === null && profile.status === 'active' && <div role="group" aria-label="HR actions">
+        <button className="secondary-button" onClick={() => setEditing({ action: 'terminate' })}>Terminate employee</button>
         <button className="secondary-button" onClick={() => setEditing({ action: 'contact' })}>Edit contact</button>
         <button className="secondary-button" onClick={() => setEditing({ action: 'classification' })}>Change classification</button>
         <button className="secondary-button" onClick={() => setEditing({ action: 'assign' })}>Assign shops</button>
         {profile.shops?.filter(s => s.status === 'active' && Number.isSafeInteger(s.assignment_id)).map(s => <button key={s.assignment_id} className="secondary-button" onClick={() => setEditing({ action: 'end', assignmentId: s.assignment_id, assignmentName: s.name })}>End assignment to {s.name}</button>)}
       </div>}
-      {editing && canManage && period === null && profile.status === 'active' && <EmployeeHRForm key={editing.action + String(editing.assignmentId)} action={editing.action} businessId={businessId} employee={profile} shops={shops.filter(s => !profile.shops?.some(a => a.id === s.id && a.status === 'active'))} assignmentId={editing.assignmentId} assignmentName={editing.assignmentName} onClose={() => setEditing(null)} onDenied={onDenied} onSaved={text => { setEditing(null); setMessage(text); setRevision(v => v + 1); onChanged() }} />}
+      {canManage && period === null && profile.status === 'ended' && <button className="secondary-button" onClick={() => setEditing({ action: 'rehire' })}>Rehire employee</button>}
+      {editing && canManage && period === null && ((profile.status === 'active' && editing.action !== 'rehire') || (profile.status === 'ended' && editing.action === 'rehire')) && <EmployeeHRForm key={editing.action + String(editing.assignmentId)} action={editing.action} businessId={businessId} employee={profile} shops={shops.filter(s => !profile.shops?.some(a => a.id === s.id && a.status === 'active'))} assignmentId={editing.assignmentId} assignmentName={editing.assignmentName} onClose={() => setEditing(null)} onDenied={onDenied} onSaved={text => { setEditing(null); setMessage(editing.action === 'rehire' ? 'A new employment period was created. No account access, grants, pay or work was restored. A future period appears in Active Employees only when its start date arrives.' : text); setRevision(v => v + 1); onChanged(editing.action) }} />}
       <h4>Employment timeline</h4><ol>{timeline.employees.map(e => <li key={e.period_id}>
         <p>Period #{e.period_id}: {e.starts_on} – {e.ends_on || 'Present'} · {label(e.classification)} · {e.period_id === e.employee_id ? 'Original employment' : 'Rehire period'} · {e.status === 'ended' ? 'Termination recorded' : 'Active status (see effective dates)'}</p>
         <button className="secondary-button" onClick={() => setPeriod(e.period_id)}>View period {e.period_id}</button>

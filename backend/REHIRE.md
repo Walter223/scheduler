@@ -2,8 +2,9 @@
 
 `Employment.HR.rehire_employment(credential, previous_period, starts_on)` creates a
 new empty employment period. `HR.list_employment_history(actor_user, period)`
-provides an explicitly projected, HR-authorized timeline. No HTTP/UI, account
+provides an explicitly projected, HR-authorized timeline. No account
 provisioning, payroll, Keycloak changes or grant restoration is implemented.
+Protected UI integration is documented in [HR_LIFECYCLE_UI.md](HR_LIFECYCLE_UI.md).
 
 ## Stable identity, immutable periods
 

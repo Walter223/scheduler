@@ -103,3 +103,7 @@ nothing. Other unfinished management areas remain placeholders.
 (active same-business id/name choices for authorized HR managers). These are separate
 from operational shops and do not grant scheduling authority. See
 [HR_MANAGEMENT_UI.md](HR_MANAGEMENT_UI.md) for the forms and CSRF/write boundaries.
+
+5C-2B adds separate [termination and rehire confirmations](HR_LIFECYCLE_UI.md),
+using the same current HR capability hints and existing record-specific protected
+endpoints. No lifecycle or authorization policy is implemented in the frontend.

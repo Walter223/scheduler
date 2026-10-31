@@ -4,7 +4,8 @@ The existing Admin directory/profile gains Create Employee, Edit Contact, Change
 Classification, Assign Shops and End Shop Assignment. These delegate exclusively
 to the protected HR write endpoints in [HR_WRITE_API.md](HR_WRITE_API.md); no new
 mutation route, persistence shortcut, lifecycle or authorization policy is added.
-No termination, rehire, compensation, role, invitation or account-linking UI exists.
+Termination and rehire are added separately in [HR_LIFECYCLE_UI.md](HR_LIFECYCLE_UI.md).
+No compensation, role, invitation or account-linking UI is added.
 
 Current business `hr_manage` is derived from the existing `employment_manage`
 permission on one complete business grant. Owner/authorized Manager gets controls;

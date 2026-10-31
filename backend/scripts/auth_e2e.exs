@@ -345,13 +345,26 @@ case command do
         from e in SchedulerApi.Employment.EmploymentRecord, where: e.first_name == "Created"
       )
 
-    unless length(created) == 2 and
+    roots = Enum.filter(created, &(&1.id == &1.employee_id))
+    current = Enum.filter(created, &(&1.id != &1.employee_id))
+
+    unless length(roots) == 2 and length(current) == 2 and
+             Enum.all?(roots, &(is_nil(&1.user_id) and &1.status == :ended)) and
              Enum.all?(
-               created,
-               &(is_nil(&1.user_id) and &1.status == :active and
-                   &1.classification == :shop_manager)
+               current,
+               &(is_nil(&1.user_id) and &1.status == :active and &1.home_address == nil)
              ),
-           do: raise("HR browser mutation fixture state invalid")
+           do: raise("Termination/rehire browser fixture state invalid")
+
+    current_ids = Enum.map(current, & &1.id)
+
+    unless Repo.aggregate(
+             from(a in SchedulerApi.Employment.ShopAssignment,
+               where: a.employment_id in ^current_ids
+             ),
+             :count
+           ) == 0,
+           do: raise("Rehire restored old shop assignments")
 
     unless Repo.aggregate(SchedulerApi.Organizations.RoleAssignment, :count) == 10,
       do: raise("Classification edits must not create role grants")

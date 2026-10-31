@@ -2,7 +2,8 @@
 
 `Employment.HR.terminate_employment(session_credential, employment)` is the internal
 atomic HR workflow. IDs are references; ownership and linked user are reloaded.
-There is no HTTP/UI, rehire, payroll change, invitation or platform bypass.
+Protected HTTP/UI adapters delegate to this operation; see [HR_LIFECYCLE_UI.md](HR_LIFECYCLE_UI.md).
+No payroll change, invitation or platform bypass is introduced.
 
 ## Authorization and access
 

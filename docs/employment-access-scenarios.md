@@ -155,3 +155,9 @@ contact/classification edits and shop assignments. Classification never creates 
 grants, creation needs no linked user, and ending a shop relationship never terminates
 employment. Historical records and Shop Manager rosters remain read-only; existing
 work, Owner-history, tenant and audit protections remain server-enforced.
+
+5C-2B adds the [termination/rehire UI](../backend/HR_LIFECYCLE_UI.md) with explicit
+offboarding/no-restoration confirmations, inclusive rehire-date validation and
+authorized refreshes. Real-Keycloak cases cover Owner/Manager lifecycle actions and
+Owner-protected denial; linked multi-business/stale-cookie, future-team and rollback
+behavior retain their backend HTTP/domain coverage. No permission is restored by UI.

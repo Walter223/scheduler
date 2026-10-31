@@ -79,3 +79,70 @@ test('duplicate submits are locked and unmount prevents a late success from cros
   await act(async () => finish(Response.json({ data: {} })))
   expect(saved).not.toHaveBeenCalled()
 })
+test('termination confirmation describes atomic offboarding and sends only an empty payload', async () => {
+  const mock = vi.fn(async (url: string) => url === '/api/me' ? Response.json({ authenticated: true, csrf_token: 'masked-test-csrf' }) : Response.json({ data: { employment: { employee_id: 10, period_id: 30, status: 'ended' }, already_terminated: false } }))
+  vi.stubGlobal('fetch', mock)
+  const { saved } = mount('terminate')
+  expect(screen.getByText(/Unassign future jobs and cancel future shifts/)).toBeTruthy()
+  expect(screen.getByText(/Retain complete employment/)).toBeTruthy()
+  expect(screen.getByText(/unrelated businesses remain unchanged/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('checkbox', { name: /I confirm employment termination/ }))
+  const form = screen.getByRole('button', { name: 'Save changes' }).closest('form')!
+  const extra = document.createElement('input'); extra.name = 'user_id'; extra.value = '1'; form.append(extra)
+  fireEvent.submit(form)
+  await waitFor(() => expect(saved).toHaveBeenCalled())
+  const [url, options] = (mock.mock.calls as unknown as [string, RequestInit][])[1]!
+  expect(url).toBe('/api/admin/businesses/1/employees/10/periods/30/terminate')
+  expect(JSON.parse(options.body as string)).toEqual({})
+})
+test('rehire requires a later inclusive date and creates a new period on the stable identity path', async () => {
+  const mock = fetcher(), { saved } = mount('rehire', { employee: { ...employee, ends_on: '2026-10-31' } })
+  const input = screen.getByLabelText('Rehire start date')
+  expect(input.getAttribute('min')).toBe('2026-11-01')
+  expect(screen.getByText(/It restores no business memberships/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('checkbox', { name: /I confirm a new employment period/ }))
+  fireEvent.change(input, { target: { value: '2026-10-31' } })
+  const form = screen.getByRole('button', { name: 'Save changes' }).closest('form')!
+  fireEvent.submit(form)
+  await screen.findByRole('alert')
+  expect(mock).not.toHaveBeenCalled()
+  fireEvent.change(input, { target: { value: '2026-11-01' } })
+  fireEvent.submit(form)
+  await waitFor(() => expect(saved).toHaveBeenCalled())
+  const [url, options] = (mock.mock.calls as unknown as [string, RequestInit][])[1]!
+  expect(url).toBe('/api/admin/businesses/1/employees/10/periods/30/rehire')
+  expect(JSON.parse(options.body as string)).toEqual({ starts_on: '2026-11-01' })
+})
+test.each(['work_in_progress', 'future_assignment_dates', 'last_owner', 'offboarding_required'])('termination blocker %s never reports success', async code => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/me' ? Response.json({ authenticated: true, csrf_token: 'masked' }) : Response.json({ error: code, secret: 'PRIVATE' }, { status: 409 })))
+  const { saved } = mount('terminate')
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.submit(screen.getByRole('button', { name: 'Save changes' }).closest('form')!)
+  await screen.findByRole('alert')
+  expect(saved).not.toHaveBeenCalled()
+  expect(document.body.textContent).not.toContain('PRIVATE')
+})
+test('duplicate termination is locked and a context teardown discards late completion', async () => {
+  let finish!: (v: Response) => void
+  let writes = 0
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url === '/api/me') return Response.json({ authenticated: true, csrf_token: 'masked' })
+    writes++; return new Promise<Response>(resolve => { finish = resolve })
+  }))
+  const { saved, unmount } = mount('terminate')
+  fireEvent.click(screen.getByRole('checkbox'))
+  const form = screen.getByRole('button', { name: 'Save changes' }).closest('form')!
+  fireEvent.submit(form); fireEvent.submit(form)
+  await waitFor(() => expect(writes).toBe(1))
+  unmount()
+  await act(async () => finish(Response.json({ data: {} })))
+  expect(saved).not.toHaveBeenCalled()
+})
+
+test('already-terminated responses report a no-op rather than new offboarding', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/me' ? Response.json({ authenticated: true, csrf_token: 'masked' }) : Response.json({ data: { employment: { employee_id: 10, period_id: 30, status: 'ended' }, already_terminated: true } })))
+  const { saved } = mount('terminate')
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.submit(screen.getByRole('button', { name: 'Save changes' }).closest('form')!)
+  await waitFor(() => expect(saved).toHaveBeenCalledWith(expect.stringContaining('already terminated')))
+})
