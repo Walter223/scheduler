@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import Button from './Button'
 
 type Session = {
   authenticated: boolean
@@ -76,7 +75,7 @@ function SessionControls({ onAuthenticationChange }: { onAuthenticationChange?: 
     <section className="session-controls" aria-label="Account">
       {loading ? <p role="status">Checking account status...</p> : session.authenticated && session.user ? <>
         <span>Signed in as {session.user.first_name || session.user.email}</span>
-        <Button variant="confirmation" onClick={logout} disabled={busy}>Sign out</Button>
+        <button className="admin-button admin-button--quiet admin-button--sm" onClick={logout} disabled={busy}>Sign out</button>
       </> : <a className="secondary-button" href="/auth/login">{message ? 'Try signing in again' : 'Staff sign in'}</a>}
       {!loading && message && <p role="status">{message}</p>}
     </section>

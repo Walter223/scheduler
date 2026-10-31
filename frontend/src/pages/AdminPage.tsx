@@ -86,26 +86,27 @@ export default function AdminPage() {
   const workspaceKey = `${businessId}:${shopId}:${[...available].sort().join(',')}`
   return (
     <main className="admin-shell">
-      <header className="admin-header"><h1>Magnum Command Center</h1><SessionControls onAuthenticationChange={accountChanged} /></header>
+      <a className="admin-skip-link" href="#admin-workspace">Skip to workspace</a>
+      <header className="admin-header"><div className="admin-brand"><span className="admin-brand-mark" aria-hidden="true">M</span><div><h1>Magnum Command Center</h1><p title={business?.name}>{business?.name ?? 'Operations workspace'}</p></div></div><SessionControls onAuthenticationChange={accountChanged} /></header>
       {!authenticated ? <p>Sign in to view your authorized workspaces. Authentication alone grants no business access.</p> : <>
         <button className="secondary-button admin-menu-toggle" aria-expanded={open} aria-controls="admin-navigation" onClick={() => setOpen(!open)}>Menu</button>
         <div className="admin-layout">
           <aside id="admin-navigation" className={open ? 'admin-sidebar is-open' : 'admin-sidebar'}>
             <label htmlFor="admin-business">Business</label>
-            <select id="admin-business" value={businessId} onChange={e => {
+            <select id="admin-business" title={business?.name} value={businessId} onChange={e => {
               const selected = businesses.find(b => b.id === Number(e.target.value))
               setBusinessId(selected?.id ?? 0); setShopId(selected?.shops[0]?.id ?? 0); setArea('dashboard'); setOpen(false)
             }}><option value={0} disabled>Select a business</option>{businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
-            {business && business.shops.length > 0 && <><label htmlFor="admin-shop">Shop</label><select id="admin-shop" value={shopId} onChange={e => { setShopId(Number(e.target.value)); setArea('dashboard') }}>
+            {business && business.shops.length > 0 && <><label htmlFor="admin-shop">Shop</label><select id="admin-shop" title={shop?.name ?? 'All Shops'} value={shopId} onChange={e => { setShopId(Number(e.target.value)); setArea('dashboard') }}>
               {business.all_shops.length > 0 && <option value={0}>All Shops</option>}
               {business.shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select></>}
-            <nav aria-label="Admin areas">{areas.filter(([key]) => (available.includes(key) || (key === 'employees' && available.includes('roster')))).map(([key, name]) => <button key={key} aria-current={area === key ? 'page' : undefined} onClick={() => { setArea(key); setOpen(false) }}>{name}</button>)}</nav>
+            <nav aria-label="Admin areas">{areas.filter(([key]) => (available.includes(key) || (key === 'employees' && available.includes('roster')))).map(([key, name]) => <button key={key} aria-current={area === key ? 'page' : undefined} onClick={() => { setArea(key); setOpen(false) }} aria-description={['schedules', 'compensation', 'access', 'settings'].includes(key) ? 'Planned section' : undefined}><span>{name}</span>{['schedules', 'compensation', 'access', 'settings'].includes(key) && <span className="admin-planned" aria-hidden="true">Planned</span>}</button>)}</nav>
           </aside>
-          <section className="admin-content" aria-label="Workspace">
+          <section id="admin-workspace" tabIndex={-1} className="admin-content" aria-label="Workspace">
             {state && <p role="status">{state}</p>}
             {state.startsWith('Access is unavailable') && <a href="/auth/login">Sign in again</a>}
-            <button className="secondary-button" onClick={() => setRevision(v => v + 1)}>Refresh access</button>
+            <button className="secondary-button admin-refresh" onClick={() => setRevision(v => v + 1)}>Refresh access</button>
             {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={workspaceKey} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : area === 'appointments' ? <AppointmentCalendar key={workspaceKey} businessId={business.id} shopId={shopId} timezone={shop?.timezone ?? business.shops[0]?.timezone ?? 'America/Denver'} /> : area === 'employees' ? <EmployeeDirectory key={workspaceKey} businessId={business.id} shopId={shopId} hr={business.capabilities.includes('employees')} canManage={business.capabilities.includes('hr_manage')} shops={business.hr_shops ?? []} /> : <p>This area is planned. Management screens are not available yet.</p>}</>}
           </section>
         </div>

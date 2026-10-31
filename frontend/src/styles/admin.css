@@ -1,57 +1,161 @@
-.admin-shell { max-width: 1440px; margin: auto; padding: 1.5rem; }
-.admin-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid #39e7ff; padding-bottom: 1rem; }
-.admin-header h1 { font-size: clamp(1.4rem, 3vw, 2.2rem); }
-.admin-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 2rem; margin-top: 1.5rem; }
-.admin-sidebar { display: flex; flex-direction: column; gap: .75rem; }
-.admin-sidebar select { width: 100%; padding: .7rem; background: #161029; color: white; border: 1px solid #39e7ff; border-radius: .4rem; }
-.admin-sidebar nav { display: flex; flex-direction: column; gap: .5rem; }
-.admin-sidebar nav button { text-align: left; background: #211331; color: white; border: 1px solid #8253a6; padding: .8rem; border-radius: .4rem; cursor: pointer; }
-.admin-sidebar nav button[aria-current] { border-color: #39e7ff; color: #39e7ff; }
-.admin-shell :focus-visible { outline: 3px solid #ff72dc; outline-offset: 3px; }
-.admin-content { min-width: 0; overflow-wrap: anywhere; }
-.admin-menu-toggle { display: none; }
-@media (max-width: 700px) {
-  .admin-layout { display: block; }
-  .admin-menu-toggle { display: inline-block; margin-top: 1rem; }
-  .admin-sidebar { display: none; margin-bottom: 1.5rem; }
-  .admin-sidebar.is-open { display: flex; }
+/* Admin-only tokens. Public booking styles and button variants remain unchanged. */
+.admin-shell {
+  --admin-bg: #0e121b;
+  --admin-surface: #151b27;
+  --admin-raised: #1c2433;
+  --admin-border: #344056;
+  --admin-text: #edf1f8;
+  --admin-muted: #aab7cb;
+  --admin-accent: #70dfef;
+  --admin-purple: #c1b5fb;
+  --admin-danger: #ffb4b4;
+  --admin-radius: 8px;
+  --admin-space-1: 4px;
+  --admin-space-2: 8px;
+  --admin-space-3: 12px;
+  --admin-space-4: 16px;
+  --admin-space-6: 24px;
+  --admin-control-sm: 32px;
+  --admin-control: 36px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1600px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 0;
+  color: var(--admin-text);
+  background: var(--admin-bg);
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
-.dashboard-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.dashboard-title h3 { font-size: 1.6rem; margin-bottom: .3rem; color: #73efff; }
-.dashboard-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
-.dashboard-metrics > div { display: flex; flex-direction: column; gap: .8rem; padding: 1.2rem; border: 1px solid #8958b4; border-radius: .7rem; background: linear-gradient(135deg, #241739, #151629); }
-.dashboard-metrics strong { font-size: 2.3rem; color: #78f0ff; }
-.dashboard-dates { font-size: .85rem; opacity: .85; }
-.dashboard-appointments { list-style: none; padding: 0; }
-.dashboard-appointments li { display: grid; grid-template-columns: 1fr 2fr 1.5fr; gap: 1rem; padding: 1.2rem 0; border-top: 1px solid #644378; }
-.dashboard-appointments time, .dashboard-appointments span { display: block; }
-.dashboard-appointments h4, .dashboard-appointments p { margin: .25rem 0; }
-.dashboard-status { text-transform: capitalize; display: inline !important; }
-@media (max-width: 700px) { .dashboard-appointments li { grid-template-columns: 1fr; gap: .5rem; } }
-.employee-filters { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; margin: 1.5rem 0; }
-.employee-filters label { display: flex; flex-direction: column; gap: .5rem; }
-.employee-filters input, .employee-filters select { padding: .7rem; background: #161029; color: white; border: 1px solid #39e7ff; border-radius: .4rem; max-width: 100%; }
-.employee-cards { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem; }
-.employee-cards > li, .employee-profile { background: #1d1430; border: 1px solid #8958b4; border-radius: .7rem; padding: 1.2rem; overflow-wrap: anywhere; }
-.employee-classification { text-transform: capitalize; color: #78f0ff; }
-.employee-contact { display: grid; grid-template-columns: auto 1fr; gap: .4rem .8rem; }
-.employee-contact dd { margin: 0; }
-.employee-profile { margin-top: 1.5rem; border-color: #39e7ff; }
-.employee-directory button { margin: .3rem; }
-@media (max-width: 700px) { .employee-filters label { width: 100%; } .employee-contact { grid-template-columns: 1fr; } }
-.employee-hr-dialog { color: white; background: #1d1430; border: 1px solid #39e7ff; border-radius: .7rem; width: min(540px, calc(100% - 2rem)); max-height: 85dvh; overflow-y: auto; padding: 1.5rem; }
-.employee-hr-dialog::backdrop { background: rgb(0 0 0 / 75%); }
-.employee-hr-dialog fieldset { border: 0; padding: 0; }
-.employee-hr-dialog label { display: flex; flex-direction: column; gap: .4rem; margin: .8rem 0; }
-.employee-hr-dialog input, .employee-hr-dialog select, .employee-hr-dialog textarea { padding: .65rem; color: white; background: #161029; border: 1px solid #8958b4; border-radius: .3rem; max-width: 100%; }
-.employee-hr-dialog input[type=checkbox] { align-self: start; }
-.employee-hr-dialog :focus-visible { outline: 3px solid #ff72dc; outline-offset: 3px; }
-.calendar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 1rem; margin: 1.5rem 0; }
-.calendar-day { border: 1px solid #8958b4; border-radius: .6rem; padding: 1rem; background: #1d1430; min-width: 0; }
-.calendar-day h3 { color: #78f0ff; }
-.calendar-day section { border-top: 1px solid #644378; margin-top: 1rem; }
-.calendar-list { list-style: none; padding: 0; }
-.calendar-entry { border-left: 3px solid #39e7ff; padding: .8rem; margin: .8rem 0; background: #161029; overflow-wrap: anywhere; }
-.calendar-entry p { margin: .5rem 0; }
-.calendar-entry strong { color: #ffb3ed; }
-.appointment-calendar nav { display: flex; flex-wrap: wrap; gap: .5rem; }
+.admin-shell *, .admin-shell *::before, .admin-shell *::after { box-sizing: border-box; }
+.admin-shell h1, .admin-shell h2, .admin-shell h3, .admin-shell h4 { color: var(--admin-text); line-height: 1.3; letter-spacing: -.015em; }
+.admin-shell h1 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+.admin-shell h2 { margin: 0 0 var(--admin-space-6); font-size: 1.5rem; font-weight: 650; }
+.admin-shell h3 { margin: 0 0 var(--admin-space-3); font-size: 1.1rem; }
+.admin-shell h4 { margin: 0 0 var(--admin-space-2); font-size: .9rem; }
+.admin-shell p { margin: var(--admin-space-2) 0 var(--admin-space-4); }
+.admin-shell :focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 3px; }
+.admin-shell a { color: var(--admin-accent); }
+.admin-header { display: flex; align-items: center; justify-content: space-between; gap: var(--admin-space-4); padding: 16px 24px; border-bottom: 1px solid var(--admin-border); background: var(--admin-surface); }
+.admin-brand { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; }
+.admin-brand > div { min-width: 0; }
+.admin-brand-mark { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border: 1px solid #547b9b; border-radius: 10px; background: #223449; color: var(--admin-accent); font-size: 20px; font-weight: 800; }
+.admin-header .admin-brand p { margin: 2px 0 0; font-size: 12px; color: var(--admin-muted); max-width: 38ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-shell .session-controls { flex: 0 1 auto; justify-content: flex-end; gap: 12px; padding: 0; min-width: 0; max-width: 50%; font-size: 12px; }
+.admin-shell .session-controls > span { overflow-wrap: anywhere; }
+.admin-shell .session-controls p { text-align: right; color: var(--admin-muted); font-size: 12px; }
+.admin-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: calc(100dvh - 80px); }
+.admin-sidebar { display: flex; flex-direction: column; align-self: start; position: sticky; top: 0; gap: 6px; padding: 24px 16px; min-width: 0; }
+.admin-sidebar > label { font-size: 11px; font-weight: 650; letter-spacing: .055em; text-transform: uppercase; color: var(--admin-muted); margin-top: 12px; }
+.admin-sidebar > label:first-child { margin-top: 0; }
+.admin-sidebar select { width: 100%; text-overflow: ellipsis; }
+.admin-sidebar nav { display: flex; flex-direction: column; gap: 4px; margin-top: 24px; }
+.admin-shell .admin-sidebar nav button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 40px; text-align: left; padding: 9px 10px; background: transparent; border-color: transparent; color: var(--admin-muted); font-weight: 500; }
+.admin-shell .admin-sidebar nav button:hover { background: var(--admin-raised); color: var(--admin-text); }
+.admin-shell .admin-sidebar nav button[aria-current] { color: var(--admin-accent); background: #19313c; border-color: #365a69; box-shadow: inset 3px 0 var(--admin-accent); }
+.admin-planned { flex-shrink: 0; border: 1px solid var(--admin-border); border-radius: 4px; padding: 1px 5px; color: var(--admin-muted); font-size: 10px; font-weight: 500; letter-spacing: 0; }
+.admin-content { min-width: 0; padding: 24px 28px 40px; border-left: 1px solid var(--admin-border); }
+.admin-content > p { color: var(--admin-muted); font-size: 12px; margin: 0 0 4px; }
+.admin-shell .admin-refresh { margin: 0 0 16px; min-height: var(--admin-control-sm); font-size: 12px; }
+.admin-shell button.admin-menu-toggle { display: none; }
+.admin-shell .admin-skip-link { position: absolute; z-index: 10; top: 8px; left: 8px; padding: 8px 12px; border-radius: 6px; background: var(--admin-surface); transform: translateY(-180%); }
+.admin-shell .admin-skip-link:focus { transform: translateY(0); }
+
+/* Compact semantic defaults also cover existing feature controls and dialogs. */
+.admin-shell button, .admin-shell .secondary-button, .admin-shell .admin-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: auto; max-width: 100%; min-width: 0; min-height: var(--admin-control);
+  margin: 0; padding: 7px 12px;
+  color: var(--admin-text); background: var(--admin-raised);
+  border: 1px solid var(--admin-border); border-radius: 6px;
+  font: inherit; font-size: 13px; font-weight: 550; line-height: 1.4;
+  text-align: center; text-transform: none; letter-spacing: 0; text-decoration: none;
+  box-shadow: none; cursor: pointer; white-space: normal; overflow-wrap: anywhere;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.admin-shell button:hover:not(:disabled), .admin-shell .secondary-button:hover { background: #28354a; border-color: #637992; color: white; box-shadow: none; transform: none; }
+.admin-shell button:active:not(:disabled) { background: #31425c; transform: none; }
+.admin-shell button:disabled { opacity: .5; cursor: not-allowed; }
+.admin-shell .admin-button--sm { min-height: var(--admin-control-sm); padding: 5px 10px; font-size: 12px; }
+.admin-shell .admin-button--quiet { background: transparent; }
+.admin-shell button[type=submit], .admin-shell button[aria-pressed=true] { background: #244554; border-color: #497b8d; color: #dbfaff; }
+.admin-shell button.admin-button--danger { color: var(--admin-danger); border-color: #88545d; background: #35242c; }
+.admin-shell input, .admin-shell select, .admin-shell textarea { min-width: 0; max-width: 100%; min-height: var(--admin-control); padding: 7px 10px; border: 1px solid var(--admin-border); border-radius: 6px; background: #101620; color: var(--admin-text); font: inherit; font-size: 13px; line-height: 1.4; }
+.admin-shell input::placeholder, .admin-shell textarea::placeholder { color: var(--admin-muted); }
+.admin-shell input[type=checkbox], .admin-shell input[type=radio] { min-height: auto; accent-color: var(--admin-accent); }
+.admin-shell input:disabled, .admin-shell select:disabled { opacity: .6; }
+.admin-shell label { color: var(--admin-muted); }
+.admin-shell [role=alert] { padding: 10px 12px; border-left: 3px solid var(--admin-danger); background: #30212a; color: #ffd2d2; }
+.admin-shell [role=status] { color: var(--admin-muted); }
+.admin-shell [aria-busy=true] { cursor: progress; }
+.admin-shell nav:not([aria-label='Admin areas']), .admin-shell [role=group] { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.admin-shell .dashboard-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-shell .dashboard-title h3 { margin-bottom: 4px; }
+.admin-shell .dashboard-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.admin-shell .dashboard-metrics > div { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); background: var(--admin-surface); }
+.admin-shell .dashboard-metrics strong { color: var(--admin-accent); font-size: 1.85rem; line-height: 1.2; }
+.admin-shell .dashboard-dates { font-size: 12px; color: var(--admin-muted); }
+.admin-shell .dashboard-appointments { list-style: none; padding: 0; }
+.admin-shell .dashboard-appointments li { display: grid; grid-template-columns: 1fr 2fr 1.5fr; gap: 16px; padding: 14px 0; border-top: 1px solid var(--admin-border); }
+.admin-shell .dashboard-appointments time, .admin-shell .dashboard-appointments span { display: block; }
+.admin-shell .dashboard-appointments h4, .admin-shell .dashboard-appointments p { margin: 4px 0; }
+.admin-shell .dashboard-status { text-transform: capitalize; display: inline !important; color: var(--admin-purple); }
+.admin-shell .employee-filters { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 20px 0; padding: 14px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); background: var(--admin-surface); }
+.admin-shell .employee-filters label { display: flex; flex-direction: column; gap: 6px; flex: 1 1 150px; }
+.admin-shell .employee-filters input, .admin-shell .employee-filters select { width: 100%; }
+.admin-shell .employee-cards { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.admin-shell .employee-cards > li, .admin-shell .employee-profile { min-width: 0; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 16px; }
+.admin-shell .employee-classification { text-transform: capitalize; color: var(--admin-purple); font-size: 12px; }
+.admin-shell .employee-contact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 6px 12px; font-size: 13px; }
+.admin-shell .employee-contact dt { color: var(--admin-muted); }
+.admin-shell .employee-contact dd { margin: 0; min-width: 0; }
+.admin-shell .employee-profile { margin-top: 20px; border-color: #4b637b; }
+.admin-shell .employee-directory button { margin: 3px 3px 3px 0; }
+.admin-shell .employee-hr-dialog { color: var(--admin-text); background: var(--admin-surface); border: 1px solid #637992; border-radius: 12px; width: min(540px, calc(100% - 32px)); max-height: 85dvh; overflow-y: auto; padding: 24px; }
+.admin-shell .employee-hr-dialog::backdrop { background: rgb(0 0 0 / 75%); }
+.admin-shell .employee-hr-dialog fieldset { border: 0; padding: 0; min-width: 0; }
+.admin-shell .employee-hr-dialog label { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.admin-shell .employee-hr-dialog input[type=checkbox] { align-self: start; }
+.admin-shell .calendar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; margin: 20px 0; }
+.admin-shell .calendar-day { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 14px; background: var(--admin-surface); min-width: 0; }
+.admin-shell .calendar-day section { border-top: 1px solid var(--admin-border); margin-top: 14px; padding-top: 12px; }
+.admin-shell .calendar-list { list-style: none; padding: 0; }
+.admin-shell .calendar-entry { border-left: 2px solid #498294; padding: 12px; margin: 10px 0; background: #101620; }
+.admin-shell .calendar-entry p { margin: 6px 0; font-size: 13px; }
+.admin-shell .calendar-entry strong { color: var(--admin-purple); font-size: 12px; }
+.admin-shell [aria-label='Appointment crew'] li { margin: 8px 0; }
+.admin-shell [aria-label='Appointment crew'] li > span { display: block; margin-bottom: 6px; }
+.admin-shell [aria-label='Appointment crew'] button { margin: 3px 4px 3px 0; }
+.admin-shell [aria-label='Appointment crew'] form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.admin-shell [aria-label='Appointment crew'] label { display: flex; flex-direction: column; gap: 6px; max-width: 100%; }
+@media (max-width: 1100px) {
+  .admin-layout { grid-template-columns: 220px minmax(0, 1fr); }
+  .admin-content { padding: 20px; }
+  .admin-shell .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .admin-layout { display: block; min-height: auto; }
+  .admin-shell button.admin-menu-toggle { display: inline-flex; margin: 12px 16px; }
+  .admin-sidebar { display: none; position: static; padding: 8px 16px 20px; border-bottom: 1px solid var(--admin-border); }
+  .admin-sidebar.is-open { display: flex; }
+  .admin-content { border-left: 0; border-top: 1px solid var(--admin-border); padding: 20px 16px; }
+}
+@media (max-width: 540px) {
+  .admin-header { align-items: flex-start; flex-direction: column; padding: 16px; gap: 12px; }
+  .admin-shell .session-controls { max-width: 100%; width: 100%; justify-content: space-between; gap: 8px; }
+  .admin-shell .session-controls p { text-align: left; }
+  .admin-shell button, .admin-shell .secondary-button, .admin-shell input, .admin-shell select { min-height: 44px; }
+  .admin-shell .admin-sidebar nav button { min-height: 44px; }
+  .admin-shell .employee-filters { padding: 12px; }
+  .admin-shell .employee-filters label { flex-basis: 100%; }
+  .admin-shell .employee-contact, .admin-shell .dashboard-appointments li { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .admin-shell .employee-contact dd { margin-bottom: 8px; }
+  .admin-shell .employee-hr-dialog { padding: 16px; }
+  .admin-shell h2 { font-size: 1.3rem; }
+}
+@media (prefers-reduced-motion: reduce) { .admin-shell *, .admin-shell *::before, .admin-shell *::after { transition: none; scroll-behavior: auto; } }

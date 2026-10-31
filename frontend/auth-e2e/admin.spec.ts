@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdirSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { test, expect } from '@playwright/test'
 import { AdminPage } from './pages/AdminPage'
@@ -371,3 +371,65 @@ for (const kind of ['owner', 'shop_manager']) {
     await expect(admin.crew).toHaveCount(0)
   })
 }
+
+
+test('Admin visual foundation is compact and accessible at desktop, tablet and mobile widths', async ({ page }) => {
+  const admin = new AdminPage(page)
+  await admin.login(users.find(u => u.kind === 'owner')!)
+  await expect(admin.dashboard.getByText('Appointments today', {exact:true})).toBeVisible()
+  const directory = '/private/tmp/magnum-admin-ux'
+  mkdirSync(directory, { recursive: true })
+  async function checkWidth(width: number, name: string) {
+    await page.setViewportSize({ width, height: 1000 })
+    await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+    const logout = page.getByRole('button', { name: 'Sign out', exact: true })
+    const bounds = await logout.boundingBox()
+    expect(bounds!.width).toBeLessThan(160)
+    expect(bounds!.height).toBeLessThanOrEqual(44)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    const clipped = await page.locator('.admin-shell button:visible, .admin-shell input:visible, .admin-shell select:visible').evaluateAll(nodes => nodes.some(n => { const r=n.getBoundingClientRect(); return r.left < -1 || r.right > innerWidth+1 }))
+    expect(clipped).toBe(false)
+    await page.screenshot({ path: `${directory}/${name}-${width}.png`, fullPage: true, animations: 'disabled' })
+  }
+  for (const width of [1440,1024,768,390,320]) {
+    if (width > 900) await expect(page.getByRole('button', {name:'Menu',exact:true})).not.toBeVisible()
+    await checkWidth(width, 'dashboard')
+    if (width <= 900) {
+      const menu = page.getByRole('button', { name: 'Menu', exact: true })
+      await menu.focus()
+      await page.keyboard.press('Enter')
+      await expect(admin.navigation).toBeVisible()
+      await checkWidth(width, 'navigation')
+      await page.keyboard.press('Enter')
+      await expect(admin.navigation).not.toBeVisible()
+    }
+  }
+  await page.setViewportSize({width:1440,height:1000})
+  await admin.openEmployees()
+  await expect(admin.employees.getByRole('heading', {level:3}).first()).toBeVisible()
+  await checkWidth(1440, 'employees')
+  await checkWidth(390, 'employees')
+  await admin.employees.getByRole('button', {name:'Create employee', exact:true}).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await checkWidth(320, 'employee-form')
+  await page.getByRole('button', {name:'Cancel', exact:true}).click()
+  await page.setViewportSize({width:1440,height:1000})
+  await admin.openCalendar()
+  await expect(admin.calendar.getByRole('button', {name:/View Acceptance service/}).first()).toBeVisible()
+  await admin.calendar.getByLabel('Calendar view').selectOption('week')
+  const context = page.waitForResponse(r=>r.url().endsWith('/api/admin/context') && r.status()===200)
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')))
+  await context
+  await expect(admin.calendar.getByLabel('Calendar view')).toHaveValue('week')
+  await expect(admin.calendar.getByRole('button', {name:/View Acceptance service/}).first()).toBeVisible()
+  await checkWidth(1440,'calendar')
+  await checkWidth(390,'calendar')
+  // Stress only display labels in this disposable browser; no grants or records change.
+  await page.setViewportSize({width:320,height:1000})
+  await page.getByRole('button', {name:'Menu',exact:true}).click()
+  await admin.business.locator('option:checked').evaluate(n=>n.textContent='A very long independently owned business name for narrow viewport review')
+  await admin.shop.locator('option:checked').evaluate(n=>n.textContent='A very long shop and operational location name for layout review')
+  await page.locator('.admin-brand p').evaluate(n=>n.textContent='A very long independently owned business name for narrow viewport review')
+  await checkWidth(320,'long-selectors')
+  await admin.logout()
+})

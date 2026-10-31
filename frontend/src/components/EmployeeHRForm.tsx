@@ -123,7 +123,7 @@ export default function EmployeeHRForm({ action, businessId, employee, shops, as
         {action === 'rehire' && <label>Rehire start date<input type="date" name="starts_on" required min={nextDate(employee?.ends_on)} /></label>}
         {(action === 'terminate' || action === 'rehire') && <label><input type="checkbox" name="confirm_lifecycle" required />{action === 'terminate' ? 'I confirm employment termination and business-specific offboarding.' : 'I confirm a new employment period with no automatic restoration.'}</label>}
         {error && <p role="alert">{error}</p>}
-        <button className="secondary-button" type="submit">{busy ? 'Saving…' : 'Save changes'}</button>
+        <button className={action === 'terminate' ? 'secondary-button admin-button--danger' : 'secondary-button'} type="submit">{busy ? 'Saving…' : 'Save changes'}</button>
         <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
       </fieldset>
     </form>

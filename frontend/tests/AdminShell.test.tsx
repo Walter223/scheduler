@@ -146,3 +146,13 @@ test('revoked selected shop clears the old calendar and chooses only a permitted
   await waitFor(() => expect((screen.getByLabelText('Shop') as HTMLSelectElement).value).toBe('10'))
   expect(screen.queryByLabelText('Retained calendar date')).toBeNull()
 })
+
+test('compact shell keeps semantic account controls, workspace skip link and planned navigation labels', async () => {
+  mount(contexts)
+  await screen.findByRole('button', { name: 'Business settings' })
+  expect(screen.getByRole('link', { name: 'Skip to workspace' }).getAttribute('href')).toBe('#admin-workspace')
+  expect(screen.getByRole('button', { name: 'Business settings' }).getAttribute('aria-description')).toBe('Planned section')
+  expect(screen.getByRole('button', { name: 'Employees and HR' }).getAttribute('aria-description')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Sign out' }).classList.contains('confirmation-button')).toBe(false)
+  expect(screen.getByLabelText('Business').getAttribute('title')).toBe('Business 1')
+})
