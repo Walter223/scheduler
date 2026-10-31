@@ -143,3 +143,9 @@ counts use stable employment identity across shops and active effective assignme
 Employee grants never substitute for Detailer classification. HR-only Manager roles
 receive no scheduling totals. Dashboard results are cleared on tenant/shop changes,
 revocation errors and logout; existing operational authorization remains server-side.
+
+5C-1 adds the [read-only HR directory/timeline UI](../backend/HR_DIRECTORY_UI.md):
+HR Active/Former views, explicit stable-ID/period-ID profiles, server-side filters,
+and shop-only current contact rosters. Ended and rehired periods remain distinct;
+no compensation or audit data is included. Test coverage and remaining UI/browser
+boundaries are documented in that contract.

@@ -46,6 +46,8 @@ defmodule SchedulerApiWeb.AdminContextControllerTest do
     other = shop_fixture()
     grant_fixture(user, shop, :shop_manager)
     data = hd(contexts(user)["businesses"])
+    assert "roster" in hd(data["shops"])["capabilities"]
+    refute "employees" in data["capabilities"]
     assert data["all_shops"] == []
     assert Enum.map(data["shops"], & &1["id"]) == [shop.id]
     refute Enum.any?(data["shops"], &(&1["id"] == other.id))

@@ -232,6 +232,89 @@ case command do
         ends_at: DateTime.add(starts, 5400),
         is_lead: true
       })
+
+      # Retained historical fixture and a separately authorized rehire period.
+      actor_identity = Enum.find(fixture["users"], &(&1["kind"] == "owner"))
+      actor = Repo.get_by!(User, keycloak_subject: actor_identity["subject"])
+      {:ok, actor_session, credential} = Accounts.create_session(actor)
+
+      try do
+        {:ok, former} =
+          SchedulerApi.Employment.create_employment(
+            a,
+            %{
+              first_name: "Former",
+              last_name: "Fixture",
+              classification: :detailer,
+              starts_on: ~D[2025-01-01],
+              home_address: "Prior fixture address"
+            }
+          )
+
+        {:ok, former} = SchedulerApi.Employment.end_employment(former, ~D[2025-12-31])
+
+        Repo.insert!(%SchedulerApi.Employment.OffboardingAudit{
+          business_id: a.id,
+          employment_id: former.id,
+          actor_user_id: actor.id,
+          ended_on: ~D[2025-12-31],
+          jobs_removed: 0,
+          shifts_cancelled: 0,
+          assignments_ended: 0,
+          occurred_at: ~U[2025-12-31 19:00:00Z]
+        })
+
+        {:ok, returning} =
+          SchedulerApi.Employment.create_employment(
+            a,
+            %{
+              first_name: "Returning",
+              last_name: "Fixture",
+              classification: :detailer,
+              starts_on: ~D[2025-01-01],
+              home_address: "Historical fixture address"
+            }
+          )
+
+        {:ok, _} =
+          SchedulerApi.Employment.HR.update_contact(credential, returning, %{
+            home_address: "Historical fixture address"
+          })
+
+        {:ok, returning} = SchedulerApi.Employment.end_employment(returning, ~D[2025-12-31])
+
+        Repo.insert!(%SchedulerApi.Employment.OffboardingAudit{
+          business_id: a.id,
+          employment_id: returning.id,
+          actor_user_id: actor.id,
+          ended_on: ~D[2025-12-31],
+          jobs_removed: 0,
+          shifts_cancelled: 0,
+          assignments_ended: 0,
+          occurred_at: ~U[2025-12-31 19:00:00Z]
+        })
+
+        {:ok, new} =
+          SchedulerApi.Employment.HR.rehire_employment(credential, returning, ~D[2026-01-01])
+
+        {:ok, _} =
+          SchedulerApi.Employment.assign_shop(
+            Repo.get!(SchedulerApi.Employment.EmploymentRecord, new.id),
+            shop,
+            %{starts_on: ~D[2026-01-01]}
+          )
+
+        second_shop = Enum.find(shops, &(&1.business_id == a.id and &1.id != shop.id))
+
+        {:ok, _} =
+          SchedulerApi.Employment.assign_shop(
+            Repo.get!(SchedulerApi.Employment.EmploymentRecord, new.id),
+            second_shop,
+            %{starts_on: ~D[2026-01-01]}
+          )
+      after
+        {:ok, _} = Accounts.revoke_session(actor_session, :logout)
+      end
     end)
 
     IO.puts("AUTH_E2E_SEEDED")
@@ -307,6 +390,18 @@ case command do
 
       Repo.delete_all(
         from v in SchedulerApi.Catalog.VehicleSize, where: v.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from h in SchedulerApi.Employment.HrAuditEvent, where: h.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from h in SchedulerApi.Employment.RehireAudit, where: h.business_id in ^businesses
+      )
+
+      Repo.delete_all(
+        from h in SchedulerApi.Employment.OffboardingAudit, where: h.business_id in ^businesses
       )
 
       Repo.delete_all(

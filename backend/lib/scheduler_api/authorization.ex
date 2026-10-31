@@ -574,6 +574,7 @@ defmodule SchedulerApi.Authorization do
     areas = [
       dashboard: :employment_private_read,
       employees: :employment_private_read,
+      roster: :assigned_employee_contact_read,
       compensation: :compensation_read,
       access: :staff_access_read,
       settings: :business_manage,
@@ -620,8 +621,8 @@ defmodule SchedulerApi.Authorization do
             shops ->
               allowed =
                 for {area, action} <- areas,
-                    action in @shop_actions,
-                    authorize(user, action, shop) == :ok,
+                    action in (@shop_actions ++ @assigned_staff),
+                    discovery_shop_allowed?(user, action, shop),
                     do: area
 
               if allowed == [],
@@ -648,6 +649,15 @@ defmodule SchedulerApi.Authorization do
               ]
     end
   end
+
+  defp discovery_shop_allowed?(user, :assigned_employee_contact_read, shop) do
+    from(p in subquery(employment_scopes_query(user, :assigned_employee_contact_read)),
+      where: p.business_id == ^shop.business_id and p.shop_id == ^shop.id
+    )
+    |> Repo.exists?()
+  end
+
+  defp discovery_shop_allowed?(user, action, shop), do: authorize(user, action, shop) == :ok
 
   defp grants(user_id, action) do
     roles = for {role, actions} <- @permissions, action in actions, do: role

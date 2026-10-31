@@ -93,3 +93,8 @@ or production readiness claim is included in this milestone.
 appointments. See [DASHBOARD_API.md](DASHBOARD_API.md) for scope, per-shop date/DST,
 counting semantics and privacy. HR-only workspaces retain their permitted navigation
 without operational scheduling data. Other areas remain placeholders.
+
+5C-1 implements the read-only [Employees/HR directory](HR_DIRECTORY_UI.md).
+Business `employees` capabilities enable HR profiles/history; shop `roster`
+capabilities enable only the approved current-shop contacts. Classification grants
+nothing. Other unfinished management areas remain placeholders.

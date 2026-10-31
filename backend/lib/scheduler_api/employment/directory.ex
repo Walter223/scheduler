@@ -111,13 +111,26 @@ defmodule SchedulerApi.Employment.Directory do
   end
 
   defp paginate(query, kind, biz, resource, params) do
-    allowed = if kind == :directory, do: ["limit", "cursor", "status"], else: ["limit", "cursor"]
+    allowed =
+      if kind == :directory,
+        do: ["limit", "cursor", "status", "q", "classification"],
+        else:
+          if(kind == :shop,
+            do: ["limit", "cursor", "q", "classification"],
+            else: ["limit", "cursor"]
+          )
 
     with :ok <- params_allowed(params, allowed),
          {:ok, limit} <- limit(Map.get(params, "limit", "50")),
          {:ok, status} <- status(kind, Map.get(params, "status", "active")),
+         {:ok, search, classification} <- filters(params),
+         binding =
+           if(search == "" and is_nil(classification),
+             do: status,
+             else: Jason.encode!([status, search, classification])
+           ),
          {:ok, position} <-
-           cursor(Map.get(params, "cursor"), [Atom.to_string(kind), biz, resource || 0, status]) do
+           cursor(Map.get(params, "cursor"), [Atom.to_string(kind), biz, resource || 0, binding]) do
       query =
         case status do
           "active" ->
@@ -135,6 +148,26 @@ defmodule SchedulerApi.Employment.Directory do
             query
         end
 
+      query =
+        if search == "",
+          do: query,
+          else:
+            where(
+              query,
+              [e],
+              fragment(
+                "strpos(lower(? || ' ' || ?), lower(?)) > 0",
+                e.first_name,
+                e.last_name,
+                ^search
+              )
+            )
+
+      query =
+        if is_nil(classification),
+          do: query,
+          else: where(query, [e], e.classification == ^classification)
+
       key = if kind == :history, do: :id, else: :employee_id
 
       query =
@@ -143,7 +176,7 @@ defmodule SchedulerApi.Employment.Directory do
           order_by: field(e, ^key),
           limit: ^(limit + 1)
 
-      rows = Repo.all(project(query, kind))
+      rows = Repo.all(project(query, kind, if(kind == :shop, do: resource)))
       items = Enum.take(rows, limit)
       more = length(rows) > limit
 
@@ -153,7 +186,7 @@ defmodule SchedulerApi.Employment.Directory do
             Map.fetch!(List.last(items), if(kind == :history, do: :period_id, else: :employee_id))
 
           Base.url_encode64(
-            Jason.encode!([1, Atom.to_string(kind), biz, resource || 0, status, value]),
+            Jason.encode!([1, Atom.to_string(kind), biz, resource || 0, binding, value]),
             padding: false
           )
         end
@@ -163,9 +196,41 @@ defmodule SchedulerApi.Employment.Directory do
     end
   end
 
-  defp project(query, kind) do
+  defp project(query, kind, shop \\ nil) do
     fields = if kind == :history, do: @timeline, else: @fields
-    from e in query, select: map(e, ^fields), select_merge: %{period_id: e.id}
+    query = from e in query, select: map(e, ^fields), select_merge: %{period_id: e.id}
+
+    if kind == :history,
+      do: query,
+      else:
+        from(e in query,
+          select_merge: %{
+            shops:
+              fragment(
+                "(SELECT coalesce(jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'status',a.status,'starts_on',a.starts_on,'ends_on',a.ends_on) ORDER BY s.id,a.id),'[]') FROM employment_shop_assignments a JOIN shops s ON s.id=a.shop_id AND s.business_id=a.business_id WHERE a.employment_id=? AND s.status='active' AND (?::bigint IS NULL OR (s.id=?::bigint AND a.status='active' AND a.starts_on <= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Denver')::date)))",
+                e.id,
+                ^shop,
+                ^shop
+              )
+          }
+        )
+  end
+
+  defp filters(params) do
+    q = Map.get(params, "q", "")
+    c = Map.get(params, "classification")
+
+    roles = %{
+      "detailer" => :detailer,
+      "shop_manager" => :shop_manager,
+      "business_manager" => :business_manager,
+      "business_owner" => :business_owner
+    }
+
+    if is_binary(q) and byte_size(q) <= 100 and String.valid?(q) and
+         (is_nil(c) or Map.has_key?(roles, c)),
+       do: {:ok, String.trim(q), roles[c]},
+       else: {:error, :invalid_options}
   end
 
   defp session_scope(%WebSession{id: id, user_id: user_id})

@@ -28,3 +28,14 @@
 .dashboard-appointments h4, .dashboard-appointments p { margin: .25rem 0; }
 .dashboard-status { text-transform: capitalize; display: inline !important; }
 @media (max-width: 700px) { .dashboard-appointments li { grid-template-columns: 1fr; gap: .5rem; } }
+.employee-filters { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; margin: 1.5rem 0; }
+.employee-filters label { display: flex; flex-direction: column; gap: .5rem; }
+.employee-filters input, .employee-filters select { padding: .7rem; background: #161029; color: white; border: 1px solid #39e7ff; border-radius: .4rem; max-width: 100%; }
+.employee-cards { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem; }
+.employee-cards > li, .employee-profile { background: #1d1430; border: 1px solid #8958b4; border-radius: .7rem; padding: 1.2rem; overflow-wrap: anywhere; }
+.employee-classification { text-transform: capitalize; color: #78f0ff; }
+.employee-contact { display: grid; grid-template-columns: auto 1fr; gap: .4rem .8rem; }
+.employee-contact dd { margin: 0; }
+.employee-profile { margin-top: 1.5rem; border-color: #39e7ff; }
+.employee-directory button { margin: .3rem; }
+@media (max-width: 700px) { .employee-filters label { width: 100%; } .employee-contact { grid-template-columns: 1fr; } }

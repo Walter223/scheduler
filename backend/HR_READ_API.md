@@ -42,13 +42,20 @@ Directory, roster and timeline responses:
 
 Profiles return `{"employee": {...}}`. Contact projections contain only
 `employee_id`, `period_id`, `business_id`, `first_name`, `last_name`, `classification`,
-`status`, `starts_on`, `ends_on`, `phone`, `email`, `home_address`. Nullable contact
-fields have no identity-provider fallback. Timelines omit phone/email/home address.
+`status`, `starts_on`, `ends_on`, `phone`, `email`, `home_address`, `shops`. Nullable contact
+fields have no identity-provider fallback. `shops` contains allowlisted period-specific
+assignment labels/dates: HR sees retained relationships at active business shops;
+shop rosters expose only current relationships at the requested shop. Timelines
+omit phone/email/home address and shop relationships.
 Dates serialize as ISO dates. No user identifiers, sessions, credentials, payroll,
 compensation values, raw schemas or audit payloads are serialized.
 
 Collections accept `limit` 1..100 (default 50) and `cursor`. Directory additionally
-accepts `status=active|former|all`. Unknown parameters, malformed selectors/filters
+accepts `status=active|former|all`. Directory and shop roster also accept optional
+`q` (literal case-insensitive name substring, up to 100 UTF-8 bytes) and fixed
+`classification`. These SQL filters precede ordering/pagination; filtered cursors
+bind the normalized search/classification while unfiltered contracts remain intact.
+Unknown parameters, malformed selectors/filters
 or cursors return generic 422 `{"error":"invalid_options"}`. Path parameters
 are read independently of query parameters; `business_id`, `shop_id`, `user_id`
 or ownership overrides in query strings are rejected.
@@ -87,3 +94,6 @@ mix precommit
 
 See [protected HR write APIs](HR_WRITE_API.md) for the 4F-2 HTTP adapters,
 session-bound CSRF requirements, payload allowlists and safe error contract.
+
+See [HR_DIRECTORY_UI.md](HR_DIRECTORY_UI.md) for the 5C-1 read-only UI, privacy
+boundaries and browser acceptance coverage.

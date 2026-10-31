@@ -23,6 +23,36 @@ defmodule SchedulerApiWeb.EmployeeControllerTest do
     get(conn, path)
   end
 
+  test "name and classification filters run before scoped pagination and cursors bind filters",
+       c do
+    for _ <- 1..2,
+        do:
+          employment_fixture(%{first_name: "Needle", classification: :detailer},
+            business: c.business
+          )
+
+    raw = token(c.owner)
+    path = directory(c) <> "?q=Needle&classification=detailer&limit=1"
+    page = json_response(request(raw, path), 200)
+    assert length(page["employees"]) == 1 and page["meta"]["has_more"]
+    cursor = page["meta"]["next_cursor"]
+    assert length(json_response(request(raw, path <> "&cursor=#{cursor}"), 200)["employees"]) == 1
+    assert json_response(request(raw, directory(c) <> "?q=Other&cursor=#{cursor}"), 422)
+    assert json_response(request(raw, directory(c) <> "?classification=invalid"), 422)
+    assert json_response(request(raw, directory(c) <> "?q=%25_%25"), 200)["employees"] == []
+  end
+
+  test "shop labels do not expose another shop's relationships to Shop Managers", c do
+    other = shop_fixture(%{business_id: c.business.id})
+    {:ok, _} = Employment.assign_shop(c.employment, other, %{starts_on: ~D[2026-01-01]})
+    sm = active_user_fixture()
+    grant_fixture(sm, c.shop, :shop_manager)
+    [row] = json_response(request(token(sm), roster(c, c.shop)), 200)["employees"]
+    assert Enum.map(row["shops"], & &1["id"]) == [c.shop.id]
+    [hr] = json_response(request(token(c.owner), directory(c)), 200)["employees"]
+    assert Enum.sort(Enum.map(hr["shops"], & &1["id"])) == Enum.sort([c.shop.id, other.id])
+  end
+
   test "all routes require a current browser session and no-store", c do
     routes = [
       directory(c),
@@ -74,7 +104,7 @@ defmodule SchedulerApiWeb.EmployeeControllerTest do
 
       assert Enum.sort(Map.keys(e)) ==
                Enum.sort(
-                 ~w(employee_id period_id business_id first_name last_name classification status starts_on ends_on phone email home_address)
+                 ~w(employee_id period_id business_id first_name last_name classification status starts_on ends_on phone email home_address shops)
                )
 
       assert json_response(request(credential, profile(c, c.employment)), 200)["employee"] == e

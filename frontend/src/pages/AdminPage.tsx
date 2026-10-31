@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import EmployeeDirectory from '../components/EmployeeDirectory'
 import OperationalDashboard from '../components/OperationalDashboard'
 import SessionControls from '../components/SessionControls'
 
@@ -83,13 +84,13 @@ export default function AdminPage() {
               {business.all_shops.length > 0 && <option value={0}>All Shops</option>}
               {business.shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select></>}
-            <nav aria-label="Admin areas">{areas.filter(([key]) => available.includes(key)).map(([key, name]) => <button key={key} aria-current={area === key ? 'page' : undefined} onClick={() => { setArea(key); setOpen(false) }}>{name}</button>)}</nav>
+            <nav aria-label="Admin areas">{areas.filter(([key]) => (available.includes(key) || (key === 'employees' && available.includes('roster')))).map(([key, name]) => <button key={key} aria-current={area === key ? 'page' : undefined} onClick={() => { setArea(key); setOpen(false) }}>{name}</button>)}</nav>
           </aside>
           <section className="admin-content" aria-label="Workspace">
             {state && <p role="status">{state}</p>}
             {state.startsWith('Access is unavailable') && <a href="/auth/login">Sign in again</a>}
             <button className="secondary-button" onClick={() => setRevision(v => v + 1)}>Refresh access</button>
-            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={`${business.id}:${shopId}`} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : <p>This area is planned. Management screens are not available yet.</p>}</>}
+            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={`${business.id}:${shopId}`} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : area === 'employees' ? <EmployeeDirectory key={`${business.id}:${shopId}`} businessId={business.id} shopId={shopId} hr={business.capabilities.includes('employees')} /> : <p>This area is planned. Management screens are not available yet.</p>}</>}
           </section>
         </div>
       </>}
