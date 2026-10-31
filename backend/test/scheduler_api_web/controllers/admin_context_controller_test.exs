@@ -28,7 +28,8 @@ defmodule SchedulerApiWeb.AdminContextControllerTest do
     a = shop_fixture()
     {m, _} = grant_fixture(user, a, :business_owner)
     b = Repo.insert!(%Business{name: "Separate", slug: "separate-context"})
-    grant_fixture(user, shop_fixture(%{business_id: b.id}), :business_manager)
+    second = shop_fixture(%{business_id: b.id})
+    grant_fixture(user, second, :business_manager)
     data = contexts(user)["businesses"]
     first = Enum.find(data, &(&1["id"] == a.business_id))
     other = Enum.find(data, &(&1["id"] == b.id))
@@ -36,6 +37,8 @@ defmodule SchedulerApiWeb.AdminContextControllerTest do
     assert "appointments" in first["all_shops"]
     refute "settings" in other["capabilities"]
     assert other["shops"] == []
+    assert "hr_manage" in other["capabilities"]
+    assert Enum.map(other["hr_shops"], & &1["id"]) == [second.id]
     {:ok, _} = SchedulerApi.Organizations.Memberships.revoke(m)
     assert Enum.map(contexts(user)["businesses"], & &1["id"]) == [b.id]
   end

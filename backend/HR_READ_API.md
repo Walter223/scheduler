@@ -97,3 +97,8 @@ session-bound CSRF requirements, payload allowlists and safe error contract.
 
 See [HR_DIRECTORY_UI.md](HR_DIRECTORY_UI.md) for the 5C-1 read-only UI, privacy
 boundaries and browser acceptance coverage.
+
+5C-2A adds `assignment_id` to the existing allowlisted shop relationship projection
+so authorized HR forms can invoke the existing end-assignment route. This ID grants
+no mutation authority; Shop Managers remain read-only. No user/provider/pay/audit
+fields are added.

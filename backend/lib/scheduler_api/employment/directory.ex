@@ -207,7 +207,7 @@ defmodule SchedulerApi.Employment.Directory do
           select_merge: %{
             shops:
               fragment(
-                "(SELECT coalesce(jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'status',a.status,'starts_on',a.starts_on,'ends_on',a.ends_on) ORDER BY s.id,a.id),'[]') FROM employment_shop_assignments a JOIN shops s ON s.id=a.shop_id AND s.business_id=a.business_id WHERE a.employment_id=? AND s.status='active' AND (?::bigint IS NULL OR (s.id=?::bigint AND a.status='active' AND a.starts_on <= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Denver')::date)))",
+                "(SELECT coalesce(jsonb_agg(jsonb_build_object('assignment_id',a.id,'id',s.id,'name',s.name,'status',a.status,'starts_on',a.starts_on,'ends_on',a.ends_on) ORDER BY s.id,a.id),'[]') FROM employment_shop_assignments a JOIN shops s ON s.id=a.shop_id AND s.business_id=a.business_id WHERE a.employment_id=? AND s.status='active' AND (?::bigint IS NULL OR (s.id=?::bigint AND a.status='active' AND a.starts_on <= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Denver')::date)))",
                 e.id,
                 ^shop,
                 ^shop

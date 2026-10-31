@@ -340,6 +340,22 @@ case command do
                "Expected only the explicitly expired fixture session; all logout sessions must be revoked"
              )
 
+    created =
+      Repo.all(
+        from e in SchedulerApi.Employment.EmploymentRecord, where: e.first_name == "Created"
+      )
+
+    unless length(created) == 2 and
+             Enum.all?(
+               created,
+               &(is_nil(&1.user_id) and &1.status == :active and
+                   &1.classification == :shop_manager)
+             ),
+           do: raise("HR browser mutation fixture state invalid")
+
+    unless Repo.aggregate(SchedulerApi.Organizations.RoleAssignment, :count) == 10,
+      do: raise("Classification edits must not create role grants")
+
     IO.puts("AUTH_E2E_VERIFIED")
 
   "cleanup" ->
@@ -362,6 +378,10 @@ case command do
       )
 
     Repo.transaction(fn ->
+      Repo.delete_all(
+        from h in SchedulerApi.Employment.HrAuditEvent, where: h.business_id in ^businesses
+      )
+
       Repo.delete_all(
         from e in SchedulerApi.Authorization.AuditEvent, where: e.business_id in ^businesses
       )
@@ -390,10 +410,6 @@ case command do
 
       Repo.delete_all(
         from v in SchedulerApi.Catalog.VehicleSize, where: v.business_id in ^businesses
-      )
-
-      Repo.delete_all(
-        from h in SchedulerApi.Employment.HrAuditEvent, where: h.business_id in ^businesses
       )
 
       Repo.delete_all(

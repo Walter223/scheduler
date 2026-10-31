@@ -98,3 +98,8 @@ without operational scheduling data. Other areas remain placeholders.
 Business `employees` capabilities enable HR profiles/history; shop `roster`
 capabilities enable only the approved current-shop contacts. Classification grants
 nothing. Other unfinished management areas remain placeholders.
+
+5C-2A adds business `hr_manage` (existing `employment_manage`) and `hr_shops`
+(active same-business id/name choices for authorized HR managers). These are separate
+from operational shops and do not grant scheduling authority. See
+[HR_MANAGEMENT_UI.md](HR_MANAGEMENT_UI.md) for the forms and CSRF/write boundaries.

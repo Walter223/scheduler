@@ -149,3 +149,9 @@ HR Active/Former views, explicit stable-ID/period-ID profiles, server-side filte
 and shop-only current contact rosters. Ended and rehired periods remain distinct;
 no compensation or audit data is included. Test coverage and remaining UI/browser
 boundaries are documented in that contract.
+
+5C-2A adds [everyday HR forms](../backend/HR_MANAGEMENT_UI.md) for authorized creation,
+contact/classification edits and shop assignments. Classification never creates role
+grants, creation needs no linked user, and ending a shop relationship never terminates
+employment. Historical records and Shop Manager rosters remain read-only; existing
+work, Owner-history, tenant and audit protections remain server-enforced.

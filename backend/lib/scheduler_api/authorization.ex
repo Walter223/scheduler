@@ -574,6 +574,7 @@ defmodule SchedulerApi.Authorization do
     areas = [
       dashboard: :employment_private_read,
       employees: :employment_private_read,
+      hr_manage: :employment_manage,
       roster: :assigned_employee_contact_read,
       compensation: :compensation_read,
       access: :staff_access_read,
@@ -644,6 +645,17 @@ defmodule SchedulerApi.Authorization do
                         if(shops != [], do: [:dashboard], else: [])
                     ),
                   all_shops: Enum.filter(capabilities, &(&1 in [:appointments, :schedules])),
+                  hr_shops:
+                    if(:hr_manage in capabilities,
+                      do:
+                        Repo.all(
+                          from s in Shop,
+                            where: s.business_id == ^b.id and s.status == :active,
+                            order_by: s.id,
+                            select: %{id: s.id, name: s.name}
+                        ),
+                      else: []
+                    ),
                   shops: shops
                 }
               ]

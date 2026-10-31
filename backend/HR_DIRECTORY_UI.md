@@ -66,3 +66,8 @@ employee lifecycle records or development identities are modified.
 
 Remaining scope: no editable forms, self-service UI, exhaustive accessibility audit,
 production MFA hardening, or browser-level race tests for concurrent HR mutations.
+
+5C-2A adds [authorized everyday HR forms](HR_MANAGEMENT_UI.md) to the existing
+read views. `hr_manage` explicitly gates controls; historical views and Shop Manager
+rosters remain read-only. Existing HR authorization and retained-period privacy
+continue to govern all requests.
