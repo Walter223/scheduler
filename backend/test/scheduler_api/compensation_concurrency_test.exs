@@ -16,6 +16,10 @@ defmodule SchedulerApi.CompensationConcurrencyTest do
   alias SchedulerApi.Organizations.{Business, Shop, BusinessMembership, RoleAssignment}
   alias SchedulerApi.Accounts.{User, WebSession}
 
+  import Plug.Conn
+  import Phoenix.ConnTest
+  @endpoint SchedulerApiWeb.Endpoint
+
   @now ~U[2026-10-29 18:00:00Z]
   setup do
     c = Sandbox.unboxed_run(Repo, &compensation_fixture/0)
@@ -221,6 +225,62 @@ defmodule SchedulerApi.CompensationConcurrencyTest do
       assert Repo.aggregate(CompensationAuditEvent, :count) == 1
       audit = Repo.one!(CompensationAuditEvent)
       if audit.outcome == :applied, do: assert(Repo.get!(CompensationRate, audit.rate_id))
+    end)
+  end
+
+  test "simultaneous HTTP rate writes retain one rate and safe effective-date conflict", c do
+    raw = SchedulerApi.Accounts.SessionCredential.reveal(c.credential)
+
+    auth = fn ->
+      build_conn() |> put_req_cookie(SchedulerApiWeb.BrowserSession.session_name(), raw)
+    end
+
+    csrf =
+      Sandbox.unboxed_run(Repo, fn ->
+        auth.() |> get("/api/me") |> json_response(200) |> Map.fetch!("csrf_token")
+      end)
+
+    date =
+      Sandbox.unboxed_run(Repo, fn ->
+        DateTime.utc_now()
+        |> SchedulerApi.Appointments.Availability.local_datetime()
+        |> NaiveDateTime.to_date()
+        |> Date.to_iso8601()
+      end)
+
+    path =
+      "/api/admin/businesses/#{c.business.id}/employees/#{c.employment.employee_id}/periods/#{c.employment.id}/compensation/rates"
+
+    results =
+      compete(
+        c.supervisor,
+        for(
+          amount <- ["25.00", "30.00"],
+          do: fn ->
+            auth.()
+            |> put_req_header("content-type", "application/json")
+            |> put_req_header("origin", "http://localhost:5173")
+            |> put_req_header("x-csrf-token", csrf)
+            |> post(
+              path,
+              Jason.encode!(%{amount: amount, pay_basis: "hourly", effective_from: date})
+            )
+          end
+        )
+      )
+
+    assert Enum.count(results, &(&1.status == 201)) == 1
+    assert Enum.count(results, &(&1.status == 409)) == 1
+
+    assert json_response(Enum.find(results, &(&1.status == 409)), 409) == %{
+             "error" => "effective_date_conflict"
+           }
+
+    Sandbox.unboxed_run(Repo, fn ->
+      assert Repo.aggregate(
+               from(r in CompensationRate, where: r.business_id == ^c.business.id),
+               :count
+             ) == 1
     end)
   end
 end

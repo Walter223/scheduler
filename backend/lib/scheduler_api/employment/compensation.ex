@@ -38,6 +38,82 @@ defmodule SchedulerApi.Employment.Compensation do
     end
   end
 
+  @doc "Bounded HR-only history; authorization precedes cursor filtering and pagination."
+  def page_rate_history(user, employment, opts) do
+    with {:ok, limit, cursor} <- history_options(opts, employment) do
+      allowed = read_targets(user, employment, [:compensation_read], DateTime.utc_now())
+
+      if Repo.exists?(allowed) do
+        query =
+          allowed
+          |> rates()
+          |> order_by([r], asc: r.effective_from, asc: r.id)
+          |> limit(^(limit + 1))
+
+        query =
+          case cursor do
+            nil ->
+              query
+
+            {date, id} ->
+              where(
+                query,
+                [r],
+                r.effective_from > ^date or (r.effective_from == ^date and r.id > ^id)
+              )
+          end
+
+        rows = Repo.all(query)
+        items = Enum.take(rows, limit)
+        more = length(rows) > limit
+
+        next =
+          if more do
+            last = List.last(items)
+
+            Base.url_encode64(
+              Jason.encode!([1, employment.id, Date.to_iso8601(last.effective_from), last.id]),
+              padding: false
+            )
+          end
+
+        {:ok, %{rates: Enum.map(items, &project/1), has_more: more, next_cursor: next}}
+      else
+        {:error, :forbidden}
+      end
+    end
+  end
+
+  defp history_options(opts, %EmploymentRecord{id: id}) when is_list(opts) do
+    if Keyword.keyword?(opts) and Enum.all?(Keyword.keys(opts), &(&1 in [:limit, :cursor])) do
+      with limit when is_integer(limit) and limit in 1..100 <- Keyword.get(opts, :limit, 50),
+           {:ok, cursor} <- history_cursor(Keyword.get(opts, :cursor), id) do
+        {:ok, limit, cursor}
+      else
+        _ -> {:error, :invalid_input}
+      end
+    else
+      {:error, :invalid_input}
+    end
+  end
+
+  defp history_options(_, _), do: {:error, :invalid_input}
+  defp history_cursor(nil, _), do: {:ok, nil}
+
+  defp history_cursor(value, period) when is_binary(value) and byte_size(value) <= 256 do
+    with {:ok, json} <- Base.url_decode64(value, padding: false),
+         {:ok, [1, ^period, date, id]} <- Jason.decode(json),
+         true <- is_binary(date),
+         {:ok, date} <- Date.from_iso8601(date),
+         true <- is_integer(id) and id > 0 and id <= 9_223_372_036_854_775_807 do
+      {:ok, {date, id}}
+    else
+      _ -> {:error, :invalid_input}
+    end
+  end
+
+  defp history_cursor(_, _), do: {:error, :invalid_input}
+
   @doc "Own current pay only, from explicit linked identity and an own-pay grant."
   def get_own_current_rate(user, business, opts \\ [])
 

@@ -102,3 +102,6 @@ Focused verification:
 ```sh
 mix test test/scheduler_api/compensation_test.exs test/scheduler_api/compensation_audit_test.exs test/scheduler_api/compensation_concurrency_test.exs
 ```
+
+Milestone 4F-4A adds [protected compensation HTTP APIs](COMPENSATION_API.md)
+with bounded authorized history, strict projections and existing rate semantics.

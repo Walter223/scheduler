@@ -110,6 +110,28 @@ defmodule SchedulerApiWeb.Router do
       log: false
   end
 
+  scope "/api/admin/businesses/:business_id", SchedulerApiWeb do
+    pipe_through :admin_api
+
+    get "/employees/:employee_id/periods/:period_id/compensation/current",
+        CompensationController,
+        :current, log: false
+
+    get "/employees/:employee_id/periods/:period_id/compensation/history",
+        CompensationController,
+        :history, log: false
+
+    get "/me/compensation/current", CompensationController, :own, log: false
+  end
+
+  scope "/api/admin/businesses/:business_id", SchedulerApiWeb do
+    pipe_through :admin_write
+
+    post "/employees/:employee_id/periods/:period_id/compensation/rates",
+         CompensationController,
+         :create, log: false
+  end
+
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:scheduler_api, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put

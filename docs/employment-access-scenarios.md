@@ -96,3 +96,8 @@ independent-connection domain tests are the concurrency evidence.
 appointment/team/shift and own-period reads, secure writes, and independent-connection
 HTTP addition/lead races. Remaining browser and cross-lifecycle HTTP race gaps are
 listed in that contract; domain concurrency coverage remains in force.
+
+4F-4A adds [protected compensation APIs](../backend/COMPENSATION_API.md): role-
+restricted current/history reads, own-period pay, exact audited writes, Owner
+history protection across rehire and an independent-connection HTTP rate race.
+Remaining browser and cross-lifecycle HTTP race gaps are documented there.

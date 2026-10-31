@@ -174,7 +174,7 @@ defmodule SchedulerApi.RehireTest do
 
     {:ok, _} = terminate(c)
 
-    for date <- [Date.utc_today(), "invalid", nil] do
+    for date <- [Repo.reload!(c.employment).ends_on, "invalid", nil] do
       assert {:error, :invalid_start_date} =
                HR.rehire_employment(c.credential, c.employment, date)
     end
@@ -334,7 +334,13 @@ defmodule SchedulerApi.RehireTest do
     {:ok, _} = Employment.end_employment(old, ~D[2026-01-31])
     {:ok, _} = Memberships.revoke(member)
     historical_offboarding(c, old, ~D[2026-01-31])
-    {:ok, new} = HR.rehire_employment(c.credential, old, Date.utc_today())
+    # Employment eligibility uses the Denver business date, not UTC midnight.
+    today =
+      DateTime.utc_now()
+      |> SchedulerApi.Appointments.Availability.local_datetime()
+      |> NaiveDateTime.to_date()
+
+    {:ok, new} = HR.rehire_employment(c.credential, old, today)
 
     {:ok, _} =
       RoleManagement.reactivate_membership(c.credential, c.business, Repo.reload!(member))
@@ -343,7 +349,7 @@ defmodule SchedulerApi.RehireTest do
       RoleManagement.grant_role(c.credential, c.business, Repo.reload!(member), :employee, c.shop)
 
     current = Repo.get!(EmploymentRecord, new.id)
-    {:ok, _} = HR.assign_shop(c.credential, current, c.shop, %{starts_on: Date.utc_today()})
+    {:ok, _} = HR.assign_shop(c.credential, current, c.shop, %{starts_on: today})
     assert {:ok, nil} = Compensation.get_own_current_rate(user, c.business)
     assert {:ok, %{shifts: []}} = WorkSchedules.list_own_shifts(user, c.business)
     assert {:ok, %{assignments: []}} = JobAssignments.list_own_work(user, c.business)
