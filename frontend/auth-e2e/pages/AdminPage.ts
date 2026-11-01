@@ -19,5 +19,11 @@ export class AdminPage {
     await this.page.getByLabel('Password', { exact: true }).fill(identity.password)
     await this.page.getByRole('button', { name: /sign in/i }).click()
   }
-  async logout() { await this.page.getByRole('button', { name: 'Sign out', exact: true }).click() }
+  async logout() {
+    const form = this.page.locator('dialog.employee-hr-dialog[open]')
+    if (await form.count()) await form.getByRole('button', {name:'Cancel', exact:true}).click()
+    const drawer = this.page.locator('dialog.employee-drawer[open]')
+    if (await drawer.count()) await drawer.getByRole('button', {name:/^Close (profile|contact)$/}).click()
+    await this.page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  }
 }

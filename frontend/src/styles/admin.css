@@ -159,3 +159,152 @@
   .admin-shell h2 { font-size: 1.3rem; }
 }
 @media (prefers-reduced-motion: reduce) { .admin-shell *, .admin-shell *::before, .admin-shell *::after { transition: none; scroll-behavior: auto; } }
+
+/* Employees: one semantic table, stacked summaries on phones. No contact data in rows. */
+.admin-shell .employee-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+.admin-shell .employee-table th, .admin-shell .employee-table td { text-align: left; padding: 12px; vertical-align: middle; border-bottom: 1px solid var(--admin-border); overflow-wrap: anywhere; }
+.admin-shell .employee-table thead th { color: var(--admin-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; background: var(--admin-surface); }
+.admin-shell .employee-table thead th:first-child { width: 25%; }
+.admin-shell .employee-table thead th:nth-child(2) { width: 17%; }
+.admin-shell .employee-table thead th:nth-child(3) { width: 18%; }
+.admin-shell .employee-table thead th:last-child { width: 128px; }
+.admin-shell .employee-table h3 { font-size: 14px; margin: 0; font-weight: 600; letter-spacing: 0; }
+.admin-shell .employee-table .employee-classification { font-size: 12px; }
+.admin-shell .employee-table tbody tr:hover, .admin-shell .employee-table tbody tr:focus-within { background: var(--admin-surface); }
+.admin-shell .employment-badge { display: inline-block; border-radius: 4px; padding: 2px 6px; color: #a9e7cf; background: #1c332f; font-size: 11px; line-height: 1.5; }
+.admin-shell .employment-badge.is-former { color: var(--admin-muted); background: var(--admin-raised); }
+.admin-shell .hr-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.admin-shell .employee-drawer { position: fixed; inset: 0 0 0 auto; width: min(660px, 90vw); max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0 0 0 auto; padding: 24px; border: 0; border-left: 1px solid var(--admin-border); background: var(--admin-surface); color: var(--admin-text); overflow-y: auto; overscroll-behavior: contain; box-shadow: -16px 0 60px #0005; }
+.admin-shell .employee-drawer::backdrop { background: rgb(0 0 0 / 55%); }
+.admin-shell .employee-drawer > .employee-profile { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.admin-shell .hr-drawer-header { position: sticky; top: -24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -24px -24px 24px; padding: 16px 24px; border-bottom: 1px solid var(--admin-border); background: var(--admin-surface); z-index: 1; }
+.admin-shell .hr-drawer-header > span { color: var(--admin-muted); font-size: 12px; }
+.admin-shell .hr-drawer-header h3 { font-size: 1rem; margin: 0; }
+.admin-shell .hr-drawer-header button { flex-shrink: 0; }
+.admin-shell .employee-drawer .hr-profile-section { padding: 20px 0; border-top: 1px solid var(--admin-border); }
+.admin-shell .employee-drawer .employee-contact { grid-template-columns: 100px minmax(0,1fr); margin-bottom: 0; }
+.admin-shell .hr-assignment-list, .admin-shell .hr-timeline { margin: 0; padding: 0; list-style: none; }
+.admin-shell .hr-assignment-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--admin-border); }
+.admin-shell .hr-assignment-list li > span, .admin-shell .hr-period-dates { color: var(--admin-muted); font-size: 12px; }
+.admin-shell .hr-timeline li { border-left: 2px solid #53677e; padding: 0 0 16px 14px; margin-left: 4px; font-size: 13px; }
+.admin-shell .hr-timeline li p { margin-top: 0; }
+.admin-shell .hr-management-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.admin-shell .hr-management-actions button { justify-content: flex-start; margin: 0; }
+.admin-shell .hr-danger-zone { grid-column: 1/-1; border-top: 1px solid var(--admin-border); margin-top: 8px; padding-top: 16px; }
+.admin-shell .hr-danger-zone p { font-size: 12px; color: var(--admin-muted); }
+.admin-shell .hr-history-notice { padding: 10px; border-left: 2px solid var(--admin-purple); background: var(--admin-raised); }
+.admin-shell .hr-form-legend { padding: 0; margin-bottom: 4px; font-size: 12px; color: var(--admin-muted); }
+.admin-shell .hr-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid var(--admin-border); margin-top: 16px; }
+.admin-shell .employee-hr-dialog textarea { resize: vertical; min-height: 72px; }
+@media (max-width: 600px) {
+  .admin-shell .employee-table, .admin-shell .employee-table tbody { display: block; }
+  .admin-shell .employee-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .admin-shell .employee-table tr { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 10px; border-bottom: 1px solid var(--admin-border); padding: 14px 0; }
+  .admin-shell .employee-table td, .admin-shell .employee-table th { display: block; padding: 0; border: 0; }
+  .admin-shell .employee-table tbody th { grid-column: 1/-1; }
+  .admin-shell .employee-table td:nth-child(4) { grid-column: 1/-1; color: var(--admin-muted); font-size: 12px; }
+  .admin-shell .employee-table td:last-child { grid-column: 1/-1; padding-top: 4px; }
+  .admin-shell .employee-drawer { width: 100%; padding: 20px 16px; border-left: 0; }
+  .admin-shell .hr-drawer-header { top: -20px; margin: -20px -16px 20px; padding: 12px 16px; }
+  .admin-shell .employee-drawer .employee-contact { grid-template-columns: 80px minmax(0,1fr); gap: 6px 10px; }
+}
+
+.admin-shell .hr-directory-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
+.admin-shell .hr-directory-toolbar p { margin: 0; color: var(--admin-muted); font-size: 12px; }
+.admin-shell .hr-directory-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) {
+  .admin-shell .hr-directory-actions button { margin: 0; font-size: 12px; padding-inline: 10px; }
+  .admin-shell .employee-directory > [role=group] { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .admin-shell .employee-directory > [role=group] button { margin: 0; padding-inline: 8px; font-size: 12px; }
+  .admin-shell .employee-directory .employee-filters { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; }
+  .admin-shell .employee-directory .employee-filters label:first-child { grid-column: 1/-1; }
+}
+
+/* Calendar: compact agenda, separated shop lanes and progressive timezone detail. */
+.admin-shell .calendar-toolbar { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding: 14px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); background: var(--admin-surface); margin-bottom: 20px; }
+.admin-shell .calendar-filters { display: flex; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.admin-shell .calendar-filters label { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 12px; }
+.admin-shell .calendar-filters select, .admin-shell .calendar-filters input { width: 100%; }
+.admin-shell .calendar-filters label:first-child { width: 90px; }
+.admin-shell .calendar-filters label:nth-child(2) { width: 150px; }
+.admin-shell .calendar-filters label:last-child { width: 140px; }
+.admin-shell .calendar-toolbar nav { margin: 0; gap: 6px; }
+.admin-shell .calendar-window-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; }
+.admin-shell .calendar-window-heading h3 { margin: 0; }
+.admin-shell .calendar-date-help { font-size: 12px; color: var(--admin-muted); max-width: 48ch; }
+.admin-shell .calendar-date-help summary, .admin-shell .calendar-timezone-details summary { cursor: pointer; color: var(--admin-accent); padding: 4px 0; }
+.admin-shell .calendar-date-help p { margin: 8px 0; }
+.admin-shell .calendar-page-note { font-size: 12px; color: var(--admin-muted); }
+.admin-shell .calendar-grid { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+.admin-shell .calendar-day { display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 16px; border: 1px solid var(--admin-border); padding: 14px; border-radius: var(--admin-radius); background: var(--admin-surface); }
+.admin-shell .calendar-day > h3 { font-size: 13px; padding-top: 3px; margin: 0; }
+.admin-shell .calendar-day section { border: 0; margin: 0; padding: 0; }
+.admin-shell .calendar-lanes { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 14px; min-width: 0; }
+.admin-shell .calendar-shop-lane { min-width: 0; }
+.admin-shell .calendar-shop-lane h4 { font-size: 12px; color: var(--admin-text); }
+.admin-shell .calendar-shop-lane h4 small { display: block; color: var(--admin-muted); font-size: 11px; font-weight: 400; margin-top: 2px; }
+.admin-shell .calendar-day[data-empty=true] { padding-block: 10px; background: transparent; }
+.admin-shell .calendar-day[data-empty=true] .calendar-lanes { display: flex; flex-wrap: wrap; gap: 10px 24px; }
+.admin-shell .calendar-day[data-empty=true] .calendar-shop-lane h4 { margin-bottom: 0; }
+.admin-shell .calendar-day[data-empty=true] .calendar-shop-lane h4 small { display: none; }
+.admin-shell .calendar-empty { color: var(--admin-muted); font-size: 12px; margin: 2px 0 !important; }
+.admin-shell .calendar-list { margin: 0; }
+.admin-shell .calendar-entry { padding: 0; margin: 8px 0; border: 1px solid var(--admin-border); border-left: 3px solid #c4a060; background: #111824; border-radius: 6px; }
+.admin-shell .calendar-entry[data-status=confirmed] { border-left-color: var(--admin-accent); }
+.admin-shell .calendar-entry[data-status=completed] { border-left-color: var(--admin-purple); }
+.admin-shell .calendar-entry[data-status=cancelled] { border-left-color: #78859a; }
+.admin-shell button.calendar-open { display: grid; grid-template-columns: 92px minmax(0,1fr) auto; gap: 14px; align-items: start; width: 100%; border: 0; padding: 12px; background: transparent; text-align: left; font-size: 13px; font-weight: 400; }
+.admin-shell button.calendar-open:hover { background: #1c293b; }
+.admin-shell .calendar-time { font-weight: 650; font-variant-numeric: tabular-nums; }
+.admin-shell .calendar-time small { display: block; color: var(--admin-muted); font-size: 11px; font-weight: 400; margin-top: 3px; }
+.admin-shell .calendar-summary { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.admin-shell .calendar-summary strong { color: var(--admin-text); font-size: 14px; font-weight: 600; }
+.admin-shell .calendar-summary > span { color: var(--admin-muted); font-size: 12px; }
+.admin-shell .calendar-summary .calendar-needs-staffing { color: #f6d39a; }
+.admin-shell .calendar-status { display: inline-block; width: fit-content; padding: 2px 6px; border-radius: 4px; background: #343023; color: #f4dca6; font-size: 11px; font-weight: 500; text-transform: capitalize; }
+.admin-shell [data-status=confirmed] .calendar-status, .admin-shell .calendar-status[data-status=confirmed] { background: #19353d; color: #a9edf5; }
+.admin-shell [data-status=completed] .calendar-status, .admin-shell .calendar-status[data-status=completed] { background: #302b46; color: #d0c6ff; }
+.admin-shell [data-status=cancelled] .calendar-status, .admin-shell .calendar-status[data-status=cancelled] { background: #29313e; color: #c0cad9; }
+.admin-shell .appointment-detail { margin-top: 24px; padding: 20px; border: 1px solid #546c88; border-radius: var(--admin-radius); background: var(--admin-surface); }
+.admin-shell .calendar-detail-header, .admin-shell .calendar-section-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 16px; }
+.admin-shell .calendar-detail-header p { color: var(--admin-muted); font-size: 12px; margin: 0 0 4px; }
+.admin-shell .calendar-detail-header h3, .admin-shell .calendar-section-header h4 { margin: 0; }
+.admin-shell .calendar-detail-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); gap: 20px; padding: 16px 0; border-block: 1px solid var(--admin-border); }
+.admin-shell .calendar-detail-grid section { min-width: 0; }
+.admin-shell .calendar-detail-grid p { margin: 6px 0; font-size: 13px; }
+.admin-shell .calendar-detail-facts { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 6px 12px; margin: 6px 0; font-size: 13px; }
+.admin-shell .calendar-detail-facts dt { color: var(--admin-muted); }
+.admin-shell .calendar-detail-facts dd { margin: 0; }
+.admin-shell .calendar-timezone-details { font-size: 12px; margin: 12px 0 20px; }
+.admin-shell .appointment-crew { border-top: 1px solid var(--admin-border); padding-top: 16px; }
+.admin-shell .appointment-crew .crew-roster { list-style: none; padding: 0; margin: 0 0 12px; }
+.admin-shell .appointment-crew .crew-roster li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; margin: 0; border-bottom: 1px solid var(--admin-border); }
+.admin-shell .crew-member-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-shell .appointment-crew button { margin: 0; font-size: 12px; }
+.admin-shell .crew-controls { display: flex; flex-direction: column; align-items: start; gap: 10px; }
+.admin-shell .crew-controls nav { margin: 0; }
+.admin-shell .crew-policy-note { color: var(--admin-muted); font-size: 12px; margin-bottom: 0; }
+@media (max-width: 700px) {
+  .admin-shell .calendar-day { grid-template-columns: minmax(0,1fr); gap: 10px; }
+  .admin-shell .calendar-day[data-empty=true] { gap: 4px; }
+  .admin-shell button.calendar-open { grid-template-columns: 76px minmax(0,1fr); gap: 8px 12px; padding: 10px; }
+  .admin-shell .calendar-open > .calendar-status { grid-column: 2; }
+  .admin-shell .appointment-detail { padding: 14px; }
+  .admin-shell .calendar-detail-facts { grid-template-columns: minmax(0,1fr) minmax(0,2fr); }
+}
+@media (max-width: 420px) {
+  .admin-shell .calendar-toolbar { padding: 12px; gap: 12px; }
+  .admin-shell .calendar-filters { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); width: 100%; gap: 10px; }
+  .admin-shell .calendar-filters label:first-child, .admin-shell .calendar-filters label:nth-child(2), .admin-shell .calendar-filters label:last-child { width: auto; }
+  .admin-shell .calendar-filters label:last-child { grid-column: 1/-1; }
+  .admin-shell .calendar-toolbar nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; }
+  .admin-shell .calendar-toolbar nav button { width: 100%; }
+  .admin-shell .calendar-detail-header { align-items: start; }
+}
+.admin-shell .crew-roster li > span { min-width: 0; flex: 1 1 140px; overflow-wrap: anywhere; }
+/* Shop lanes can be narrow even on desktop; card layout follows its container. */
+.admin-shell .calendar-day[data-empty=false] .calendar-shop-lane { container-type: inline-size; }
+@container (max-width: 420px) {
+  .admin-shell button.calendar-open { grid-template-columns: 76px minmax(0,1fr); gap: 8px 12px; }
+  .admin-shell .calendar-open > .calendar-status { grid-column: 2; }
+}

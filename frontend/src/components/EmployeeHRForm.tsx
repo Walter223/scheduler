@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import useModalDialog from '../hooks/useModalDialog'
 export type HRRecord = { employee_id: number; period_id: number; first_name: string; last_name: string; classification: string; ends_on?: string | null; phone?: string | null; email?: string | null; home_address?: string | null }
 export type HRShop = { id: number; name: string }
 export type HRAction = 'create' | 'contact' | 'classification' | 'assign' | 'end' | 'terminate' | 'rehire'
@@ -25,7 +26,7 @@ function message(status: number, code: string) {
 export default function EmployeeHRForm({ action, businessId, employee, shops, assignmentId, assignmentName, onClose, onSaved, onDenied }: {
   action: HRAction; businessId: number; employee?: HRRecord; shops: HRShop[]; assignmentId?: number; assignmentName?: string; onClose: () => void; onSaved: (message: string) => void; onDenied: (message: string) => void
 }) {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const dialog = useModalDialog()
   const locked = useRef(false)
   const controller = useRef(new AbortController())
   const [busy, setBusy] = useState(false)
@@ -33,9 +34,7 @@ export default function EmployeeHRForm({ action, businessId, employee, shops, as
   useEffect(() => {
     const abort = new AbortController()
     controller.current = abort
-    const node = dialog.current
-    node?.showModal()
-    return () => { abort.abort(); node?.close() }
+    return () => abort.abort()
   }, [])
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -97,7 +96,7 @@ export default function EmployeeHRForm({ action, businessId, employee, shops, as
       }
     } finally { locked.current = false; if (!signal.aborted) setBusy(false) }
   }
-  return <dialog ref={dialog} aria-labelledby="hr-form-title" className="employee-hr-dialog" onCancel={e => { e.preventDefault(); if (!busy) onClose() }}>
+  return <dialog ref={dialog} aria-labelledby="hr-form-title" className="employee-hr-dialog" onCancel={e => { e.preventDefault(); if (!locked.current) onClose() }}>
     <h3 id="hr-form-title">{names[action]}</h3>
     {employee && <p>{employee.first_name} {employee.last_name} · Period #{employee.period_id}</p>}
     {action === 'create' && <p>This creates an employment record without a login account or role grants.</p>}
@@ -108,6 +107,7 @@ export default function EmployeeHRForm({ action, businessId, employee, shops, as
     {action === 'rehire' && <><p>Rehire creates a new period for this stable employee identity. Previous periods remain retained HR history.</p><p>It restores no business memberships, RBAC grants, account access, compensation rates, shop assignments, work shifts or job assignments. Historical private information is not copied into the new period.</p><p>Previous termination: {employee?.ends_on}. Dates are inclusive; same-day termination and rehire are not supported.</p></>}
     <form onSubmit={submit}>
       <fieldset disabled={busy}>
+        <legend className="hr-form-legend">{action === 'create' || action === 'contact' ? 'Employee information' : 'Change details'}</legend>
         {(action === 'create' || action === 'contact') && <>
           <label>First name<input name="first_name" required maxLength={100} defaultValue={employee?.first_name ?? ''} /></label>
           <label>Last name<input name="last_name" required maxLength={100} defaultValue={employee?.last_name ?? ''} /></label>
@@ -123,8 +123,8 @@ export default function EmployeeHRForm({ action, businessId, employee, shops, as
         {action === 'rehire' && <label>Rehire start date<input type="date" name="starts_on" required min={nextDate(employee?.ends_on)} /></label>}
         {(action === 'terminate' || action === 'rehire') && <label><input type="checkbox" name="confirm_lifecycle" required />{action === 'terminate' ? 'I confirm employment termination and business-specific offboarding.' : 'I confirm a new employment period with no automatic restoration.'}</label>}
         {error && <p role="alert">{error}</p>}
-        <button className={action === 'terminate' ? 'secondary-button admin-button--danger' : 'secondary-button'} type="submit">{busy ? 'Saving…' : 'Save changes'}</button>
-        <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+        <div className="hr-form-actions"><button className={action === 'terminate' ? 'secondary-button admin-button--danger' : 'secondary-button'} type="submit">{busy ? 'Saving…' : 'Save changes'}</button>
+        <button className="secondary-button" type="button" onClick={onClose}>Cancel</button></div>
       </fieldset>
     </form>
   </dialog>

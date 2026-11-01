@@ -85,24 +85,23 @@ export default function AppointmentCrew({ businessId, shopId, appointmentId, edi
     } catch { if (!signal.aborted) { setMembers(null); setCandidates([]); setError(failure(503, '')) } }
     finally { locked.current = false; if (!signal.aborted) setBusy(false) }
   }
-  return <section aria-label="Appointment crew" aria-busy={busy}>
-    <h4>Appointment crew</h4>
+  return <section aria-label="Appointment crew" className="appointment-crew" aria-busy={busy}>
+    <div className="calendar-section-header"><h4>Appointment crew</h4><button className="secondary-button" disabled={busy} onClick={() => { setError(''); setRevision(v => v + 1); onChanged() }}>Refresh crew</button></div>
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     {!members ? <p role="status">{error ? 'Refresh to review current crew.' : 'Loading crew…'}</p> : <>
-      {!members.length ? <p>No Detailers assigned.</p> : <ul aria-label="Assigned Detailers">{members.map(m => <li key={m.id}>
+      {!members.length ? <p>No Detailers assigned.</p> : <ul aria-label="Assigned Detailers" className="crew-roster">{members.map(m => <li key={m.id}>
         <span>{m.first_name} {m.last_name}{m.is_lead ? ' · Lead' : ''}</span>
-        {editable && <><button className="secondary-button" disabled={busy || m.is_lead} onClick={() => void mutate(`/${m.id}/lead`)}>Make {m.first_name} {m.last_name} lead</button><button className="secondary-button" disabled={busy} onClick={() => void mutate(`/${m.id}/remove`)}>Remove {m.first_name} {m.last_name}</button></>}
+        {editable && <div className="crew-member-actions"><button className="secondary-button" disabled={busy || m.is_lead} onClick={() => void mutate(`/${m.id}/lead`)} aria-label={`Make ${m.first_name} ${m.last_name} lead`}>Set Lead</button><button className="secondary-button" disabled={busy} onClick={() => void mutate(`/${m.id}/remove`)} aria-label={`Remove ${m.first_name} ${m.last_name}`}>Remove</button></div>}
       </li>)}</ul>}
-      {editable && <><button className="secondary-button" disabled={busy || !members.some(m => m.is_lead)} onClick={() => void mutate('/clear-lead')}>Clear Lead Detailer</button>
+      {editable && <div className="crew-controls"><button className="secondary-button" disabled={busy || !members.some(m => m.is_lead)} onClick={() => void mutate('/clear-lead')}>Clear Lead Detailer</button>
         <form onSubmit={e => { e.preventDefault(); const c = candidates.find(c => String(c.assignment_id) === choice); if (c) void mutate('', { employee_id: c.employee_id, period_id: c.period_id, assignment_id: c.assignment_id }) }}>
           <label>Eligible Detailer<select disabled={busy} value={choice} onChange={e => setChoice(e.target.value)}><option value="">Choose a Detailer</option>{candidates.map(c => <option key={c.assignment_id} value={c.assignment_id}>{c.first_name} {c.last_name}</option>)}</select></label>
           <button className="secondary-button" disabled={busy || !choice}>Add Detailer</button>
         </form>
         {!candidates.length && <p>No eligible Detailers on this page. A covering shift including the buffer and no overlapping job are required.</p>}
         <nav aria-label="Eligible Detailer pages"><button className="secondary-button" disabled={busy || !cursor} onClick={() => { setCursor(''); setError('') }}>First candidates</button><button className="secondary-button" disabled={busy || !next} onClick={() => { setCursor(next ?? ''); setError('') }}>Next candidates</button></nav>
-      </>}
+      </div>}
     </>}
-    <button className="secondary-button" disabled={busy} onClick={() => { setError(''); setRevision(v => v + 1); onChanged() }}>Refresh crew</button>
-    <p>Removing the Lead leaves the role vacant; no other team member is automatically promoted.</p>
+    <p className="crew-policy-note">Removing the Lead leaves the role vacant; no other team member is automatically promoted.</p>
   </section>
 }

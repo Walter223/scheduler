@@ -146,3 +146,18 @@ test('already-terminated responses report a no-op rather than new offboarding', 
   fireEvent.submit(screen.getByRole('button', { name: 'Save changes' }).closest('form')!)
   await waitFor(() => expect(saved).toHaveBeenCalledWith(expect.stringContaining('already terminated')))
 })
+test('Escape cannot dismiss a pending save and becomes available after completion', async () => {
+  let finish!: (value: Response) => void
+  const mock = vi.fn((url: string) => url === '/api/me' ? Promise.resolve(Response.json({authenticated:true,csrf_token:'synthetic'})) : new Promise<Response>(r => { finish=r }))
+  vi.stubGlobal('fetch',mock)
+  const {close,saved}=mount('contact')
+  fireEvent.submit(screen.getByRole('button',{name:'Save changes'}).closest('form')!)
+  await waitFor(()=>expect(mock).toHaveBeenCalledTimes(2))
+  const dialog=screen.getByRole('dialog')
+  fireEvent(dialog,new Event('cancel',{cancelable:true}))
+  expect(close).not.toHaveBeenCalled()
+  await act(async()=>finish(Response.json({data:{}})))
+  await waitFor(()=>expect(saved).toHaveBeenCalled())
+  fireEvent(dialog,new Event('cancel',{cancelable:true}))
+  expect(close).toHaveBeenCalledOnce()
+})

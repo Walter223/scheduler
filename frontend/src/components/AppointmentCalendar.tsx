@@ -15,6 +15,10 @@ function advance(date: string, count: number) {
 }
 const time = (value: string, zone: string) => new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit' }).format(new Date(value))
 const offset = (value: string, zone: string) => new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(new Date(value)).find(p => p.type === 'timeZoneName')!.value
+function dateLabel(value: string) {
+  const instant = new Date(`${value}T12:00:00Z`)
+  return Number.isFinite(instant.getTime()) ? new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }).format(instant) : 'Choose a date'
+}
 export default function AppointmentCalendar({ businessId, shopId, timezone }: { businessId: number; shopId: number; timezone: string }) {
   const [date, setDate] = useState(() => localDate(new Date(), timezone))
   const [view, setView] = useState('list')
@@ -54,33 +58,46 @@ export default function AppointmentCalendar({ businessId, shopId, timezone }: { 
   }, [businessId, shopId, date, days, status, cursor, revision, crewRevision])
   function reset() { setData(null); setSelected(null); setCursor('') }
   function changeDate(next: string) { reset(); setDate(next); setRevision(v => v + 1) }
-  const entries = (items: Appointment[]) => items.map(a => <li key={a.id} className="calendar-entry">
-    <button className="secondary-button" onClick={e => { trigger.current = e.currentTarget; setSelected(a) }}>View {a.service_name} · {time(a.starts_at, a.timezone)} · {a.shop_name}</button>
-    <p><time dateTime={a.starts_at}>{localDate(new Date(a.starts_at), a.timezone)} {time(a.starts_at, a.timezone)}</time> – {time(a.ends_at, a.timezone)} ({a.timezone}; {offset(a.starts_at, a.timezone)} → {offset(a.ends_at, a.timezone)}) · {a.duration_minutes} min</p>
-    <p>{a.status} · {a.crew_size} Detailer(s){a.lead_detailer ? ` · Lead: ${a.lead_detailer}` : ''}</p>
-    {['pending', 'confirmed'].includes(a.status) && a.crew_size === 0 && <strong>Needs staffing</strong>}
+  const entries = (items: Appointment[]) => items.map(a => <li key={a.id} className="calendar-entry" data-status={a.status}>
+    <button className="calendar-open" aria-label={`View ${a.service_name} · ${time(a.starts_at, a.timezone)} · ${a.shop_name}`} onClick={e => { trigger.current = e.currentTarget; setSelected(a) }}>
+      <span className="calendar-time"><time dateTime={a.starts_at}>{time(a.starts_at, a.timezone)}</time><small>{a.duration_minutes} min</small></span>
+      <span className="calendar-summary"><strong>{a.service_name}</strong><span>{a.shop_name} · {a.timezone}</span><span>{a.crew_size} Detailer(s){a.lead_detailer ? ` · Lead: ${a.lead_detailer}` : ''}</span>{['pending', 'confirmed'].includes(a.status) && a.crew_size === 0 && <span className="calendar-needs-staffing">Needs staffing</span>}</span>
+      <span className="calendar-status">{a.status}</span>
+    </button>
   </li>)
   return <section aria-label="Appointment calendar" className="appointment-calendar">
-    <div className="employee-filters">
-      <label>Calendar view<select value={view} onChange={e => { reset(); setView(e.target.value); setRevision(v => v + 1) }}><option value="list">Chronological list</option><option value="day">Day calendar</option><option value="week">Week calendar</option></select></label>
-      <label>Calendar date<input type="date" required value={date} onChange={e => changeDate(e.target.value)} /></label>
-      <label>Appointment status<select value={status} onChange={e => { reset(); setStatus(e.target.value) }}><option value="all">All statuses</option>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select></label>
+    <div className="calendar-toolbar">
+      <div className="calendar-filters">
+        <label>Calendar view<select value={view} onChange={e => { reset(); setView(e.target.value); setRevision(v => v + 1) }}><option value="list">List</option><option value="day">Day</option><option value="week">Week</option></select></label>
+        <label>Calendar date<input type="date" required value={date} onChange={e => changeDate(e.target.value)} /></label>
+        <label>Appointment status<select value={status} onChange={e => { reset(); setStatus(e.target.value) }}><option value="all">All statuses</option>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select></label>
+      </div>
+      <nav aria-label="Calendar dates"><button className="secondary-button" aria-label={`Previous ${days === 7 ? 'week' : 'day'}`} disabled={!date} onClick={() => changeDate(advance(date, -days))}>Previous</button><button className="secondary-button" onClick={() => changeDate(localDate(new Date(), timezone))}>Today</button><button className="secondary-button" aria-label={`Next ${days === 7 ? 'week' : 'day'}`} disabled={!date} onClick={() => changeDate(advance(date, days))}>Next</button><button className="secondary-button" aria-label="Refresh appointments" onClick={() => { reset(); setRevision(v => v + 1) }}>Refresh</button></nav>
     </div>
-    <nav aria-label="Calendar dates"><button className="secondary-button" disabled={!date} onClick={() => changeDate(advance(date, -days))}>Previous {days === 7 ? 'week' : 'day'}</button><button className="secondary-button" onClick={() => changeDate(localDate(new Date(), timezone))}>Today</button><button className="secondary-button" disabled={!date} onClick={() => changeDate(advance(date, days))}>Next {days === 7 ? 'week' : 'day'}</button><button className="secondary-button" onClick={() => { reset(); setRevision(v => v + 1) }}>Refresh appointments</button></nav>
-    <p>Dates apply separately in each shop’s timezone. Today navigation uses {timezone}. Shops have separate calendar lanes; simultaneous appointments across shops are not conflicts.</p>
+    <div className="calendar-window-heading"><h3>{dateLabel(date)}{days === 7 && ` – ${dateLabel(advance(date, 6))}`}</h3><details className="calendar-date-help"><summary>Shop-local times</summary><p>Dates apply separately in each shop’s timezone. Today navigation uses {timezone}. Shops have separate calendar lanes; simultaneous appointments across shops are not conflicts.</p></details></div>
     {error ? <p role="alert">{error}</p> : !data ? <p role="status">Loading appointments…</p> : <>
-      <p>{data.appointments.length} appointment(s) on this page.{data.meta.has_more && ' Partial view: more appointments are available on the next page.'}</p>
-      {view === 'list' ? (!data.appointments.length ? <p>No appointments on this page.</p> : <ol className="calendar-list">{entries(data.appointments)}</ol>) : <div className="calendar-grid">{Array.from({ length: days }, (_, i) => advance(date, i)).map(day => <section key={day} aria-label={`${day} schedule`} className="calendar-day"><h3>{day}</h3>{data.shops.map(shop => {
+      <p className="calendar-page-note">{data.appointments.length} appointment(s) on this page.{data.meta.has_more && ' Partial view: more appointments are available on the next page.'}</p>
+      {view === 'list' ? (!data.appointments.length ? <p>No appointments on this page.</p> : <ol className="calendar-list">{entries(data.appointments)}</ol>) : <div className="calendar-grid" data-view={view}>{Array.from({ length: days }, (_, i) => advance(date, i)).map(day => <section key={day} aria-label={`${day} schedule`} className="calendar-day" data-empty={!data.appointments.some(a => localDate(new Date(a.starts_at), a.timezone) === day)}><h3><time dateTime={day}>{dateLabel(day)}</time></h3><div className="calendar-lanes">{data.shops.map(shop => {
         const items = data.appointments.filter(a => a.shop_id === shop.id && localDate(new Date(a.starts_at), a.timezone) === day)
-        return <section key={shop.id} aria-label={`${shop.name} ${day}`}><h4>{shop.name} · {shop.timezone}</h4>{items.length ? <ol className="calendar-list">{entries(items)}</ol> : <p>No appointments on this page.</p>}</section>
-      })}</section>)}</div>}
+        return <section key={shop.id} aria-label={`${shop.name} ${day}`} className="calendar-shop-lane"><h4>{shop.name}<small>{shop.timezone}</small></h4>{items.length ? <ol className="calendar-list">{entries(items)}</ol> : <p className="calendar-empty">No appointments on this page.</p>}</section>
+      })}</div></section>)}</div>}
+
       <nav aria-label="Appointment pagination"><button className="secondary-button" disabled={!cursor} onClick={() => { reset(); setCursor('') }}>First page</button><button className="secondary-button" disabled={!data.meta.has_more || !data.meta.next_cursor} onClick={() => { setData(null); setSelected(null); setCursor(data.meta.next_cursor ?? '') }}>Next page</button></nav>
     </>}
-    {selected && !error && <AppointmentDetail key={selected.id} businessId={businessId} onChanged={crewChanged} onDenied={crewDenied} appointment={data?.appointments.find(a => a.id === selected.id) ?? selected} close={() => { setSelected(null); trigger.current?.focus() }} />}
+    {selected && !error && <AppointmentDetail key={selected.id} businessId={businessId} onChanged={crewChanged} onDenied={crewDenied} appointment={data?.appointments.find(a => a.id === selected.id) ?? selected} close={() => { setSelected(null); trigger.current?.focus({ preventScroll: true }) }} />}
   </section>
 }
 function AppointmentDetail({ appointment: a, close, businessId, onChanged, onDenied }: { appointment: Appointment; close: () => void; businessId: number; onChanged: () => void; onDenied: (message: string) => void }) {
   const panel = useRef<HTMLElement | null>(null)
   useEffect(() => { panel.current?.focus() }, [])
-  return <section ref={panel} tabIndex={-1} aria-label="Appointment details" className="employee-profile"><button className="secondary-button" onClick={close}>Close appointment</button><h3>{a.service_name}</h3><dl className="employee-contact"><dt>Shop</dt><dd>{a.shop_name} · {a.timezone} ({offset(a.starts_at, a.timezone)})</dd><dt>Time</dt><dd>{localDate(new Date(a.starts_at), a.timezone)} {time(a.starts_at, a.timezone)} – {localDate(new Date(a.ends_at), a.timezone)} {time(a.ends_at, a.timezone)}</dd><dt>Duration</dt><dd>{a.duration_minutes} minutes</dd><dt>Status</dt><dd>{a.status}</dd><dt>Vehicle</dt><dd>{a.vehicle_make} {a.vehicle_model} · {a.vehicle_size}</dd><dt>Detailers</dt><dd>{a.crew_size}</dd><dt>Lead Detailer</dt><dd>{a.lead_detailer || 'None designated'}</dd></dl><AppointmentCrew businessId={businessId} shopId={a.shop_id} appointmentId={a.id} editable={['pending', 'confirmed'].includes(a.status)} onChanged={onChanged} onDenied={onDenied} /></section>
+  return <section ref={panel} tabIndex={-1} aria-label="Appointment details" className="appointment-detail">
+    <header className="calendar-detail-header"><div><p>Appointment details</p><h3>{a.service_name}</h3></div><button className="secondary-button" onClick={close}>Close appointment</button></header>
+    <div className="calendar-detail-grid">
+      <section aria-label="Appointment schedule"><h4>Schedule</h4><p><time dateTime={a.starts_at}>{dateLabel(localDate(new Date(a.starts_at), a.timezone))} · {time(a.starts_at, a.timezone)}</time> – <time dateTime={a.ends_at}>{dateLabel(localDate(new Date(a.ends_at), a.timezone))} · {time(a.ends_at, a.timezone)}</time></p><p>{a.duration_minutes} minutes · {a.timezone}</p><span className="calendar-status" data-status={a.status}>{a.status}</span></section>
+      <section aria-label="Appointment service and vehicle"><h4>Service &amp; vehicle</h4><p>{a.service_name}</p><p>{a.vehicle_make} {a.vehicle_model} · {a.vehicle_size}</p><p>{a.shop_name}</p></section>
+      <section aria-label="Appointment staffing"><h4>Staffing</h4><dl className="calendar-detail-facts"><dt>Detailers</dt><dd>{a.crew_size}</dd><dt>Lead Detailer</dt><dd>{a.lead_detailer || 'None designated'}</dd></dl></section>
+    </div>
+    <details className="calendar-timezone-details"><summary>Timezone details</summary><dl className="calendar-detail-facts"><dt>Shop timezone</dt><dd>{a.timezone}</dd><dt>Start offset</dt><dd>{offset(a.starts_at, a.timezone)}</dd><dt>End offset</dt><dd>{offset(a.ends_at, a.timezone)}</dd></dl></details>
+    <AppointmentCrew businessId={businessId} shopId={a.shop_id} appointmentId={a.id} editable={['pending', 'confirmed'].includes(a.status)} onChanged={onChanged} onDenied={onDenied} />
+  </section>
 }

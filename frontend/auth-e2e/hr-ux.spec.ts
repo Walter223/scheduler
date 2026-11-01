@@ -1,0 +1,90 @@
+import { readFileSync, mkdirSync } from 'node:fs'
+import { test, expect } from '@playwright/test'
+import { AdminPage } from './pages/AdminPage'
+const path = process.env.BFF_E2E_FIXTURE
+if (!path) throw Error('Use the isolated test:auth runner')
+const { users } = JSON.parse(readFileSync(path,'utf8')) as {users:{kind:string; username:string; password:string}[]}
+test('real Owner HR table, responsive drawer, nested modal focus and retained history state', async ({page}) => {
+  const admin = new AdminPage(page)
+  await admin.login(users.find(u=>u.kind==='owner')!)
+  await admin.openEmployees()
+  const table=admin.employees.getByRole('table',{name:'Employees',exact:true})
+  await expect(table.getByRole('heading',{name:'Returning Fixture',exact:true})).toBeVisible()
+  mkdirSync('/private/tmp/magnum-hr-ux',{recursive:true})
+  async function capture(name:string,width:number) {
+    await page.setViewportSize({width,height:900})
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+    for (const dialog of await page.locator('dialog[open]').all()) expect(await dialog.evaluate(n=>n.scrollWidth<=n.clientWidth)).toBe(true)
+    await page.screenshot({path:`/private/tmp/magnum-hr-ux/${name}-${width}.png`,fullPage:false,animations:'disabled'})
+  }
+  for (const width of [1440,768,390,320]) {
+    await capture('directory',width)
+    if (width <= 390) {
+      await table.evaluate(n=>n.scrollIntoView({block:'start'}))
+      await capture('directory-records',width)
+      await page.evaluate(()=>window.scrollTo(0,0))
+    }
+  }
+  // Complete names wrap; no contacts or full period history are in directory rows.
+  await expect(table.getByText('Historical fixture address',{exact:true})).toHaveCount(0)
+  await page.setViewportSize({width:1440,height:900})
+  await admin.employees.getByRole('button',{name:'Former Employees',exact:true}).click()
+  await expect(table.getByRole('heading',{name:'Former Fixture',exact:true})).toBeVisible()
+  await capture('former-directory',1440)
+  await capture('former-directory',390)
+  await admin.employees.getByRole('button',{name:'Active Employees',exact:true}).click()
+  await admin.employees.getByLabel('Search employee names').fill('Returning')
+  await admin.employees.getByRole('combobox',{name:/Classification/}).selectOption('detailer')
+  await admin.employees.getByRole('button',{name:'Search',exact:true}).click()
+  await expect(table.getByRole('heading',{name:'Returning Fixture',exact:true})).toBeVisible()
+  const trigger=table.getByRole('button',{name:'View profile and history for Returning Fixture',exact:true})
+  await trigger.click()
+  const drawer=page.getByRole('dialog',{name:'Employee details',exact:true})
+  const profile=page.getByRole('region',{name:'Employee profile and employment history',exact:true})
+  await expect(profile.getByRole('heading',{name:'Employment timeline'})).toBeVisible()
+  for (const width of [1440,768,390]) await capture('profile',width)
+  const old=profile.getByRole('listitem').filter({hasText:'Original employment'}).getByRole('button',{name:/View period/})
+  await old.click()
+  await expect(profile.getByText('Historical fixture address',{exact:true})).toBeVisible()
+  await expect(profile.getByRole('button',{name:'Edit contact',exact:true})).toHaveCount(0)
+  const revalidate=page.waitForResponse(r=>r.url().endsWith('/api/admin/context') && r.status()===200)
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')))
+  await revalidate
+  await expect(profile.getByText('Historical fixture address',{exact:true})).toBeVisible()
+  await expect(admin.employees.getByLabel('Search employee names')).toHaveValue('Returning')
+  // Read retained background state without trying to interact with inert controls.
+  expect(await admin.employees.locator('.employee-filters select').inputValue()).toBe('detailer')
+  await capture('historical-period',390)
+  await profile.getByRole('button',{name:'Return to current profile',exact:true}).click()
+  await profile.getByRole('button',{name:'Edit contact',exact:true}).click()
+  const form=page.locator('dialog.employee-hr-dialog')
+  await expect(form.getByLabel('First name',{exact:true})).toBeFocused()
+  await form.getByRole('button',{name:'Cancel',exact:true}).focus()
+  await page.keyboard.press('Tab')
+  expect(await form.evaluate(n=>n.contains(document.activeElement))).toBe(true)
+  // Native showModal keeps keyboard focus in the topmost modal.
+  await page.locator('.admin-refresh').evaluate(n=>(n as HTMLElement).focus())
+  expect(await form.evaluate(n=>n.contains(document.activeElement))).toBe(true)
+  expect(await drawer.evaluate(n=>n.matches(':modal'))).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(form).toHaveCount(0)
+  await expect(profile.getByRole('button',{name:'Edit contact',exact:true})).toBeFocused()
+  await expect(drawer).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(drawer).toHaveCount(0)
+  await expect(trigger).toBeFocused()
+  await admin.employees.getByRole('button',{name:'Create employee',exact:true}).click()
+  await capture('create-form',390)
+  await capture('create-form',320)
+  await page.keyboard.press('Escape')
+  await expect(admin.employees.getByRole('button',{name:'Create employee',exact:true})).toBeFocused()
+  // Display-only stress in this disposable browser; no database mutation.
+  await table.getByRole('heading').first().evaluate(n=>n.textContent='Alexandria'.repeat(10)+' '+'Montgomery'.repeat(10))
+  await capture('long-name',320)
+  await table.getByRole('button',{name:'View profile and history for Returning Fixture',exact:true}).click()
+  await expect(profile.getByRole('heading',{name:'Employment timeline'})).toBeVisible()
+  await profile.locator('.employee-contact dd').nth(1).evaluate(n=>n.textContent='x'.repeat(300)+'@example.invalid')
+  await profile.locator('.employee-contact dd').nth(2).evaluate(n=>n.textContent='Fictional long address '.repeat(45))
+  await capture('long-contacts',320)
+  await admin.logout()
+})
