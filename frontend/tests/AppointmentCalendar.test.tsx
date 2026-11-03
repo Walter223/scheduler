@@ -85,3 +85,13 @@ test('week keeps all seven dates, compact empty lanes and truthful partial-page 
   expect(screen.getByText(/Partial view: more appointments/)).toBeTruthy()
   expect(screen.getAllByText('No appointments on this page.')).toHaveLength(7)
 })
+
+test('crew summaries use clear singular/plural labels without technical placeholder copy', async () => {
+  vi.stubGlobal('fetch',vi.fn(async()=>Response.json({data:data([appointment(1,'pending',0),appointment(2,'confirmed',1),appointment(3,'confirmed',2)])})))
+  render(<AppointmentCalendar businessId={1} shopId={1} timezone="America/Denver" />)
+  const zero=await screen.findByRole('button',{name:'View Detail 1 · 9:00 AM · Shop A'})
+  expect(zero.textContent).toContain('0 Detailers')
+  expect(screen.getByRole('button',{name:'View Detail 2 · 9:00 AM · Shop A'}).textContent).toContain('1 Detailer · Lead:')
+  expect(screen.getByRole('button',{name:'View Detail 3 · 9:00 AM · Shop A'}).textContent).toContain('2 Detailers')
+  expect(document.body.textContent).not.toContain('Detailer(s)')
+})

@@ -35,3 +35,10 @@ creation/cancellation/rescheduling, shift editing or calendar-provider integrati
 Exhaustive cross-browser/screen-reader audits and real-browser multi-timezone/DST
 and large-page permutations remain separate from deterministic component/domain
 coverage. See ../backend/CALENDAR_API.md and ../backend/CREW_MANAGEMENT_UI.md.
+
+Completion acceptance includes independent Owner and Shop Manager runs at every
+requested width. Owner captures use the original filenames; Shop Manager captures
+use the `shop-manager-` prefix, including an empty second assigned shop. Long shop,
+service and vehicle labels are display-only stress on disposable authenticated
+fixtures; they do not change persisted data or authorization. Keyboard Enter opens
+appointment details, and focus revalidation retains the selected appointment/team.

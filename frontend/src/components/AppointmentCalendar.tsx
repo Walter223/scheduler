@@ -61,7 +61,7 @@ export default function AppointmentCalendar({ businessId, shopId, timezone }: { 
   const entries = (items: Appointment[]) => items.map(a => <li key={a.id} className="calendar-entry" data-status={a.status}>
     <button className="calendar-open" aria-label={`View ${a.service_name} · ${time(a.starts_at, a.timezone)} · ${a.shop_name}`} onClick={e => { trigger.current = e.currentTarget; setSelected(a) }}>
       <span className="calendar-time"><time dateTime={a.starts_at}>{time(a.starts_at, a.timezone)}</time><small>{a.duration_minutes} min</small></span>
-      <span className="calendar-summary"><strong>{a.service_name}</strong><span>{a.shop_name} · {a.timezone}</span><span>{a.crew_size} Detailer(s){a.lead_detailer ? ` · Lead: ${a.lead_detailer}` : ''}</span>{['pending', 'confirmed'].includes(a.status) && a.crew_size === 0 && <span className="calendar-needs-staffing">Needs staffing</span>}</span>
+      <span className="calendar-summary"><strong>{a.service_name}</strong><span>{a.shop_name} · {a.timezone}</span><span>{a.crew_size} {a.crew_size === 1 ? 'Detailer' : 'Detailers'}{a.lead_detailer ? ` · Lead: ${a.lead_detailer}` : ''}</span>{['pending', 'confirmed'].includes(a.status) && a.crew_size === 0 && <span className="calendar-needs-staffing">Needs staffing</span>}</span>
       <span className="calendar-status">{a.status}</span>
     </button>
   </li>)
