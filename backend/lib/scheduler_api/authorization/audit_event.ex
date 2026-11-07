@@ -20,7 +20,8 @@ defmodule SchedulerApi.Authorization.AuditEvent do
         :revoke_role,
         :revoke_membership,
         :reactivate_membership,
-        :bootstrap_owner
+        :bootstrap_owner,
+        :provision_business
       ]
 
     field :outcome, Ecto.Enum, values: [:applied, :denied, :noop]

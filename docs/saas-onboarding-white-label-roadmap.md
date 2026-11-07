@@ -2,6 +2,10 @@
 
 Architecture audit, 2026-10-31. This is a proposed roadmap, not implemented signup or white-label functionality. Keycloak authenticates; Phoenix authorizes Magnum access. Authentication alone grants no tenant access.
 
+6A-1 adds the internal [new-business provisioning foundation](../backend/BUSINESS_PROVISIONING.md)
+for explicitly operator-authorized eligible identities. Public signup, pending-account
+activation and publishing remain unimplemented; the proposals below still require those boundaries.
+
 ## Current support and gaps
 
 | Area | Present in the repository | Still needed |

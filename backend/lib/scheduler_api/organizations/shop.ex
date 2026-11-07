@@ -14,13 +14,20 @@ defmodule SchedulerApi.Organizations.Shop do
   # Ownership is assigned by trusted callers on the struct, never from attrs.
   def changeset(shop, attrs) do
     shop
+    |> configuration_changeset(attrs)
+    |> validate_required([:business_id])
+    |> unique_constraint([:business_id, :slug], name: :shops_business_id_slug_key)
+    |> foreign_key_constraint(:business_id)
+  end
+
+  @doc false
+  def configuration_changeset(shop, attrs) do
+    shop
     |> cast(attrs, [:name, :slug, :timezone, :status])
-    |> validate_required([:business_id, :name, :slug, :timezone, :status])
+    |> validate_required([:name, :slug, :timezone, :status])
     |> validate_length(:name, max: 255)
     |> validate_length(:slug, max: 255)
     |> validate_length(:timezone, max: 255)
     |> validate_format(:slug, ~r/^[a-z0-9]+(-[a-z0-9]+)*$/)
-    |> unique_constraint([:business_id, :slug], name: :shops_business_id_slug_key)
-    |> foreign_key_constraint(:business_id)
   end
 end
