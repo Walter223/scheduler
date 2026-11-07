@@ -3,9 +3,10 @@ defmodule SchedulerApi.Authorization.AuditEvent do
 
   schema "authorization_audit_events" do
     field :source, Ecto.Enum,
-      values: [:customer_role_management, :deployment_operator_command],
+      values: [:customer_role_management, :deployment_operator_command, :self_service_signup],
       default: :customer_role_management
 
+    field :activated_pending_account, :boolean, default: false
     belongs_to :actor_user, SchedulerApi.Accounts.User
     belongs_to :target_user, SchedulerApi.Accounts.User
     belongs_to :business, SchedulerApi.Organizations.Business

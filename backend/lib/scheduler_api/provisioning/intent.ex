@@ -3,6 +3,11 @@ defmodule SchedulerApi.Provisioning.Intent do
   use Ecto.Schema
 
   schema "business_provisioning_intents" do
+    field :source, Ecto.Enum,
+      values: [:deployment_operator_command, :self_service_signup],
+      default: :deployment_operator_command
+
+    field :activated_pending_account, :boolean, default: false
     belongs_to :owner, SchedulerApi.Accounts.User
     field :credential_hash, :binary, redact: true
     field :business_name, :string

@@ -92,7 +92,7 @@ by this milestone. Completed intents/audits are retained; no purge job is added.
 Rejected preflight attempts return safe errors; they do not promise a durable
 denied audit. Database/audit failures cannot record themselves durably.
 
-## Required boundary before 6A-2
+## Original boundary decisions before 6A-2 (superseded below)
 
 Do not call the operator issuer from self-service signup. A separately reviewed
 issuer must verify live authenticated identity, explicit create-new-business
@@ -108,3 +108,84 @@ Future HTTP input must never choose an arbitrary owner or existing tenant, accep
 an operator label as authority, or derive claims from names, email or domains.
 Publication, invitations, billing, branding, MFA/deployment hardening and tenant
 recovery remain separate. This milestone introduces no new production auth policy.
+
+## 6A-2A implemented self-service boundary
+
+The approved exception permits verified pending accounts to become active **only
+inside successful new-business creation**. Ordinary login and operator bootstrap
+retain their existing eligibility policies. No frontend signup screen is included.
+
+Flow (same configured application origin and callback; no Keycloak change):
+
+1. `POST /auth/signup/login` with an empty JSON object and exact Origin (or the
+   existing controlled same-origin Referer fallback) starts a `signup`-purpose
+   login transaction. Normal `GET /auth/login` always records `login`. Purpose is
+   server-persisted, never accepted in callback/browser identity claims.
+2. Existing `GET /auth/callback` consumes state and browser binding before provider
+   exchange. Unchanged OIDCC signature/issuer/audience/nonce/PKCE/expiration checks
+   establish the immutable identity. Only a validated signup callback may call
+   `Onboarding.issue_after_oidc`; the supplied User is an internal trusted value,
+   not a public identity constructor. Account state is reloaded under lock.
+3. Eligible pending/active verified identities receive two separate HttpOnly,
+   SameSite=Lax, Path=/, no-Domain ten-minute cookies: `magnum_onboarding_dev` and
+   `magnum_onboarding_binding_dev` (Secure `__Host-` counterparts in production).
+   Proof and browser binding are independently generated through the OIDC flow;
+   only their hashes are persisted. No pending-user session or operator capability
+   is issued. The clean callback destination is `/admin?signup=ready`.
+4. `GET /auth/signup` returns only a masked Plug CSRF token for the matching proof
+   and binding. `POST /auth/signup/business` requires both cookies, that token in
+   `x-csrf-token`, exact same-origin validation, and the strict business/shop JSON
+   shape above. Parsing is bounded to 64 KB outside request telemetry. All signup
+   responses are no-store. Failures expose only safe errors, never provider detail.
+5. Completion locks proof then user, checks live verification/eligibility, applies
+   creation limits, and atomically activates that pending identity, creates the
+   independent tenant through shared provisioning internals, records a truthful
+   `self_service_signup` audit with actor=target and `activated_pending_account`,
+   and consumes the proof with the exact request hash and result. All changes,
+   including activation and successful-creation counters, roll back on failure.
+   No normal session is created; after success ordinary login can issue one.
+
+Proof validity is strictly before its ten-minute expiry. Concurrent identical
+submissions return the same result; a different payload after consumption fails.
+Retries are limited to the proof lifetime and cannot restore revoked grants.
+Failed validation, slug collision or audit insertion leaves proof and pending
+status retryable. Cookie theft alone is insufficient without the independent
+browser binding and proof-specific CSRF token. Browser-provided owner/role/user,
+existing-business, membership and status fields are rejected. There is no operator
+issuer endpoint. Suspended/deactivated/unverified accounts fail even with an old
+proof. Keycloak outages fail login safely and cannot produce a new proof; an
+already validated proof can finish while the provider is unavailable.
+
+Concurrent login attempts keep independent server records until expiry; the most
+recent callback replaces the browser's delivered cookies. There is no cross-proof
+mutation under a user lock (avoids inverted proof/user locking). Browser switching
+without both cookies fails. Successful creation is limited across all proofs for
+one identity, not just the latest browser attempt.
+
+Conservative PostgreSQL-backed fixed-window limits: 20 signup POST attempts per
+socket IP per 15 minutes, five proof issuances per identity per UTC hour, and one
+successful new business per identity per UTC day. IP attempts commit before body/
+proof validation so rejected submissions count; successful idempotent retries do
+not consume the creation budget. Database UPSERTs serialize limits across nodes.
+Window boundaries allow adjacent-window bursts. Production requires trusted proxy
+IP configuration (never arbitrary forwarded headers), ingress/login rate limits,
+capacity monitoring, abuse policy and retention/purge of expired proofs/counters.
+Current code uses the actual socket IP; a proxy can group clients conservatively.
+Identity limits do not replace protection against many new Keycloak identities.
+
+Deployment: apply the additive `add_self_service_onboarding` migration before
+running updated code. It adds login purpose, onboarding proofs, shared limits,
+intent/audit provenance and activation metadata. Existing rows default to ordinary
+login/operator provenance; no accounts are activated by migration. Rollback of
+retained security history requires review. No development migration was run.
+
+### 6A-2B browser integration
+
+The customer UI lives at `/signup`; successful signup callbacks now return there
+instead of the earlier `/admin?signup=ready` marker. Validated signup cancellation/
+provider errors also return a generic error there. Unknown/invalid transactions
+retain the existing safe authentication fallback. `/auth/signup/login` returns
+`{redirect_to: authorization_url}` only for explicit `Accept: application/json`,
+so the UI navigates to Keycloak without cross-origin fetch redirect handling.
+Normal redirect callers and every authorization/proof check remain unchanged.
+See [frontend signup verification](../frontend/SIGNUP.md).

@@ -323,8 +323,15 @@ case command do
     subjects = Enum.map(fixture["users"], & &1["subject"])
     users = Repo.all(from u in User, where: u.keycloak_subject in ^subjects)
 
-    unless Enum.sort(Enum.map(users, & &1.status)) == List.duplicate(:active, 7) ++ [:pending],
-      do: raise("Expected active and denied pending identities")
+    signup_audits = Repo.all(from e in SchedulerApi.Authorization.AuditEvent,
+      where: e.source == :self_service_signup and e.target_user_id in ^Enum.map(users, & &1.id))
+    expected = if signup_audits == [], do: List.duplicate(:active, 7) ++ [:pending], else: List.duplicate(:active, 8)
+    unless Enum.sort(Enum.map(users, & &1.status)) == expected,
+      do: raise("Expected precise account lifecycle outcomes")
+    if signup_audits != [] do
+      unless length(signup_audits) == 2 and Enum.count(signup_audits, & &1.activated_pending_account) == 1,
+        do: raise("Expected one pending and one active signup audit")
+    end
 
     expired_identity = Enum.find(fixture["users"], &(&1["kind"] == "shop_manager"))
     expired_user = Repo.get_by!(User, keycloak_subject: expired_identity["subject"])
@@ -366,7 +373,7 @@ case command do
            ) == 0,
            do: raise("Rehire restored old shop assignments")
 
-    unless Repo.aggregate(SchedulerApi.Organizations.RoleAssignment, :count) == 10,
+    unless Repo.aggregate(SchedulerApi.Organizations.RoleAssignment, :count) == 10 + length(signup_audits),
       do: raise("Classification edits must not create role grants")
 
     IO.puts("AUTH_E2E_VERIFIED")
@@ -435,7 +442,21 @@ case command do
           select: b.id
       )
 
+    signup_businesses = Repo.all(from i in SchedulerApi.Provisioning.Intent,
+      where: i.owner_id in ^ids and i.source == :self_service_signup, select: i.business_id)
+    businesses = Enum.uniq(businesses ++ signup_businesses)
     Repo.transaction(fn ->
+      Repo.delete_all(from p in SchedulerApi.Provisioning.Onboarding.Proof, where: p.user_id in ^ids)
+      Repo.delete_all(from i in SchedulerApi.Provisioning.Intent, where: i.owner_id in ^ids and i.source == :self_service_signup)
+      for id <- ids, kind <- ["proof", "creation"] do
+        key = :crypto.hash(:sha256, kind <> ":" <> to_string(id))
+        Repo.delete_all(from l in "signup_limits", where: l.key == ^key)
+      end
+      # Exclusive _auth_e2e runner owns these local-proxy attempt buckets.
+      for ip <- ["127.0.0.1", "::1"] do
+        key = :crypto.hash(:sha256, "ip:" <> ip)
+        Repo.delete_all(from l in "signup_limits", where: l.key == ^key)
+      end
       Repo.delete_all(
         from h in SchedulerApi.Employment.HrAuditEvent, where: h.business_id in ^businesses
       )

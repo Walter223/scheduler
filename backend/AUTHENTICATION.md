@@ -277,3 +277,11 @@ Suspended/deactivated or unrelated identities are excluded. Accounts has no sepa
 activation-audit primitive; first-Owner provisioning uses the existing durable,
 audited `magnum.bootstrap_owner` dry-run/apply workflow and all ownership-history
 checks. Production restrictions and isolated browser-test behavior are unchanged.
+
+## Explicit new-business signup exception
+
+6A-2A adds signup-purpose OIDC transactions and separate browser-bound onboarding
+proofs. Pending accounts receive no normal session and ordinary login remains
+unchanged. Activation is atomic only with successful creation of a new tenant.
+See [BUSINESS_PROVISIONING.md](BUSINESS_PROVISIONING.md#6a-2a-implemented-self-service-boundary)
+for routes, cookies, CSRF, limits, audit provenance and deployment migration.

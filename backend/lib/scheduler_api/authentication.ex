@@ -15,12 +15,14 @@ defmodule SchedulerApi.Authentication do
 
   def create_login_transaction(%Config{} = config, opts \\ []) do
     with {:ok, now} <- now(opts),
-         "/admin" <- Keyword.get(opts, :return_path, "/admin") do
+         "/admin" <- Keyword.get(opts, :return_path, "/admin"),
+         purpose when purpose in [:login, :signup] <- Keyword.get(opts, :purpose, :login) do
       [state, binding, nonce, verifier] = Enum.map(1..4, fn _ -> Credential.generate() end)
       {:ok, state_hash} = Credential.hash(Credential.reveal(state))
       {:ok, binding_hash} = Credential.hash(Credential.reveal(binding))
 
       transaction = %LoginTransaction{
+        purpose: purpose,
         issuer: config.issuer,
         client_id: config.client_id,
         callback_url: config.callback_url,
@@ -61,6 +63,7 @@ defmodule SchedulerApi.Authentication do
         if is_nil(transaction), do: Repo.rollback(:invalid_login_transaction)
 
         material = %ConsumedLogin{
+          purpose: transaction.purpose,
           issuer: transaction.issuer,
           client_id: transaction.client_id,
           callback_url: transaction.callback_url,

@@ -1,0 +1,19 @@
+.signup-page { padding: clamp(1rem, 4vw, 4rem) 1rem; color: #e9edf5; min-height: 80vh; }
+.signup-panel { max-width: 44rem; margin: auto; padding: clamp(1rem, 4vw, 2.5rem); background: #111722; border: 1px solid #344051; border-radius: 1rem; overflow-wrap: anywhere; }
+.signup-panel h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); margin: .5rem 0 1rem; }
+.signup-panel h2, .signup-panel legend { font-size: 1.15rem; font-weight: 650; }
+.signup-panel p, .signup-panel small { color: #b9c4d4; line-height: 1.6; }
+.signup-eyebrow { color: #6adce6 !important; font-size: .75rem; letter-spacing: .1em; }
+.signup-panel fieldset { min-width: 0; border: 0; margin: 1.5rem 0; padding: 0; }
+.signup-panel label { display: grid; gap: .4rem; margin: 1rem 0; }
+.signup-panel input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid #566479; border-radius: .4rem; padding: .7rem; background: #080e17; color: #f1f5fa; font: inherit; }
+.signup-panel button, .signup-panel a { font: inherit; color: #a4eef5; }
+.signup-panel button { width: auto; max-width: 100%; padding: .65rem 1rem; border: 1px solid #47747c; border-radius: .4rem; background: #18323d; cursor: pointer; }
+.signup-panel button:disabled { opacity: .6; cursor: wait; }
+.signup-panel :focus-visible { outline: 3px solid #a5a0ff; outline-offset: 3px; }
+.signup-panel dt { color: #aab6c8; margin-top: 1rem; font-size: .85rem; }
+.signup-panel dd { margin: .3rem 0; }
+.signup-panel footer, .signup-actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
+.signup-message { padding: .8rem; border: 1px solid #b99562; border-radius: .4rem; }
+.signup-panel { text-align: left; }
+.signup-panel h1, .signup-panel h2, .signup-panel legend { color: #e9edf5; }

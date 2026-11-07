@@ -27,10 +27,20 @@ defmodule SchedulerApiWeb.AuthController do
     conn = BrowserSession.clear_binding(conn)
 
     case Browser.complete_login(params, binding, previous) do
-      {:ok, {_session, credential}} ->
+      {:ok, {%SchedulerApi.Accounts.WebSession{}, credential}} ->
         conn
         |> BrowserSession.put_session(SessionCredential.reveal(credential))
         |> redirect(external: BrowserConfig.current().origin <> "/admin")
+
+      {:ok, {:onboarding, token}} ->
+        conn
+        |> SchedulerApiWeb.SignupController.deliver(token, binding)
+        |> redirect(external: BrowserConfig.current().origin <> "/signup")
+
+      {:error, {:signup, _}} ->
+        redirect(conn,
+          external: BrowserConfig.current().origin <> "/signup?auth_error=login_failed"
+        )
 
       {:error, :ineligible_account} ->
         failure(conn, "account_unavailable")

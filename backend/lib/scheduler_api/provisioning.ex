@@ -78,6 +78,53 @@ defmodule SchedulerApi.Provisioning do
     end
   end
 
+  @doc false
+  # Only Onboarding calls this under its proof/user locks. No operator issuer/capability.
+  def create_from_onboarding!(%User{} = owner, attrs, now) do
+    unless Repo.in_transaction?(), do: raise("Onboarding transaction required")
+
+    with {:ok, business, shop} <- validate_request(attrs),
+         true <- Repo.exists?(from z in "pg_timezone_names", where: z.name == ^shop.timezone) do
+      activated = owner.status == :pending
+
+      owner =
+        if activated do
+          case SchedulerApi.Accounts.set_user_status(owner, :active) do
+            {:ok, user} -> user
+            _ -> Repo.rollback(:ineligible_identity)
+          end
+        else
+          owner
+        end
+
+      eligible!(owner)
+      {:ok, hash} = Credential.digest(Credential.generate())
+
+      intent =
+        Repo.insert!(
+          %Intent{
+            owner_id: owner.id,
+            credential_hash: hash,
+            business_name: business.name,
+            business_slug: business.slug,
+            shop_name: shop.name,
+            shop_slug: shop.slug,
+            timezone: shop.timezone,
+            source: :self_service_signup,
+            activated_pending_account: activated,
+            inserted_at: now,
+            updated_at: now,
+            expires_at: DateTime.add(now, 600)
+          },
+          log: false
+        )
+
+      create!(intent, owner, now)
+    else
+      _ -> Repo.rollback(:invalid_input)
+    end
+  end
+
   defp create!(intent, owner, now) do
     # The business is newly inserted and invisible to competing transactions.
     # No existing tenant is resolved, claimed, locked or modified here.
@@ -128,8 +175,9 @@ defmodule SchedulerApi.Provisioning do
     audit =
       Repo.insert!(
         %AuditEvent{
-          source: :deployment_operator_command,
-          actor_user_id: nil,
+          source: intent.source,
+          activated_pending_account: intent.activated_pending_account,
+          actor_user_id: if(intent.source == :self_service_signup, do: owner.id),
           target_user_id: owner.id,
           business_id: business.id,
           shop_id: shop.id,

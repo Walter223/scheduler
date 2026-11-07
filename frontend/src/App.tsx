@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage'
 import ServicesPage from './pages/ServicesPage'
 import NavBar from './components/NavBar'
 import BookingPage from './pages/BookingPage'
+import SignupPage from './pages/SignupPage'
 import AdminPage from './pages/AdminPage'
 
 const App = () => {
@@ -26,12 +27,13 @@ const App = () => {
 
   return (
     <>
-      {location.pathname !== '/admin' && <NavBar />}
+      {!['/admin', '/signup'].includes(location.pathname) && <NavBar />}
 
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/contact" element={<BookingPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </>

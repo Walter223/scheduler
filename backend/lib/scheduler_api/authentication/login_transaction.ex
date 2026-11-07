@@ -3,6 +3,7 @@ defmodule SchedulerApi.Authentication.LoginTransaction do
   use Ecto.Schema
   @derive {Inspect, only: [:id, :expires_at, :consumed_at]}
   schema "login_transactions" do
+    field :purpose, Ecto.Enum, values: [:login, :signup], default: :login
     field :issuer, :string
     field :client_id, :string
     field :callback_url, :string

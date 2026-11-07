@@ -6,6 +6,9 @@ defmodule SchedulerApiWeb.Router do
   end
 
   scope "/auth", SchedulerApiWeb do
+    post "/signup/login", SignupController, :login, log: false
+    get "/signup", SignupController, :show, log: false
+    post "/signup/business", SignupController, :create, log: false
     get "/login", AuthController, :login, log: false
     get "/callback", AuthController, :callback, log: false
     post "/logout", AuthController, :logout, log: false

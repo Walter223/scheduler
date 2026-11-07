@@ -4,57 +4,71 @@ defmodule SchedulerApi.Authentication.Browser do
   alias SchedulerApi.Authentication.{Protocol, Provider}
   import Ecto.Query
 
-  def begin_login do
+  def begin_login(purpose \\ :login) do
     with {:ok, config, context} <- provider_context(),
-         {:ok, attempt} <- Authentication.create_login_transaction(config),
+         {:ok, attempt} <- Authentication.create_login_transaction(config, purpose: purpose),
          {:ok, url} <- Protocol.authorization_url(attempt, config, context) do
       {:ok, attempt, url}
     end
   end
 
   def complete_login(params, binding, previous_token) do
-    with {:ok, login} <- Authentication.consume_login_transaction(params["state"], binding),
-         false <- Map.has_key?(params, "error"),
+    with {:ok, login} <- Authentication.consume_login_transaction(params["state"], binding) do
+      result = finish_login(login, params, binding, previous_token)
+
+      case result do
+        {:error, reason} when login.purpose == :signup -> {:error, {:signup, reason}}
+        _ -> result
+      end
+    end
+  end
+
+  defp finish_login(login, params, binding, previous_token) do
+    with false <- Map.has_key?(params, "error"),
          {:ok, config, context} <- provider_context(),
          {:ok, identity} <- Protocol.exchange_code(params["code"], login, config, context),
          {:ok, user} <- Accounts.sync_verified_identity(identity) do
-      previous =
-        case Accounts.get_session_by_token(previous_token) do
-          {:ok, session} -> session
-          _ -> nil
-        end
+      if login.purpose == :signup do
+        SchedulerApi.Provisioning.Onboarding.issue_after_oidc(user, binding)
+      else
+        previous =
+          case Accounts.get_session_by_token(previous_token) do
+            {:ok, session} -> session
+            _ -> nil
+          end
 
-      Repo.transaction(fn ->
-        # Account replacement can span two users. Lock their rows in ID order
-        # before the existing Accounts user-then-session operations.
-        ids = if previous, do: [user.id, previous.user_id], else: [user.id]
+        Repo.transaction(fn ->
+          # Account replacement can span two users. Lock their rows in ID order
+          # before the existing Accounts user-then-session operations.
+          ids = if previous, do: [user.id, previous.user_id], else: [user.id]
 
-        Repo.all(
-          from u in SchedulerApi.Accounts.User,
-            where: u.id in ^ids,
-            order_by: u.id,
-            lock: "FOR UPDATE"
-        )
+          Repo.all(
+            from u in SchedulerApi.Accounts.User,
+              where: u.id in ^ids,
+              order_by: u.id,
+              lock: "FOR UPDATE"
+          )
 
-        case Accounts.create_session(user) do
-          {:ok, session, credential} ->
-            case previous do
-              %SchedulerApi.Accounts.WebSession{} ->
-                case Accounts.revoke_session(previous, :session_rotation) do
-                  {:ok, _} -> :ok
-                  {:error, _} -> Repo.rollback(:session_unavailable)
-                end
+          case Accounts.create_session(user) do
+            {:ok, session, credential} ->
+              case previous do
+                %SchedulerApi.Accounts.WebSession{} ->
+                  case Accounts.revoke_session(previous, :session_rotation) do
+                    {:ok, _} -> :ok
+                    {:error, _} -> Repo.rollback(:session_unavailable)
+                  end
 
-              _ ->
-                :ok
-            end
+                _ ->
+                  :ok
+              end
 
-            {session, credential}
+              {session, credential}
 
-          {:error, reason} ->
-            Repo.rollback(reason)
-        end
-      end)
+            {:error, reason} ->
+              Repo.rollback(reason)
+          end
+        end)
+      end
     else
       true -> {:error, :login_denied}
       {:error, reason} -> {:error, reason}

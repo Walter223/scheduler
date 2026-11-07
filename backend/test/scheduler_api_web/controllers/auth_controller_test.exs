@@ -396,4 +396,79 @@ defmodule SchedulerApiWeb.AuthControllerTest do
     Process.put(:browser_test_provider, {:error, :provider_unavailable})
     assert redirected_to(get(build_conn(), "/auth/login")) =~ "auth_error=provider_unavailable"
   end
+
+  test "signup signed callback issues only proof and protects HTTP completion", c do
+    origin = BrowserConfig.current().origin
+    assert post(build_conn(), "/auth/signup/login", %{}).status == 403
+    conn = build_conn() |> put_req_header("origin", origin) |> post("/auth/signup/login", %{})
+    params = conn |> redirected_to() |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    {:ok, hash} = Credential.hash(params["state"])
+    login = Repo.get_by!(LoginTransaction, state_hash: hash)
+    assert login.purpose == :signup
+    Agent.update(c.storage, fn _ -> {login, %{}, 200} end)
+    cb = callback(conn, params)
+    assert redirected_to(cb) == origin <> "/signup"
+    assert Repo.aggregate(WebSession, :count) == 0
+    assert Repo.one!(User).status == :pending
+
+    csrf =
+      cb |> recycle() |> get("/auth/signup") |> json_response(200) |> Map.fetch!("csrf_token")
+
+    attrs = %{
+      business: %{name: "HTTP Signup", slug: "http-signup"},
+      shop: %{name: "Main", slug: "main", timezone: "America/Denver"}
+    }
+
+    denied =
+      cb
+      |> recycle()
+      |> put_req_header("origin", "https://evil.invalid")
+      |> post("/auth/signup/business", attrs)
+
+    assert denied.status == 403
+
+    denied =
+      cb
+      |> recycle()
+      |> put_req_header("origin", origin)
+      |> put_req_header("x-csrf-token", "invalid")
+      |> post("/auth/signup/business", attrs)
+
+    assert denied.status == 403
+
+    for injected <- [
+          Map.put(attrs, :owner_id, 1),
+          Map.put(attrs, :business_id, 1),
+          Map.put(attrs, :role, "business_owner")
+        ] do
+      denied =
+        cb
+        |> recycle()
+        |> put_req_header("origin", origin)
+        |> put_req_header("x-csrf-token", csrf)
+        |> post("/auth/signup/business", injected)
+
+      assert denied.status == 422
+    end
+
+    stolen =
+      build_conn()
+      |> put_req_header("origin", origin)
+      |> put_req_header("x-csrf-token", csrf)
+      |> post("/auth/signup/business", attrs)
+
+    assert stolen.status == 403
+
+    result =
+      cb
+      |> recycle()
+      |> put_req_header("origin", origin)
+      |> put_req_header("x-csrf-token", csrf)
+      |> post("/auth/signup/business", attrs)
+
+    assert json_response(result, 200)["data"]["business_id"]
+    assert get_resp_header(result, "cache-control") == ["no-store"]
+    assert Repo.one!(User).status == :active
+    assert Repo.aggregate(WebSession, :count) == 0
+  end
 end
