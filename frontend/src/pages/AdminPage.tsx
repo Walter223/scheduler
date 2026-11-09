@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import SetupWorkspace from '../components/SetupWorkspace'
 import AppointmentCalendar from '../components/AppointmentCalendar'
 import EmployeeDirectory from '../components/EmployeeDirectory'
 import OperationalDashboard from '../components/OperationalDashboard'
@@ -6,7 +7,7 @@ import SessionControls from '../components/SessionControls'
 
 type Shop = { timezone?: string; id: number; name: string; capabilities: string[] }
 type Business = { hr_shops?: { id: number; name: string }[]; id: number; name: string; capabilities: string[]; all_shops: string[]; shops: Shop[] }
-const areas = [['dashboard', 'Dashboard'], ['appointments', 'Appointments and calendar'], ['employees', 'Employees and HR'], ['schedules', 'Staff schedules'], ['compensation', 'Compensation'], ['access', 'Access management'], ['settings', 'Business settings']]
+const areas = [['dashboard', 'Dashboard'], ['appointments', 'Appointments and calendar'], ['employees', 'Employees and HR'], ['schedules', 'Staff schedules'], ['compensation', 'Compensation'], ['access', 'Access management'], ['settings', 'Business settings'], ['setup', 'Setup']]
 
 function validZone(value: unknown) {
   if (value === undefined) return true
@@ -107,7 +108,7 @@ export default function AdminPage() {
             {state && <p role="status">{state}</p>}
             {state.startsWith('Access is unavailable') && <a href="/auth/login">Sign in again</a>}
             <button className="secondary-button admin-refresh" onClick={() => setRevision(v => v + 1)}>Refresh access</button>
-            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={workspaceKey} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : area === 'appointments' ? <AppointmentCalendar key={workspaceKey} businessId={business.id} shopId={shopId} timezone={shop?.timezone ?? business.shops[0]?.timezone ?? 'America/Denver'} /> : area === 'employees' ? <EmployeeDirectory key={workspaceKey} businessId={business.id} shopId={shopId} hr={business.capabilities.includes('employees')} canManage={business.capabilities.includes('hr_manage')} shops={business.hr_shops ?? []} /> : <p>This area is planned. Management screens are not available yet.</p>}</>}
+            {business && <><p>Business: <strong>{business.name}</strong>{shop && <> · Shop: <strong>{shop.name}</strong></>}</p><h2>{areas.find(([key]) => key === area)?.[1]}</h2>{area === 'setup' ? <SetupWorkspace key={`setup:${business.id}`} businessId={business.id} /> : area === 'dashboard' ? (available.includes('appointments') && available.includes('schedules') ? <OperationalDashboard key={workspaceKey} businessId={business.id} shopId={shopId} /> : <p>Your workspace has no operational scheduling access. Choose a permitted management area.</p>) : area === 'appointments' ? <AppointmentCalendar key={workspaceKey} businessId={business.id} shopId={shopId} timezone={shop?.timezone ?? business.shops[0]?.timezone ?? 'America/Denver'} /> : area === 'employees' ? <EmployeeDirectory key={workspaceKey} businessId={business.id} shopId={shopId} hr={business.capabilities.includes('employees')} canManage={business.capabilities.includes('hr_manage')} shops={business.hr_shops ?? []} /> : <p>This area is planned. Management screens are not available yet.</p>}</>}
           </section>
         </div>
       </>}

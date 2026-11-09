@@ -578,6 +578,7 @@ defmodule SchedulerApi.Authorization do
       roster: :assigned_employee_contact_read,
       compensation: :compensation_read,
       access: :staff_access_read,
+      setup: :access_manage,
       settings: :business_manage,
       appointments: :appointments_read,
       schedules: :schedule_manage

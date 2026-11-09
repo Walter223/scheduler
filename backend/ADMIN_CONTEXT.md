@@ -112,3 +112,9 @@ endpoints. No lifecycle or authorization policy is implemented in the frontend.
 list, local day/seven-day agendas and minimal detail panels. Discovery shop metadata
 now includes the configured timezone; existing operational capabilities continue to
 control navigation and API authorization. No appointment/team mutations are added.
+
+7A-3 adds business capability `setup`, derived exclusively from existing
+`access_manage` authorization (current business Owner). It is a navigation hint;
+the private onboarding API independently rechecks live Owner authority. Setup has
+no shop-scoped capability and creates no grants or employment records. See
+[Setup workspace](../frontend/SETUP_WORKSPACE.md). No authorization policy changed.

@@ -34,6 +34,8 @@ defmodule SchedulerApiWeb.AdminContextControllerTest do
     first = Enum.find(data, &(&1["id"] == a.business_id))
     other = Enum.find(data, &(&1["id"] == b.id))
     assert "settings" in first["capabilities"] and "employees" in first["capabilities"]
+    assert "setup" in first["capabilities"]
+    refute "setup" in other["capabilities"]
     assert "appointments" in first["all_shops"]
     refute "settings" in other["capabilities"]
     assert other["shops"] == []
@@ -50,6 +52,7 @@ defmodule SchedulerApiWeb.AdminContextControllerTest do
     grant_fixture(user, shop, :shop_manager)
     data = hd(contexts(user)["businesses"])
     assert "roster" in hd(data["shops"])["capabilities"]
+    refute "setup" in data["capabilities"]
     refute "employees" in data["capabilities"]
     assert data["all_shops"] == []
     assert Enum.map(data["shops"], & &1["id"]) == [shop.id]
