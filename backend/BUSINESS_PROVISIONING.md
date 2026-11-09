@@ -189,3 +189,9 @@ retain the existing safe authentication fallback. `/auth/signup/login` returns
 so the UI navigates to Keycloak without cross-origin fetch redirect handling.
 Normal redirect callers and every authorization/proof check remain unchanged.
 See [frontend signup verification](../frontend/SIGNUP.md).
+
+### Persisted post-login setup
+
+[Business onboarding drafts](BUSINESS_ONBOARDING.md) provide an Owner-only API to
+begin, save and resume proposed setup after ordinary login. Draft completion is
+separate from provisioning, domain application and publication; it grants nothing.

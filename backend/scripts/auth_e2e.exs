@@ -446,6 +446,12 @@ case command do
       where: i.owner_id in ^ids and i.source == :self_service_signup, select: i.business_id)
     businesses = Enum.uniq(businesses ++ signup_businesses)
     Repo.transaction(fn ->
+      draft_ids = Repo.all(from d in SchedulerApi.BusinessOnboarding.Draft,
+        where: d.business_id in ^businesses, select: d.id)
+      Repo.delete_all(from r in "business_onboarding_receipts", where: r.draft_id in ^draft_ids)
+      Repo.delete_all(from e in "business_onboarding_events", where: e.draft_id in ^draft_ids)
+      Repo.delete_all(from d in SchedulerApi.BusinessOnboarding.Draft, where: d.id in ^draft_ids)
+
       Repo.delete_all(from p in SchedulerApi.Provisioning.Onboarding.Proof, where: p.user_id in ^ids)
       Repo.delete_all(from i in SchedulerApi.Provisioning.Intent, where: i.owner_id in ^ids and i.source == :self_service_signup)
       for id <- ids, kind <- ["proof", "creation"] do

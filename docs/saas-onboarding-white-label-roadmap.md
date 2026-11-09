@@ -90,3 +90,13 @@ Decide trial limits, billing administrators, suspension/grace behavior and cance
 | 6 | Subscription lifecycle, then optional custom domains. | Signed/idempotent webhooks, cross-tenant provider IDs, grace/archival behavior, domain takeover prevention and exact auth-origin contracts. |
 
 Open owner decisions: self-service activation/abuse policy; whether businesses start unpublished; editable booking policy defaults; branding scope versus custom domains; invitation identity/activation rules; subscription entitlements and retention. None is implemented by this document.
+
+## Persisted setup workflow checkpoint
+
+[7A-1 onboarding drafts](../backend/BUSINESS_ONBOARDING.md) add Owner-authorized,
+revisioned private proposals, atomic audit/receipt persistence and a progress API.
+This is not an AI concierge, a domain-application engine or public publishing.
+
+7A-2 extends only those private proposals with multi-location defaults/overrides and
+mobile-dispatch intent. Travel-aware availability, capacity and public mobile
+booking remain unimplemented; proposed travel buffers do not alter booking rules.
