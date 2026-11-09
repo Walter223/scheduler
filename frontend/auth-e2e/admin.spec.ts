@@ -18,7 +18,7 @@ for (const kind of ['owner', 'manager', 'shop_manager', 'employee']) {
     const admin = new AdminPage(page)
     await admin.login(users.find(u => u.kind === kind)!)
     await expect(page.getByText('Signed in as E2E', { exact: true })).toBeVisible()
-    await expect(admin.navigation.getByRole('button', {name:'Setup',exact:true})).toHaveCount(kind === 'owner' ? 1 : 0)
+    await expect(page.getByRole('link', {name:'Resume Setup',exact:true})).toHaveCount(kind === 'owner' ? 1 : 0)
     if (kind === 'employee') {
       await expect(page.getByText(/No management workspaces/)).toBeVisible()
       await expect(admin.navigation.getByRole('button')).toHaveCount(0)

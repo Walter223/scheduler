@@ -189,6 +189,7 @@ From the repository root:
 ./scripts/check-fast.sh    # Backend format check; frontend lint and component tests
 ./scripts/check-full.sh    # Backend precommit, frontend checks, anonymous Playwright
 ./scripts/dev-smoke.sh     # Read-only check of already-running dev API and Vite proxy
+python3 scripts/dev-auth-health.py # Read-only listeners, session proxy, discovery and launcher configuration
 ```
 
 Or run focused suites explicitly:

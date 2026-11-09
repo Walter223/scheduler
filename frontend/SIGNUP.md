@@ -1,6 +1,6 @@
 # Customer signup — 6A-2B
 
-Home has a separate Create a business link to `/signup`. Signup never replaces
+The Magnum platform landing at `/platform` links to `/signup`; the detailing Home no longer advertises business registration. Signup never replaces
 employee `/admin` login. Verification POSTs JSON to `/auth/signup/login`; its
 opt-in JSON response carries the authorization URL for a normal browser navigation
 (fetch must not follow a cross-origin Keycloak redirect). Native non-JSON callers
@@ -32,3 +32,5 @@ provider-failure browser coverage.
 Screenshots: entry.png, validation.png, pending-form-{1440,1024,768,390,320}.png,
 owner-form-{1440,1024,768,390,320}.png, pending-success.png, owner-success.png.
 No password-entry screen, provider token or proof cookie is captured.
+
+See [platform routes](PLATFORM_ROUTES.md) for the dedicated Setup/operations navigation and unchanged OIDC return boundary.

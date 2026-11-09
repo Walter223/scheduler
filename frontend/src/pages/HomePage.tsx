@@ -49,7 +49,6 @@ function HomePage() {
               Check Availability
             </ButtonLink>
           </div>
-          <p><a href="/signup">Create a business</a></p>
         </div>
       </section>
     </main>

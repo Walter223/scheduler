@@ -285,3 +285,38 @@ proofs. Pending accounts receive no normal session and ordinary login remains
 unchanged. Activation is atomic only with successful creation of a new tenant.
 See [BUSINESS_PROVISIONING.md](BUSINESS_PROVISIONING.md#6a-2a-implemented-self-service-boundary)
 for routes, cookies, CSRF, limits, audit provenance and deployment migration.
+
+## Local login reachability and recovery
+
+From any working directory, run `python3 /absolute/path/to/scheduler/scripts/dev-auth-health.py`
+(or `python3 scripts/dev-auth-health.py` from the repository root). This read-only
+check probes listeners 4000/5173, direct/proxied `/api/me`, canonical realm discovery,
+and the launcher's secret-safe configuration check. It prints no response bodies,
+secret values, cookies or provider credentials. It does not call `/auth/login`,
+create login transactions, sign in, migrate, start or stop anything. Exit 1 means
+at least one prerequisite failed. Presence of launcher configuration does not prove
+running provider readiness or validate the client's secret against Keycloak.
+
+`ECONNREFUSED 127.0.0.1:4000` is a TCP listener failure before OIDC or Phoenix routing.
+Check the backend process first; do not reset Keycloak or change callback settings
+in response. If port 4000 is free and the operator wants to start development,
+`python3 scripts/dev-backend.py` starts the documented OIDC-enabled backend in the
+foreground. It refuses occupied ports. Starting/replacing user-owned services
+still requires authorization; no health check automatically repairs processes.
+Then rerun the health check and sign in via `http://localhost:5173/admin`.
+
+The ordinary retry link retains `/auth/login`, but first performs a five-second,
+read-only same-origin `/api/me` probe. Refusal, proxy errors, malformed replies or
+timeout preserve the React page/business selector with a recovery message. No
+OIDC URL is fetched as a preflight and no automatic redirect/retry loop is added.
+A server can still fail between probe and navigation; this check reduces that race,
+it cannot guarantee reachability. Keycloak/provider failures retain existing safe
+callback errors. Signup's separate OIDC purpose and pending denial are unchanged.
+
+Isolated browser acceptance includes an actual stop/start of the runner-owned
+Phoenix child on 4002 via temporary-directory IPC (`bff_backend_control.py`). Only
+the parent holding the Popen handle can signal/recreate that process; no arbitrary
+PID input or production test-control HTTP endpoint exists. The helper requires
+the dedicated test partition and owned fixture directory. Development ports and
+services are never targeted. Existing role, revocation, expiry, Signup, HR, Calendar
+and tenant-isolation tests run after/alongside this fault/recovery scenario.

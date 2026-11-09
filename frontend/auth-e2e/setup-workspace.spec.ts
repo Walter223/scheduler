@@ -7,7 +7,7 @@ const {users}=JSON.parse(readFileSync(file,'utf8')) as {users:{kind:string;usern
 test('real Owner edits, resumes and reviews multi-location proposals with conflict recovery',async({page})=>{
   const admin=new AdminPage(page)
   await admin.login(users.find(u=>u.kind==='owner')!)
-  await admin.navigation.getByRole('button',{name:'Setup',exact:true}).click()
+  await page.getByRole('link',{name:'Resume Setup',exact:true}).click()
   const setup=page.getByRole('region',{name:'Business setup'})
   await expect(setup.getByText('Saved setup loaded.')).toBeVisible()
   mkdirSync('/private/tmp/magnum-setup',{recursive:true})
@@ -37,7 +37,7 @@ test('real Owner edits, resumes and reviews multi-location proposals with confli
     await setup.screenshot({path:`/private/tmp/magnum-setup/locations-${width}.png`})
   }
   await page.setViewportSize({width:1440,height:1000})
-  await page.reload();await admin.navigation.getByRole('button',{name:'Setup',exact:true}).click()
+  await page.reload()
   await setup.getByRole('button',{name:'Review',exact:true}).click()
   await expect(setup.getByText(/2 location proposals/)).toBeVisible()
   await setup.screenshot({path:'/private/tmp/magnum-setup/review.png'})

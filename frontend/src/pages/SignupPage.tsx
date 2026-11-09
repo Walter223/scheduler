@@ -74,7 +74,7 @@ export default function SignupPage() {
   return <main className="signup-page"><section className="signup-panel" aria-labelledby="signup-title">
     <p className="signup-eyebrow">MAGNUM · FOR DETAILING BUSINESSES</p>
     <h1 id="signup-title">Create a business</h1>
-    <p>Set up an independent workspace. Employee sign-in remains separate.</p>
+    <p>Set up your company on the Magnum platform. Your business and customer booking stay independent.</p>
     {message && <p role="alert" className="signup-message">{message}</p>}
     {phase === 'loading' && <p role="status">Checking signup verification…</p>}
     {phase === 'verify' && <><h2>First, verify your identity</h2><p>Continue to Keycloak to sign in with a verified account. If you need an account, follow the registration options provided there. No business access is granted until setup succeeds.</p><button disabled={busy} onClick={verify}>{busy ? 'Connecting…' : 'Continue to verification'}</button></>}
@@ -91,7 +91,7 @@ export default function SignupPage() {
       </fieldset><button type="submit">Review business</button>
     </form>}
     {(phase === 'review' || phase === 'uncertain') && <><h2>Review your workspace</h2><dl><dt>Business</dt><dd>{details.business.name}</dd><dt>Business slug</dt><dd>{details.business.slug}</dd><dt>First shop</dt><dd>{details.shop.name} · {details.shop.slug}</dd><dt>Timezone</dt><dd>{details.shop.timezone}</dd></dl><p>You will become this new business’s Owner. Your shop will not be published for public booking. No catalog or other business data is copied.</p><div className="signup-actions">{phase === 'review' && <button disabled={busy} onClick={() => setPhase('form')}>Edit details</button>}<button disabled={busy} onClick={submit}>{busy ? 'Creating…' : phase === 'uncertain' ? 'Retry same request' : 'Create business'}</button></div></>}
-    {phase === 'success' && <div role="status"><h2>Your business is ready</h2><p>Setup is confirmed. No new session was created. Sign in through the normal Magnum flow to open your Owner workspace.</p><a href="/auth/login">Sign in to Magnum</a></div>}
-    <footer><Link to="/admin">Employee sign-in</Link><Link to="/">Back to Magnum</Link></footer>
+    {phase === 'success' && <div role="status"><h2>Your business is ready</h2><p>Setup is confirmed. No new session was created. Sign in through the normal Magnum flow, then choose Resume Setup in your Owner workspace.</p><a href="/auth/login">Sign in to Magnum</a></div>}
+    <footer><Link to="/admin">Sign in</Link><Link to="/platform">Back to Magnum platform</Link></footer>
   </section></main>
 }

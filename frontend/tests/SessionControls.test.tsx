@@ -71,3 +71,16 @@ test('genuine login failure remains visible after its URL parameter is consumed'
   expect(window.location.search).toBe('')
   expect(screen.getByRole('link', { name:'Try signing in again' })).toBeTruthy()
 })
+
+test('backend outage preserves page and retries only a read-only health probe',async()=>{
+  window.history.replaceState({},'', '/admin?business=2')
+  const fetcher=vi.fn(async()=>new Response(null,{status:502}))
+  vi.stubGlobal('fetch',fetcher)
+  render(<SessionControls/>)
+  fireEvent.click(await screen.findByRole('link',{name:'Try signing in again'}))
+  await screen.findByText(/Magnum cannot reach its backend/)
+  expect(window.location.search).toBe('?business=2')
+  expect(fetcher.mock.calls.length).toBe(2)
+  expect(fetcher).toHaveBeenLastCalledWith('/api/me',expect.objectContaining({cache:'no-store'}))
+  expect(screen.getByRole('link',{name:'Try signing in again'}).getAttribute('href')).toBe('/auth/login')
+})

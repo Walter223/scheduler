@@ -32,3 +32,7 @@ Tests use disposable real-Keycloak role fixtures and the existing isolated runne
 including owned draft cleanup. Screenshots: `/private/tmp/magnum-setup/overview.png`,
 `validation.png`, `review.png`, and `locations-{1440,1024,768,390,320}.png`.
 Existing 7A-1 migration must be deployed before accessing Setup; 7A-3 adds no migration.
+
+7A-3B moves this same component to the dedicated `/setup/:businessId` layout.
+Admin retains an authorized Resume Setup link instead of a daily-operations Setup
+section. See [platform routes](PLATFORM_ROUTES.md); draft/API semantics are unchanged.

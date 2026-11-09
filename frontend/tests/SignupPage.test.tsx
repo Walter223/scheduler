@@ -14,7 +14,7 @@ test('missing proof offers separate verification and normal employee entry', asy
   vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 403 })))
   show()
   expect(await screen.findByRole('button', { name: 'Continue to verification' })).toBeTruthy()
-  expect(screen.getByRole('link', { name: 'Employee sign-in' }).getAttribute('href')).toBe('/admin')
+  expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/admin')
 })
 test('review, exact CSRF payload, duplicate protection and confirmed success', async () => {
   const fetcher = vi.fn(async (url: string) => url === '/auth/signup' ? Response.json({ csrf_token: 'masked' }) : Response.json({ data: { business_id: 9, shop_id: 10 } }))

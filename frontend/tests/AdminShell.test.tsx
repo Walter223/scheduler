@@ -22,6 +22,7 @@ test('server capabilities control navigation and switching clears shop and page 
   expect((screen.getByLabelText('Shop') as HTMLSelectElement).value).toBe('12')
   fireEvent.click(screen.getByRole('button', { name: 'Appointments and calendar' }))
   fireEvent.change(screen.getByLabelText('Business'), { target: { value: '2' } })
+  expect(new URLSearchParams(window.location.search).get('business')).toBe('2')
   expect(screen.queryByLabelText('Shop')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Business settings' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Appointments and calendar' })).toBeNull()
@@ -46,6 +47,7 @@ test('two Owner businesses keep selections independent', async () => {
   mount([1, 2].map(id => ({ id, name: `Business ${id}`, capabilities: ['dashboard', 'employees', 'settings'], all_shops: ['appointments'], shops: [shop(id * 10)] })))
   await screen.findByRole('button', { name: 'Business settings' })
   fireEvent.change(screen.getByLabelText('Business'), { target: { value: '2' } })
+  expect(new URLSearchParams(window.location.search).get('business')).toBe('2')
   expect((screen.getByLabelText('Shop') as HTMLSelectElement).value).toBe('20')
   expect(screen.queryByText('Shop 10')).toBeNull()
   expect(screen.getByRole('button', { name: 'Business settings' })).toBeTruthy()
@@ -69,6 +71,7 @@ test('repeated focus keeps business, shop, section and mounted feature state; ex
   mount(contexts)
   await screen.findByRole('button', { name: 'Employees and HR' })
   fireEvent.change(screen.getByLabelText('Business'), { target: { value: '2' } })
+  expect(new URLSearchParams(window.location.search).get('business')).toBe('2')
   fireEvent.change(screen.getByLabelText('Shop'), { target: { value: '21' } })
   fireEvent.click(screen.getByRole('button', { name: 'Employees and HR' }))
   const input = screen.getByLabelText('Retained employee search') as HTMLInputElement

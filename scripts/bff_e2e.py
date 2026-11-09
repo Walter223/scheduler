@@ -38,6 +38,8 @@ def run():
     processes = []
     owned_names = []
     seeded = False
+    control_stop = threading.Event()
+    control_thread = None
     with tempfile.TemporaryDirectory(prefix="magnum-bff-e2e-") as directory:
         run_id = "magnum-bff-e2e-" + uuid.uuid4().hex
         fixture = {"run_id": run_id, "users": []}
@@ -104,7 +106,7 @@ def run():
                 json.dump(fixture, stream)
             mix("run", "--no-start", "scripts/auth_e2e.exs", "seed")
             seeded = True
-            _, ready = spawn(["mix", "run", "--no-start", "scripts/auth_e2e.exs", "server"], auth.ROOT / "backend")
+            backend, ready = spawn(["mix", "run", "--no-start", "scripts/auth_e2e.exs", "server"], auth.ROOT / "backend")
             try:
                 ready.get(timeout=60)
             except queue.Empty:
@@ -120,12 +122,47 @@ def run():
                 except OSError:
                     auth.require(vite.poll() is None and time.monotonic() < deadline, "Vite did not become ready")
                     threading.Event().wait(0.1)  # readiness polling, not browser/test timing
+            control = Path(directory) / "backend-control.json"
+            env["BFF_E2E_BACKEND_CONTROL"] = str(control)
+            def control_backend():
+                nonlocal backend
+                while not control_stop.wait(0.1):
+                    if not control.exists():
+                        continue
+                    try:
+                        command = json.loads(control.read_text())
+                        control.unlink()
+                        if command["action"] == "stop":
+                            if backend.poll() is None:
+                                os.killpg(backend.pid, signal.SIGTERM)
+                                backend.wait(timeout=15)
+                        elif command["action"] == "start":
+                            auth.require(backend.poll() is not None, "Owned backend already running")
+                            for host in ("127.0.0.1", "::1"):
+                                try:
+                                    with socket.create_connection((host,4002),timeout=1):
+                                        raise ValueError("Test port occupied; preserving listener")
+                                except OSError:
+                                    pass
+                            backend, ready_again = spawn(["mix", "run", "--no-start", "scripts/auth_e2e.exs", "server"], auth.ROOT / "backend")
+                            ready_again.get(timeout=60)
+                        else:
+                            raise ValueError("Unsupported owned-server action")
+                        response = {"ok": True}
+                    except Exception:
+                        response = {"ok": False}
+                    control.with_suffix(".response").write_text(json.dumps(response))
+            control_thread = threading.Thread(target=control_backend, daemon=True)
+            control_thread.start()
             result = subprocess.run(["npx", "playwright", "test", "--config", "playwright.auth.config.ts"],
                                     cwd=auth.ROOT / "frontend", env=env)
             auth.require(result.returncode == 0, "Real Keycloak browser suite failed")
             mix("run", "--no-start", "scripts/auth_e2e.exs", "verify")
             print("PASS: real signed-token login, pending denial, role-scoped Admin acceptance, expiry and local logout")
         finally:
+            control_stop.set()
+            if control_thread:
+                control_thread.join(timeout=60)
             for process in reversed(processes):
                 if process.poll() is None:
                     os.killpg(process.pid, signal.SIGTERM)

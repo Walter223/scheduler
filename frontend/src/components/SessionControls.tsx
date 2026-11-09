@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Session = {
   authenticated: boolean
@@ -17,6 +17,9 @@ function SessionControls({ onAuthenticationChange }: { onAuthenticationChange?: 
   const [session, setSession] = useState<Session>(anonymous)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const loginPending = useRef(false)
+  const loginCheck = useRef<AbortController | null>(null)
+  useEffect(() => () => { const check = loginCheck.current; loginCheck.current = null; check?.abort() }, [])
   const [message, setMessage] = useState(() =>
     Object.hasOwn(errors, new URLSearchParams(window.location.search).get('auth_error') ?? '')
       ? errors[new URLSearchParams(window.location.search).get('auth_error')!] : '')
@@ -44,7 +47,7 @@ function SessionControls({ onAuthenticationChange }: { onAuthenticationChange?: 
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setMessage('Account status is temporarily unavailable. Please try signing in again.')
+        if (!controller.signal.aborted) setMessage('Account status is temporarily unavailable. The backend may be offline. Retry sign-in when it is available.')
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
@@ -53,6 +56,31 @@ function SessionControls({ onAuthenticationChange }: { onAuthenticationChange?: 
   useEffect(() => {
     onAuthenticationChange?.(session.authenticated)
   }, [session.authenticated, onAuthenticationChange])
+
+  async function checkLogin(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+    event.preventDefault()
+    if (loginPending.current) return
+    loginPending.current = true
+    setBusy(true)
+    const controller = new AbortController()
+    loginCheck.current = controller
+    const timer = window.setTimeout(() => controller.abort(), 5000)
+    try {
+      // Read-only reachability probe: never fetch an OIDC redirect or create a login attempt.
+      const response = await fetch('/api/me', {cache:'no-store', signal:controller.signal})
+      if (!response.ok) throw Error('unavailable')
+      const status = await response.json()
+      if (typeof status.authenticated !== 'boolean') throw Error('invalid status')
+      window.location.assign('/auth/login')
+    } catch {
+      if (loginCheck.current === controller) setMessage('Magnum cannot reach its backend. Your page has been preserved. Retry when the service is available; local developers can run scripts/dev-auth-health.py.')
+    } finally {
+      window.clearTimeout(timer)
+      loginPending.current = false
+      if (loginCheck.current === controller) setBusy(false)
+    }
+  }
 
   async function logout() {
     if (!session.csrf_token || busy) return
@@ -76,7 +104,7 @@ function SessionControls({ onAuthenticationChange }: { onAuthenticationChange?: 
       {loading ? <p role="status">Checking account status...</p> : session.authenticated && session.user ? <>
         <span>Signed in as {session.user.first_name || session.user.email}</span>
         <button className="admin-button admin-button--quiet admin-button--sm" onClick={logout} disabled={busy}>Sign out</button>
-      </> : <a className="secondary-button" href="/auth/login">{message ? 'Try signing in again' : 'Staff sign in'}</a>}
+      </> : <a className="secondary-button" href="/auth/login" onClick={checkLogin} aria-disabled={busy}>{busy ? 'Checking sign-in…' : message ? 'Try signing in again' : 'Staff sign in'}</a>}
       {!loading && message && <p role="status">{message}</p>}
     </section>
   )
