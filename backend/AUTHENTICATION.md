@@ -320,3 +320,35 @@ PID input or production test-control HTTP endpoint exists. The helper requires
 the dedicated test partition and owned fixture directory. Development ports and
 services are never targeted. Existing role, revocation, expiry, Signup, HR, Calendar
 and tenant-isolation tests run after/alongside this fault/recovery scenario.
+
+## Development schema and backup safeguards
+
+The launcher now checks the **effective** development Repo connection using
+`scripts/dev_preflight.exs` without booting Magnum. Only `scheduler_api_dev`, user
+postgres, standard port 5432 and loopback host/server address are permitted. CI,
+non-dev MIX_ENV, DATABASE_URL overrides, remote/socket targets and unknown applied
+migration versions fail closed. No credentials or raw configuration are printed.
+The launcher always injects opt-in OIDC and requires the existing ignored secret;
+this does not change environment/configuration of an already-running process.
+
+- `python3 scripts/dev-backend.py --check`: read-only database/schema/config check;
+  occupied port allowed, no backup/migration/start.
+- `python3 scripts/dev-backend.py`: start only when schema is current and 4000 free.
+- `python3 scripts/dev-backend.py --migrate --confirm-database scheduler_api_dev`:
+  explicit local migration authorization followed by startup. Review pending files
+  first; port 4000 must be free. Stop a user-owned backend only with permission.
+
+Opt-in writes a custom `pg_dump` archive under `.local/backups/` (git ignored,
+private directory and 0600 archive), verifies full `pg_restore` decoding without
+restoring a database, and writes SHA-256 plus preservation manifests. Only then
+can normal `mix ecto.migrate` run. All original tables/columns are fingerprinted
+before and after; additive default columns are excluded from the original-row
+comparison. Backup/migration/preservation failures leave the server unstarted and
+backup retained for review. There is no automatic reset or rollback. A populated
+security-history migration may intentionally disallow rollback.
+
+Normal read-only startup does not scan row contents. Data fingerprints are used
+only for explicitly requested backup/migration verification. Backups contain
+private application data and protocol material: never publish/commit them.
+`pg_dump`/`pg_restore`, local PostgreSQL, Mix and the pinned runtime must be available.
+No user activation, grants, provisioning or catalog seeding occurs in preflight.

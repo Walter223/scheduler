@@ -160,9 +160,18 @@ The development launcher injects the existing local OIDC configuration without p
 
 ```bash
 # Terminal 1 — repository root
-python3 scripts/dev-backend.py --check
-python3 scripts/dev-backend.py
+python3 scripts/dev-backend.py --check  # Read-only target/schema/OIDC preflight
+python3 scripts/dev-backend.py          # Refuses pending migrations or occupied port 4000
+
+# Explicit development-only opt-in, after reviewing pending migrations and with 4000 free:
+python3 scripts/dev-backend.py --migrate --confirm-database scheduler_api_dev
 ```
+
+The migration opt-in verifies the actual loopback database, creates and fully decodes
+a private custom-format backup under ignored `.local/backups/`, applies Ecto migrations,
+and compares original table data before starting Phoenix. It refuses test/CI,
+DATABASE_URL/remote targets and unknown applied migration versions. It never stops
+an existing server. See [authentication startup safeguards](backend/AUTHENTICATION.md#development-schema-and-backup-safeguards).
 
 ```bash
 # Terminal 2 — repository root

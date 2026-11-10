@@ -7,3 +7,6 @@
 !/infra/auth/.env.example
 __pycache__/
 *.pyc
+
+# Private local database backups and preservation manifests.
+/.local/
