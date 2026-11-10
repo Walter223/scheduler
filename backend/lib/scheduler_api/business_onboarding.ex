@@ -136,7 +136,9 @@ defmodule SchedulerApi.BusinessOnboarding do
       if next >= 2 and not Validation.locations_complete?(attrs["proposal"]),
         do: Repo.rollback(:incomplete_draft)
 
-      if next >= 5 and attrs["proposal"]["services"] == [], do: Repo.rollback(:incomplete_draft)
+      if next >= 4 and
+           not SchedulerApi.BusinessOnboarding.CatalogValidation.complete?(attrs["proposal"]),
+         do: Repo.rollback(:incomplete_draft)
 
       if attrs["state"] in ~w(ready_to_publish completed) and attrs["confirm_review"] != true,
         do: Repo.rollback(:confirmation_required)
@@ -181,6 +183,8 @@ defmodule SchedulerApi.BusinessOnboarding do
       "proposal" => d.proposal,
       "readiness" => %{
         "draft_review_complete" => d.state == "completed",
+        "services_configured" =>
+          SchedulerApi.BusinessOnboarding.CatalogValidation.complete?(d.proposal),
         "published" => false,
         "blockers" => [
           "Proposals have not been applied",

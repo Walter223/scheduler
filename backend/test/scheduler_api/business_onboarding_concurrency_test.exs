@@ -50,9 +50,9 @@ defmodule SchedulerApi.BusinessOnboardingConcurrencyTest do
           "revision" => 0,
           "request_id" => Ecto.UUID.generate(),
           "state" => "locations",
-          "proposal" => %{
-            d["proposal"]
-            | "defaults" => %{"timezone" => "America/Denver", "operating_model" => "in_shop"},
+          "proposal" =>
+            Map.merge(d["proposal"], %{
+              "defaults" => %{"timezone" => "America/Denver", "operating_model" => "in_shop"},
               "employees" => [
                 %{
                   "version" => 2,
@@ -68,11 +68,30 @@ defmodule SchedulerApi.BusinessOnboardingConcurrencyTest do
                   "access_roles" => [%{"role" => "employee", "location_keys" => ["one", "two"]}]
                 }
               ],
+              "catalog" => %{
+                "version" => 1,
+                "currency" => "USD",
+                "vehicle_categories" => [%{"key" => "car", "name" => "Custom car"}]
+              },
+              "services" => [
+                %{
+                  "version" => 2,
+                  "key" => "wash",
+                  "name" => "Custom wash",
+                  "description" => "Draft wash",
+                  "duration_minutes" => 60,
+                  "status" => "planned",
+                  "delivery_mode" => "in_shop",
+                  "location_keys" => ["one", "two"],
+                  "prices" => [%{"category_key" => "car", "price_cents" => 12345}],
+                  "overrides" => []
+                }
+              ],
               "locations" => [
                 %{"key" => "one", "name" => "First", "address" => "1 Fictional Way"},
                 %{"key" => "two", "name" => "Second", "address" => "2 Fictional Way"}
               ]
-          }
+            })
         })
       end)
 

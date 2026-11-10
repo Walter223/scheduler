@@ -10,8 +10,8 @@ test('loads existing shop without duplicating it and leaves planned areas honest
   expect((screen.getByRole('button',{name:'Configure Main'}) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button',{name:'Locations'}))
   expect(screen.getByLabelText('Shop name')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button',{name:'Services · Planned'}))
-  expect(screen.getByText(/Services editing is not implemented/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'Branding · Planned'}))
+  expect(screen.getByText(/Branding editing is not implemented/)).toBeTruthy()
 })
 for (const status of [401,403]) test(`denied ${status} clears private draft`,async()=>{
   vi.stubGlobal('fetch',vi.fn(async()=>new Response(null,{status})))
@@ -43,4 +43,26 @@ test('business switch rejects late response',async()=>{
   const view=render(<SetupWorkspace businessId={1}/>);view.rerender(<SetupWorkspace businessId={2}/> )
   await screen.findByText('Saved setup loaded.');resolve(Response.json({data:draft}))
   await waitFor(()=>expect(screen.queryByRole('button',{name:'Configure Main'})).toBeNull())
+})
+test('Services saves only catalog proposals and resumes the server response',async()=>{
+  let stored = draft as unknown as Record<string, unknown>
+  let body = ''
+  vi.stubGlobal('fetch',vi.fn(async(url:string,opts?:RequestInit)=>{
+    if(url==='/api/me')return Response.json({authenticated:true,csrf_token:'masked'})
+    if(opts?.method){body=String(opts.body);const request=JSON.parse(body);stored={...stored,revision:1,proposal:request.proposal};return Response.json({data:stored})}
+    return Response.json({data:stored})
+  }))
+  const view=render(<SetupWorkspace businessId={1}/>);await screen.findByText('Saved setup loaded.')
+  fireEvent.click(screen.getByRole('button',{name:'Services'}))
+  expect(screen.getByText(/Configuration is deferred/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'Add vehicle category'}))
+  fireEvent.change(screen.getByLabelText('Category 1 name'),{target:{value:'Custom car'}})
+  fireEvent.click(screen.getByRole('button',{name:'Use exterior-care suggestion'}))
+  fireEvent.change(screen.getByLabelText('Custom car price (USD)'),{target:{value:'105.25'}})
+  fireEvent.click(screen.getByRole('button',{name:'Save draft'}))
+  await screen.findByText('Saved to this business.')
+  expect(JSON.parse(body).proposal.services[0].prices[0].price_cents).toBe(10525)
+  view.unmount();render(<SetupWorkspace businessId={1}/>);await screen.findByText('Saved setup loaded.')
+  fireEvent.click(screen.getByRole('button',{name:'Services'}))
+  expect(screen.getByLabelText('Custom car price (USD)')).toHaveProperty('value','105.25')
 })

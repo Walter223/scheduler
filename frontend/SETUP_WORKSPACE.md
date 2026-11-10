@@ -21,8 +21,8 @@ in browser storage. Leaving without Save loses only explicitly marked unsaved ed
 
 Business, Locations, Staff, Services, Branding and Review are navigation views,
 not invented completion percentages. The saved backend workflow/revision is shown.
-Locations may advance only through the backend validation endpoint. Staff, Services
-and Branding editing remain planned; existing proposal values are preserved.
+Locations may advance only through the backend validation endpoint. Staff and Services editors are described below;
+Branding editing remains planned; existing proposal values are preserved.
 Review shows proposal counts, location/mobile details and missing fields, with
 unpublished/unapplied warnings. It never enables invitations, mobile booking,
 catalog publishing, AI operations or public booking. There is no Complete/Publish
@@ -46,7 +46,7 @@ checks a role box. Every card clearly says proposed; no external notifications,
 accounts, hiring or grants occur. Shop names resolve from stable keys. Removed or
 unassigned references show an explicit clear/reassign warning rather than silently
 removing intentions. Staff Review summarizes classification, assignments,
-management and scoped role requests separately. Services/Branding remain planned.
+management and scoped role requests separately. Branding remains planned; Services is described below.
 
 Save/retry/conflict/reload and protected-data clearing reuse the existing workflow.
 The Staff continuation uses the existing employees→services_pricing transition;
@@ -58,3 +58,33 @@ Screenshots: `/private/tmp/magnum-staff-onboarding/staff-{1440,1024,768,390,320}
 `validation.png`, `review-320.png`. Real-Keycloak acceptance uses owned disposable
 businesses/identities and confirms save/resume/focus and duplicate-email denial.
 No database migration is required; read-only development preflight reports current.
+
+
+## Services & Pricing stage — 7A-5A
+
+Services supports custom vehicle categories, blank services and an explicitly
+selected generic exterior-care suggestion. Owners enter their own names,
+description, estimated minutes, intended offering status, delivery mode, offered
+shops and shared category prices. Optional shop overrides customize duration,
+status, delivery mode and individual prices without changing shared defaults.
+Prices are entered as decimal USD and parsed into exact integer cents without
+floating-point rounding. Missing/invalid values remain visible for correction;
+Phoenix is authoritative. Removed category/shop references require explicit cleanup.
+
+Save/reload/resume, conflict recovery, exact-request retries, session-bound CSRF,
+context/focus preservation and authorization clearing reuse the existing workspace.
+Review shows defaults, local overrides and unapplied/mobile warnings. Empty service
+configuration is honestly deferred; only server validation permits advancing from
+Services to Branding. Legacy proposals need explicit completion, not silent domain
+application. No new API, migration or browser storage is introduced.
+
+Real-Keycloak screenshots: `/private/tmp/magnum-catalog-onboarding/` contains
+`services-1440.png`, `services-1024.png`, `services-768.png`, `services-390.png`,
+`services-320.png`, `validation.png`, `review-1440.png` and `review-320.png`.
+The isolated acceptance test saves custom categories/shared prices/mobile-shop
+overrides, recovers from missing-price validation, reloads, revalidates focus and
+reviews without applying catalog records. Existing role-denial tests remain active.
+
+## Screenshot archive
+
+Successful real-Keycloak runs copy intentional captures to `~/projects/Magnum-Screenshots/` with milestone/run folders and `latest/<area>` copies. Override with `MAGNUM_SCREENSHOT_ARCHIVE`; CI skips unless explicitly configured. Originals stay in `/private/tmp`. Sync existing captures with `node frontend/scripts/archive-screenshots.mjs` from the repository root. Archive failures never fail tests; failure artifacts/traces/videos and visual baselines are unchanged. Open the archive with `open ~/projects/Magnum-Screenshots`.

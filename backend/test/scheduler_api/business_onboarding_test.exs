@@ -101,9 +101,37 @@ defmodule SchedulerApi.BusinessOnboardingTest do
              BusinessOnboarding.update(c.token, c.business, attrs(d, %{"state" => "review"}))
 
     proposal =
-      put_in(d["proposal"], ["services"], [
-        %{"name" => "Detail", "duration_minutes" => 60, "price_cents" => 12000}
-      ])
+      Map.merge(d["proposal"], %{
+        "locations" => [
+          %{
+            "key" => "first",
+            "existing_shop_id" => c.shop.id,
+            "name" => "First",
+            "address" => "100 Fictional Way",
+            "timezone" => "America/Denver",
+            "operating_model" => "in_shop"
+          }
+        ],
+        "catalog" => %{
+          "version" => 1,
+          "currency" => "USD",
+          "vehicle_categories" => [%{"key" => "car", "name" => "Custom car"}]
+        },
+        "services" => [
+          %{
+            "version" => 2,
+            "key" => "detail",
+            "name" => "Detail",
+            "description" => "Draft detail",
+            "duration_minutes" => 60,
+            "status" => "planned",
+            "delivery_mode" => "in_shop",
+            "location_keys" => ["first"],
+            "prices" => [%{"category_key" => "car", "price_cents" => 12000}],
+            "overrides" => []
+          }
+        ]
+      })
 
     final =
       Enum.reduce(tl(BusinessOnboarding.states()), d, fn state, prev ->

@@ -20,16 +20,17 @@ validation/transition failure, 503 persistence failure. IDs are selectors only.
 
 Ordered states: provisioning_complete → locations → employees → services_pricing →
 branding → review → ready_to_publish → completed. Same-state saves and one-step
-backtracking are supported; completed is terminal. Review requires a proposed
-service; ready/completed require `confirm_review=true`. Empty employees supports
+backtracking are supported; completed is terminal. Advancing past Services requires a valid proposed
+service catalog; ready/completed require `confirm_review=true`. Empty employees supports
 solo operators. Empty location proposals retain the separately exposed applied
 first shop; no shop is ever created or duplicated by this workflow.
 
-Proposals have exactly locations, defaults, employees, services and branding.
+Proposals require locations, defaults, employees, services and branding, with an
+optional versioned catalog extension described below.
 7A-1 location entries use a stable draft key, name, IANA timezone, in_shop operating
 model and optional same-business active existing_shop_id. Defaults are reserved
 and empty. Employees are bounded proposed names/contact/intended roles and location
-keys, never accounts, invitations, employment records or RBAC grants. Services use
+keys, never accounts, invitations, employment records or RBAC grants. Legacy services use
 integer cents/minutes; branding only a display name and validated hex color.
 Unknown fields (including credentials/roles/ownership/status injection), invalid
 references, excess counts and invalid timezone/type/range values are rejected.
@@ -160,3 +161,50 @@ atomic metadata audits and field-bounded private JSON handling apply unchanged.
 Future invitation/application must separately reauthorize targets/scopes, enforce
 Owner protection and employment eligibility, audit actual writes and confirm them.
 Draft review is neither an invitation nor authorization to execute those writes.
+
+
+## Services & Pricing proposals — 7A-5A
+
+The optional `catalog` JSON extension is `{version: 1, currency: "USD",
+vehicle_categories: [{key, name}]}`. Names are business-specific, trimmed, bounded
+and case-insensitively unique; keys are stable lowercase/hyphen identifiers.
+Up to 20 categories and 100 services are supported within the existing 64KB request
+bound. No migration, active catalog mutation, tenant copying or development
+backfill occurs. Existing schema_version=1 and stored receipts remain unchanged.
+
+New service entries have exactly `version: 2`, `key`, `name`, `description`,
+`duration_minutes`, `status`, `delivery_mode`, `location_keys`, `prices`, `overrides`.
+Names/descriptions are required (255/2000 bytes). Durations are integer 1–1440
+minutes; estimated service duration may be explicitly overridden by shop. Status
+is `active` or `planned`, describing intended offering only. Modes are `in_shop`,
+`mobile`, `both`. Every service requires at least one existing/proposed location
+key and at least one vehicle category. Service names and keys are unique.
+
+`prices` supplies one shared `{category_key, price_cents}` for every category.
+USD cents must be exact positive integers, at most 100,000,000, matching active
+catalog positive-price semantics. Missing, duplicate, fractional/string or orphaned
+prices fail validation. `overrides` contains at most one object per offered shop:
+`{location_key, prices, duration_minutes?, delivery_mode?, status?}`. Its price
+array may override a subset of categories; omitted values inherit shared defaults.
+No implicit array union, other-tenant catalog lookup or reference by name occurs.
+Effective delivery must fit each shop's effective draft operating model: a `both`
+shop permits any mode; a single-mode shop permits only its matching mode.
+Removing categories/locations requires explicitly resolving all affected references.
+
+Legacy three-field services remain readable and accepted without `catalog` for
+compatibility. The editor adapts them in memory with a visible Standard category,
+preserves their cents/duration and requires explicit description/shop completion
+before saving the new shape. Legacy entries do not satisfy Services completion until explicitly upgraded.
+Historical receipts and database JSON are not rewritten.
+
+Empty services/categories may be saved to defer configuration. They do not satisfy
+`readiness.services_configured` or a forward transition to Branding/Review. Same
+revision/idempotency/Owner/session/audit rules apply. Generic suggestion text has
+no inherited prices or shop availability. No status or review state publishes a
+service; **mobile booking is unavailable** until separate travel-aware scheduling
+and explicit enablement exist.
+
+Future AI proposals must use this same structured contract, reference this draft's
+stable keys and pass Phoenix validation and Owner review. Applying service/vehicle
+identities, shop-specific price/duration snapshots and publication needs a separate
+audited workflow; no onboarding field invokes Catalog or scheduling operations.

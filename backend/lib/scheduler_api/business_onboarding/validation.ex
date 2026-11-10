@@ -8,7 +8,7 @@ defmodule SchedulerApi.BusinessOnboarding.Validation do
   def empty, do: Map.new(@sections, &{&1, if(&1 in ~w(defaults branding), do: %{}, else: [])})
 
   def valid?(p, business_id) when is_map(p) do
-    keys?(p, @sections, @sections) and
+    keys?(p, @sections ++ ~w(catalog), @sections) and
       list?(p["locations"], 20, &location?(&1, business_id)) and
       unique?(p["locations"], "key") and unique_existing?(p["locations"]) and
       defaults?(p["defaults"]) and
@@ -17,7 +17,7 @@ defmodule SchedulerApi.BusinessOnboarding.Validation do
       end) and
       references?(p) and
       SchedulerApi.BusinessOnboarding.StaffValidation.valid?(p["employees"], p["locations"]) and
-      list?(p["services"], 100, &service?/1) and branding?(p["branding"])
+      SchedulerApi.BusinessOnboarding.CatalogValidation.valid?(p) and branding?(p["branding"])
   end
 
   def valid?(_, _), do: false
@@ -100,12 +100,6 @@ defmodule SchedulerApi.BusinessOnboarding.Validation do
       end
     )
   end
-
-  defp service?(s),
-    do:
-      keys?(s, ~w(name duration_minutes price_cents), ~w(name duration_minutes price_cents)) and
-        text?(s["name"], 255) and integer?(s["duration_minutes"], 1, 1440) and
-        integer?(s["price_cents"], 0, 100_000_000)
 
   defp branding?(b),
     do:
