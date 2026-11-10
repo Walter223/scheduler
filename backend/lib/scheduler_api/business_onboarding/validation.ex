@@ -16,7 +16,7 @@ defmodule SchedulerApi.BusinessOnboarding.Validation do
         zone?(l["timezone"]) and l["operating_model"] in @models
       end) and
       references?(p) and
-      list?(p["employees"], 100, &employee?(&1, p["locations"])) and
+      SchedulerApi.BusinessOnboarding.StaffValidation.valid?(p["employees"], p["locations"]) and
       list?(p["services"], 100, &service?/1) and branding?(p["branding"])
   end
 
@@ -100,15 +100,6 @@ defmodule SchedulerApi.BusinessOnboarding.Validation do
       end
     )
   end
-
-  defp employee?(e, locations),
-    do:
-      keys?(e, ~w(name email intended_role location_keys), ~w(name)) and
-        text?(e["name"], 255) and optional_text?(e, "email", 255) and
-        (not Map.has_key?(e, "intended_role") or
-           e["intended_role"] in ~w(employee shop_manager business_manager)) and
-        (not Map.has_key?(e, "location_keys") or
-           list?(e["location_keys"], 20, &(&1 in Enum.map(locations, fn l -> l["key"] end))))
 
   defp service?(s),
     do:

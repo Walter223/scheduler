@@ -10,8 +10,8 @@ test('loads existing shop without duplicating it and leaves planned areas honest
   expect((screen.getByRole('button',{name:'Configure Main'}) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button',{name:'Locations'}))
   expect(screen.getByLabelText('Shop name')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button',{name:'Staff · Planned'}))
-  expect(screen.getByText(/Staff editing is not implemented/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'Services · Planned'}))
+  expect(screen.getByText(/Services editing is not implemented/)).toBeTruthy()
 })
 for (const status of [401,403]) test(`denied ${status} clears private draft`,async()=>{
   vi.stubGlobal('fetch',vi.fn(async()=>new Response(null,{status})))

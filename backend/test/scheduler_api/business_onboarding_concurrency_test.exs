@@ -53,6 +53,21 @@ defmodule SchedulerApi.BusinessOnboardingConcurrencyTest do
           "proposal" => %{
             d["proposal"]
             | "defaults" => %{"timezone" => "America/Denver", "operating_model" => "in_shop"},
+              "employees" => [
+                %{
+                  "version" => 2,
+                  "key" => "staff",
+                  "name" => "Concurrent Staff",
+                  "email" => "race@example.invalid",
+                  "classification" => "detailer",
+                  "location_keys" => ["one", "two"],
+                  "responsibilities" => %{
+                    "business_management" => false,
+                    "shop_management_keys" => []
+                  },
+                  "access_roles" => [%{"role" => "employee", "location_keys" => ["one", "two"]}]
+                }
+              ],
               "locations" => [
                 %{"key" => "one", "name" => "First", "address" => "1 Fictional Way"},
                 %{"key" => "two", "name" => "Second", "address" => "2 Fictional Way"}

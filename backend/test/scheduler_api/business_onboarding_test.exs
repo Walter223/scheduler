@@ -39,7 +39,16 @@ defmodule SchedulerApi.BusinessOnboardingTest do
 
     p =
       put_in(d["proposal"], ["employees"], [
-        %{"name" => "Proposed Manager", "intended_role" => "business_manager"}
+        %{
+          "version" => 2,
+          "key" => "manager",
+          "name" => "Proposed Manager",
+          "email" => "manager@example.invalid",
+          "classification" => "business_manager",
+          "location_keys" => [],
+          "responsibilities" => %{"business_management" => true, "shop_management_keys" => []},
+          "access_roles" => [%{"role" => "business_manager", "location_keys" => []}]
+        }
       ])
 
     assert {:ok, saved} =

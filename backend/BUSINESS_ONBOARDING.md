@@ -116,3 +116,47 @@ address verification policy, hours, geocoded service areas, dispatch-resource an
 travel-aware capacity/availability, and explicit publication gates. **Public mobile
 booking remains unavailable.** Existing booking buffers, staffing authorization,
 shop locks and capacity rules are unchanged.
+
+## Staff proposals — 7A-4
+
+Draft schema_version remains 1 (JSON extension, no database migration). Each new
+employee proposal has `version: 2`, stable `key`, `name` (full name), `email`,
+`classification`, `location_keys`, `responsibilities` and `access_roles`.
+Required fields cannot be omitted; an empty employees array explicitly supports
+solo/no-staff businesses. Work emails use a conservative ASCII mailbox/domain
+syntax; blank/whitespace, malformed domains and case-insensitive duplicate emails
+are rejected. Names need not be unique: two real people can share a name. Keys
+must be unique. No identity is looked up or linked by email.
+
+Classification is exactly detailer/shop_manager/business_manager/business_owner.
+It does not imply an employment record, membership or role. Responsibilities are
+`{business_management: boolean, shop_management_keys: [location_key]}`. They express
+untrusted business HR/finance/shop-management intentions, not effective authority.
+Shop-management keys must be included in that person's proposed shop assignments.
+
+`access_roles` is an explicit list of `{role, location_keys}` requests: Employee
+and Shop Manager require nonempty shop scope drawn from the person's assignments;
+Business Manager requires an empty location_keys array (business scope). Duplicate
+roles, Owner/platform/wildcard requests, unknown fields and mismatched scopes fail.
+The same person may request independently scoped roles without merging permission
+and scope. Zero access requests and temporarily unassigned employment are allowed.
+A manager classification holding an Employee request remains management-classified;
+future compensation privacy must enforce persisted classification/history as usual.
+
+Existing/proposed locations share stable draft keys; rename/reorder does not alter
+staff references. Deleting a referenced location or removing an assignment while
+retaining scoped requests fails validation until references are explicitly cleared
+or reassigned. Nothing cascades into actual employment, jobs, schedules or RBAC.
+
+Older name/email/intended_role proposals remain readable and historical receipts
+are not rewritten. The editor presents them in the v2 shape for explicit completion:
+missing email/classification requires user input, never inference from a role.
+Existing intended access is displayed as a request; classification is not inferred.
+New saves require the complete v2 contract. No automatic development-data backfill
+or silent activation/grant is introduced.
+
+The existing business-first Owner/session checks, revision compare, UUID receipts,
+atomic metadata audits and field-bounded private JSON handling apply unchanged.
+Future invitation/application must separately reauthorize targets/scopes, enforce
+Owner protection and employment eligibility, audit actual writes and confirm them.
+Draft review is neither an invitation nor authorization to execute those writes.

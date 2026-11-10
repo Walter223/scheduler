@@ -36,3 +36,25 @@ Existing 7A-1 migration must be deployed before accessing Setup; 7A-3 adds no mi
 7A-3B moves this same component to the dedicated `/setup/:businessId` layout.
 Admin retains an authorized Resume Setup link instead of a daily-operations Setup
 section. See [platform routes](PLATFORM_ROUTES.md); draft/API semantics are unchanged.
+
+## Staff stage — 7A-4
+
+Staff now supports adding/editing/removing draft people with name, work email,
+explicit classification, multi-shop assignments, intended management responsibility
+and independently selected proposed access roles/scopes. No classification change
+checks a role box. Every card clearly says proposed; no external notifications,
+accounts, hiring or grants occur. Shop names resolve from stable keys. Removed or
+unassigned references show an explicit clear/reassign warning rather than silently
+removing intentions. Staff Review summarizes classification, assignments,
+management and scoped role requests separately. Services/Branding remain planned.
+
+Save/retry/conflict/reload and protected-data clearing reuse the existing workflow.
+The Staff continuation uses the existing employees→services_pricing transition;
+zero employees is valid. Server validation remains authoritative. No passwords,
+provider data or private HR/pay fields are accepted. Legacy proposals require
+explicit completion of missing required fields before saving the v2 entry contract.
+
+Screenshots: `/private/tmp/magnum-staff-onboarding/staff-{1440,1024,768,390,320}.png`,
+`validation.png`, `review-320.png`. Real-Keycloak acceptance uses owned disposable
+businesses/identities and confirms save/resume/focus and duplicate-email denial.
+No database migration is required; read-only development preflight reports current.

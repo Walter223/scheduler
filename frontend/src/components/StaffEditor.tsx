@@ -1,0 +1,22 @@
+export type StaffProposal = {
+  version: number; key: string; name: string; email: string; classification: string; location_keys: string[]
+  responsibilities: {business_management: boolean; shop_management_keys: string[]}
+  access_roles: {role: string; location_keys: string[]}[]
+}
+type Location = {key: string; name: string}
+export default function StaffEditor({staff, locations, disabled, onChange}: {staff: StaffProposal[]; locations: Location[]; disabled: boolean; onChange: (staff: StaffProposal[])=>void}) {
+  function person(index: number, value: StaffProposal) {onChange(staff.map((p,i)=>i===index?value:p))}
+  function choices(label: string, selected: string[], change: (keys:string[])=>void, allowed=locations) {
+    return <fieldset><legend>{label}</legend>{allowed.map(l=><label key={l.key}><input type="checkbox" checked={selected.includes(l.key)} onChange={e=>change(e.target.checked?[...selected,l.key]:selected.filter(k=>k!==l.key))}/>{l.name || l.key}</label>)}{selected.filter(k=>!allowed.some(l=>l.key===k)).map(k=><p key={k} role="alert">Unavailable location: {k}. Reassign or clear this reference before saving. <button className="admin-button" onClick={()=>change(selected.filter(v=>v!==k))}>Clear missing reference</button></p>)}</fieldset>
+  }
+  return <fieldset className="setup-staff" disabled={disabled}><legend>Proposed staff</legend><p>Draft only: no hiring, invitations, accounts, memberships or role grants. Classification describes employment, not application authority.</p>{staff.length===0 && <p>Solo operator / no proposed employees. Zero staff is valid.</p>}{staff.map((p,i)=><fieldset key={p.key} aria-label={`Staff proposal ${i+1}`}><legend>{p.name || `Person ${i+1}`}</legend><div className="setup-grid"><label>Full name<input maxLength={255} value={p.name} onChange={e=>person(i,{...p,name:e.target.value})}/></label><label>Work email<input type="email" maxLength={254} value={p.email} onChange={e=>person(i,{...p,email:e.target.value})}/></label><label>Employment classification<select value={p.classification} onChange={e=>person(i,{...p,classification:e.target.value})}><option value="">Select classification</option>{['detailer','shop_manager','business_manager','business_owner'].map(c=><option key={c} value={c}>{c.replaceAll('_',' ')}</option>)}</select></label></div>
+    {choices('Proposed shop assignments',p.location_keys,keys=>person(i,{...p,location_keys:keys}))}
+    <fieldset><legend>Intended management responsibilities</legend><label><input type="checkbox" checked={p.responsibilities.business_management} onChange={e=>person(i,{...p,responsibilities:{...p.responsibilities,business_management:e.target.checked}})}/>Business-wide HR / finance responsibility</label>{choices('Shop management responsibility',p.responsibilities.shop_management_keys,keys=>person(i,{...p,responsibilities:{...p.responsibilities,shop_management_keys:keys}}),locations.filter(l=>p.location_keys.includes(l.key)))}</fieldset>
+    <fieldset><legend>Proposed application access (separate review required)</legend>{['employee','shop_manager','business_manager'].map(role=>{
+      const grant=p.access_roles.find(r=>r.role===role)
+      return <fieldset key={role}><legend>{role.replaceAll('_',' ')}</legend><label><input type="checkbox" checked={!!grant} onChange={e=>person(i,{...p,access_roles:e.target.checked?[...p.access_roles,{role,location_keys:[]}]:p.access_roles.filter(r=>r.role!==role)})}/>Request {role.replaceAll('_',' ')} access</label>{grant && role!=='business_manager' && choices('Requested access shops',grant.location_keys,keys=>person(i,{...p,access_roles:p.access_roles.map(r=>r.role===role?{...r,location_keys:keys}:r)}),locations.filter(l=>p.location_keys.includes(l.key)))}{grant && role==='business_manager' && <p>Business-wide request; no operational scheduling authority implied.</p>}</fieldset>
+    })}</fieldset><button className="admin-button" onClick={()=>onChange(staff.filter((_,n)=>n!==i))}>Remove proposed employee {p.name || i+1}</button></fieldset>)}
+    <button className="admin-button" onClick={()=>onChange([...staff,{version:2,key:`staff-${crypto.randomUUID()}`,name:'',email:'',classification:'',location_keys:[],responsibilities:{business_management:false,shop_management_keys:[]},access_roles:[]}])}>Add proposed employee</button>
+    {!locations.length && <p>Configure existing/proposed locations first to request shop assignments or shop-scoped access.</p>}
+  </fieldset>
+}
