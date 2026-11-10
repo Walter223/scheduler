@@ -25,3 +25,4 @@
 .admin-shell .branding-preview.phone { max-width:390px; margin-inline:auto; }
 .admin-shell .branding-samples { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; margin:16px 0; }
 .admin-shell .branding-samples article { background:white; color:#18212b; padding:16px; border-top:4px solid var(--preview-accent); }
+.admin-shell .guide-proposal { max-height:300px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }

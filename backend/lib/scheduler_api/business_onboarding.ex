@@ -13,6 +13,8 @@ defmodule SchedulerApi.BusinessOnboarding do
   def get(credential, id), do: run(credential, id, :get, nil)
   def update(credential, id, attrs), do: run(credential, id, :update, attrs)
 
+  def guide(credential, id, attrs \\ nil), do: run(credential, id, :guide, attrs)
+
   defp run(credential, id, action, attrs) do
     Repo.transaction(fn ->
       business = if is_integer(id), do: RoleManagement.lock_business(%Business{id: id})
@@ -27,21 +29,29 @@ defmodule SchedulerApi.BusinessOnboarding do
 
       result =
         case action do
+          :guide -> guide!(draft || Repo.rollback(:not_started), session.user.id, attrs)
           :start -> draft || begin!(business, session.user.id)
           :get -> draft || Repo.rollback(:not_started)
           :update -> change!(draft || Repo.rollback(:not_started), session.user.id, attrs)
         end
 
-      snapshot = if is_struct(result, Draft), do: projection(result), else: result
+      if action == :guide do
+        result
+      else
+        snapshot = if is_struct(result, Draft), do: projection(result), else: result
 
-      snapshot =
-        Map.put(
-          snapshot,
-          "effective_locations",
-          Validation.effective_locations(snapshot["proposal"])
-        )
+        snapshot =
+          Map.put(
+            snapshot,
+            "effective_locations",
+            Validation.effective_locations(snapshot["proposal"])
+          )
 
-      Map.put(snapshot, "applied", %{"business_id" => business.id, "shops" => shops(business.id)})
+        Map.put(snapshot, "applied", %{
+          "business_id" => business.id,
+          "shops" => shops(business.id)
+        })
+      end
     end)
   rescue
     _ in [
@@ -51,6 +61,165 @@ defmodule SchedulerApi.BusinessOnboarding do
       DBConnection.ConnectionError
     ] ->
       {:error, :operation_unavailable}
+  end
+
+  @topics %{
+    "locations" => ~w(locations defaults),
+    "staff" => ~w(employees),
+    "services" => ~w(services catalog),
+    "branding" => ~w(branding)
+  }
+  defp guide_state(d, actor) do
+    entry = d.guide_state[Integer.to_string(actor)] || %{}
+
+    if (entry["expires_at"] || 0) > System.system_time(:second),
+      do: entry,
+      else: %{"history" => []}
+  end
+
+  defp guide_projection(d, actor),
+    do: Map.merge(guide_state(d, actor), %{"revision" => d.revision, "engine_version" => 1})
+
+  defp guide!(d, actor, nil), do: guide_projection(d, actor)
+
+  defp guide!(d, actor, attrs) do
+    unless is_map(attrs) and
+             Enum.sort(Map.keys(attrs)) ==
+               Enum.sort(~w(action topic proposal revision request_id)) and
+             attrs["action"] in ~w(propose approve discard) and
+             Map.has_key?(@topics, attrs["topic"]) and
+             is_integer(attrs["revision"]),
+           do: Repo.rollback(:invalid_input)
+
+    uuid =
+      case Ecto.UUID.cast(attrs["request_id"]) do
+        {:ok, id} -> id
+        _ -> Repo.rollback(:invalid_input)
+      end
+
+    hash = :crypto.hash(:sha256, :erlang.term_to_binary(attrs, [:deterministic]))
+
+    receipt =
+      Repo.one(
+        from r in "business_onboarding_receipts",
+          where:
+            r.draft_id == ^d.id and r.actor_user_id == ^actor and
+              r.request_id == type(^uuid, Ecto.UUID),
+          select: r.request_hash
+      )
+
+    cond do
+      receipt == hash ->
+        guide_projection(d, actor)
+
+      receipt != nil ->
+        Repo.rollback(:request_conflict)
+
+      attrs["revision"] != d.revision ->
+        Repo.rollback(:revision_conflict)
+
+      d.state == "completed" ->
+        Repo.rollback(:invalid_transition)
+
+      true ->
+        entry = guide_state(d, actor)
+        topic = attrs["topic"]
+        action = attrs["action"]
+
+        {entry, current} =
+          case action do
+            "propose" ->
+              patch = attrs["proposal"]
+
+              unless is_map(patch) and map_size(patch) > 0 and
+                       Enum.all?(Map.keys(patch), &(&1 in @topics[topic])),
+                     do: Repo.rollback(:invalid_input)
+
+              p = Map.merge(d.proposal, patch)
+
+              unless Validation.valid?(p, d.business_id) and
+                       Map.drop(p, @topics[topic]) == Map.drop(d.proposal, @topics[topic]),
+                     do: Repo.rollback(:invalid_input)
+
+              {Map.put(entry, "pending", %{
+                 "topic" => topic,
+                 "proposal" => p,
+                 "base_revision" => d.revision + 1
+               }), d}
+
+            "approve" ->
+              pending = entry["pending"]
+
+              unless attrs["proposal"] == nil and is_map(pending) and pending["topic"] == topic and
+                       pending["base_revision"] == d.revision,
+                     do: Repo.rollback(:revision_conflict)
+
+              change!(d, actor, %{
+                "revision" => d.revision,
+                "request_id" => Ecto.UUID.generate(),
+                "state" => d.state,
+                "proposal" => pending["proposal"]
+              })
+
+              {Map.delete(entry, "pending"), Repo.get!(Draft, d.id)}
+
+            "discard" ->
+              unless attrs["proposal"] == nil, do: Repo.rollback(:invalid_input)
+              {Map.delete(entry, "pending"), d}
+          end
+
+        history =
+          Enum.take(
+            (entry["history"] || []) ++
+              [%{"action" => action, "topic" => topic, "revision" => d.revision + 1}],
+            -20
+          )
+
+        entry =
+          Map.merge(entry, %{
+            "history" => history,
+            "expires_at" => System.system_time(:second) + 604_800
+          })
+
+        current =
+          Repo.update!(
+            Ecto.Changeset.change(current,
+              guide_state:
+                Map.put(
+                  Map.filter(current.guide_state, fn {_, v} ->
+                    (v["expires_at"] || 0) > System.system_time(:second)
+                  end),
+                  Integer.to_string(actor),
+                  entry
+                ),
+              revision: d.revision + 1
+            ),
+            log: false
+          )
+
+        if action != "approve", do: audit!(current, actor, d.state)
+
+        Repo.insert_all(
+          "business_onboarding_receipts",
+          [
+            %{
+              draft_id: d.id,
+              actor_user_id: actor,
+              request_id: Ecto.UUID.dump!(uuid),
+              request_hash: hash,
+              result: %{
+                "guide_action" => action,
+                "topic" => topic,
+                "revision" => current.revision
+              },
+              inserted_at: DateTime.utc_now() |> DateTime.truncate(:second)
+            }
+          ],
+          log: false
+        )
+
+        guide_projection(current, actor)
+    end
   end
 
   defp actor!(%SessionCredential{} = credential) do
@@ -143,7 +312,8 @@ defmodule SchedulerApi.BusinessOnboarding do
       if next >= 5 and
            not SchedulerApi.BusinessOnboarding.BrandingValidation.complete?(
              attrs["proposal"]["branding"]
-           ), do: Repo.rollback(:incomplete_draft)
+           ),
+         do: Repo.rollback(:incomplete_draft)
 
       if attrs["state"] in ~w(ready_to_publish completed) and attrs["confirm_review"] != true,
         do: Repo.rollback(:confirmation_required)

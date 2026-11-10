@@ -228,3 +228,37 @@ Custom palette contrast requires review before publication. No live website or
 platform identity changes. Screenshots: /private/tmp/magnum-branding-onboarding/
 with preset-{1440,1024,768,390,320}.png, validation.png, mobile-preview.png and
 review-320.png; successful acceptance runs archive these automatically.
+
+## Guided setup — 7B-1
+
+No LLM or free-text transcript: deterministic topic prompts plus structured manual
+editor input, server-validated proposals and explicit approve/discard operations.
+GET/POST `/api/admin/businesses/:business_id/onboarding/guide` uses the same Owner,
+session, CSRF/origin, no-store and bounded-parser boundary. POST requires exactly
+action (propose/approve/discard), topic (locations/staff/services/branding), proposal
+(topic-only patch for propose; null otherwise), revision and UUID request_id.
+Unknown fields, unrelated patches and invalid domain data fail closed. Approval
+reuses the existing draft mutation/validation and never applies live configuration.
+
+Migration 20261110040000 adds private redacted guide_state JSON to the draft.
+Entries are keyed by authenticated local Owner ID; other Owners cannot read them.
+Business/member/session locks precede all guide operations. Every accepted command
+advances the shared draft revision and atomically audits actor/revision; durable
+receipt metadata records action/topic and prevents repeated writes. Concurrent manual
+edits invalidate pending approvals and require reload/review. Historical receipts
+are not rewritten. No automatic merge or forced override is provided.
+
+History is bounded to 20 enum action/topic/revision entries, not chat text. Pending
+structured proposals expire after seven days; expired entries are hidden immediately
+and pruned on subsequent guide writes. Physical removal from inactive drafts and
+backups requires an operator retention job/policy before production deployment.
+Never enter credentials or personal identifiers in setup fields. Existing bounded
+field allowlists apply; no arbitrary natural-language command is accepted.
+
+Manual editors remain available. Guide proposals are separate from saved domain
+proposals until explicit approval; approved data reloads the manual workspace.
+Network uncertainty retries the exact UUID/body. Conflicts require reload. Normal
+focus preserves mounted workspace; business/access changes clear private state.
+Screenshots: /private/tmp/magnum-guided-onboarding/proposal-{1440,1024,768,390,320}.png;
+successful real-provider runs copy them to the permanent 7b-1-guide archive.
+Development migration requires explicit approval and has not been applied.

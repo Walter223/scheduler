@@ -9,6 +9,7 @@ defmodule SchedulerApi.BusinessOnboarding.Draft do
     field :revision, :integer, default: 0
     field :state, :string, default: "provisioning_complete"
     field :proposal, :map, redact: true
+    field :guide_state, :map, default: %{}, redact: true
     timestamps(type: :utc_datetime)
   end
 end

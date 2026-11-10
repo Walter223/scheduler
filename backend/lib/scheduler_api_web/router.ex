@@ -34,6 +34,10 @@ defmodule SchedulerApiWeb.Router do
 
     get "/businesses/:business_id/calendar", CalendarController, :index, log: false
     get "/businesses/:business_id/dashboard", DashboardController, :show, log: false
+
+    get "/businesses/:business_id/onboarding/guide", BusinessOnboardingController, :guide_show,
+      log: false
+
     get "/businesses/:business_id/onboarding", BusinessOnboardingController, :show, log: false
     get "/context", AdminContextController, :index, log: false
     get "/appointments", AppointmentController, :index, log: false
@@ -59,6 +63,7 @@ defmodule SchedulerApiWeb.Router do
   scope "/api/admin/businesses/:business_id", SchedulerApiWeb do
     pipe_through :admin_write
     post "/onboarding", BusinessOnboardingController, :create, log: false
+    post "/onboarding/guide", BusinessOnboardingController, :guide_update, log: false
     put "/onboarding", BusinessOnboardingController, :update, log: false
     post "/employees", EmployeeWriteController, :create, log: false
 

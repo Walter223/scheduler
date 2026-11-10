@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './setup.css'
+import SetupGuide from './SetupGuide'
 import BrandingEditor, {BrandingPreview} from './BrandingEditor'
 import StaffEditor from './StaffEditor'
 import CatalogEditor, { CatalogReview } from './CatalogEditor'
@@ -83,6 +84,7 @@ export default function SetupWorkspace({ businessId }: { businessId: number }) {
     <p role="status">{message}</p><p><strong>Unpublished.</strong> Setup contains proposals only. Mobile booking, invitations and publishing are not enabled.</p>
     {!draft ? <><button className="admin-button" disabled={busy} onClick={() => save(true)}>Begin setup</button><button className="admin-button" onClick={() => setReload(v => v+1)}>Retry loading</button></> : <>
       <p>Saved workflow: {draft.state.replaceAll('_',' ')} · Revision {draft.revision}{dirty ? ' · Unsaved edits' : ''}</p>
+      <SetupGuide businessId={businessId} proposal={proposal! as unknown as Record<string,unknown>} onRevision={revision=>setDraft(d=>d?{...d,revision}:d)} onApproved={()=>setReload(v=>v+1)} />
       <nav aria-label="Setup steps">{['Business','Locations','Staff','Services','Branding','Review'].map(step => <button className="admin-button" key={step} aria-current={tab === step ? 'step' : undefined} onClick={() => setTab(step)}>{step}</button>)}</nav>
       {tab === 'Business' && <><h3>Provisioning complete</h3><p>Your business and initial shop already exist. Begin with Locations; no setup save creates or duplicates a shop.</p><ul>{draft.applied.shops.map(s => <li key={s.id}>{s.name} · {s.timezone} <button className="admin-button" disabled={locked || proposal!.locations.some(l => l.existing_shop_id === s.id)} onClick={() => edit({...proposal!, locations: [...proposal!.locations,{key: `shop-${s.id}`,existing_shop_id:s.id,name:s.name,timezone:s.timezone,operating_model:'in_shop'}]})}>Configure {s.name}</button></li>)}</ul></>}
       {tab === 'Locations' && <fieldset disabled={locked}><legend>Location proposals</legend><h3>Shared defaults</h3><div className="setup-grid"><label>Default timezone<input value={proposal!.defaults.timezone || ''} onChange={e => {const defaults = {...proposal!.defaults}; if(e.target.value) defaults.timezone=e.target.value; else delete defaults.timezone; edit({...proposal!,defaults})}} /></label><label>Default operating model<select value={proposal!.defaults.operating_model || ''} onChange={e => {const defaults={...proposal!.defaults}; if(e.target.value) defaults.operating_model=e.target.value; else delete defaults.operating_model; edit({...proposal!,defaults})}}><option value="">Not specified</option><option value="in_shop">In-shop</option><option value="mobile">Mobile dispatch</option><option value="both">Both</option></select></label></div>{mobile(proposal!.defaults.mobile || {}, v => edit({...proposal!,defaults:{...proposal!.defaults,mobile:v}}))}

@@ -2,6 +2,8 @@ defmodule SchedulerApiWeb.BusinessOnboardingController do
   use SchedulerApiWeb, :controller
   alias SchedulerApi.Accounts.SessionCredential
   alias SchedulerApiWeb.BrowserSession
+  def guide_show(conn, _), do: handle(conn, :guide_get)
+  def guide_update(conn, _), do: handle(conn, :guide_update)
   def show(conn, _), do: handle(conn, :get)
   def create(conn, _), do: handle(conn, :start)
   def update(conn, _), do: handle(conn, :update)
@@ -14,6 +16,8 @@ defmodule SchedulerApiWeb.BusinessOnboardingController do
         credential = %SessionCredential{value: conn.req_cookies[BrowserSession.session_name()]}
 
         case action do
+          :guide_get -> SchedulerApi.BusinessOnboarding.guide(credential, id)
+          :guide_update -> SchedulerApi.BusinessOnboarding.guide(credential, id, conn.body_params)
           :get -> SchedulerApi.BusinessOnboarding.get(credential, id)
           :start -> SchedulerApi.BusinessOnboarding.start(credential, id)
           :update -> SchedulerApi.BusinessOnboarding.update(credential, id, conn.body_params)
