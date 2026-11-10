@@ -3,7 +3,7 @@ import {copyFileSync, existsSync, mkdirSync, readdirSync, statSync, utimesSync, 
 import {homedir} from 'node:os'
 import {join, basename} from 'node:path'
 import {randomUUID} from 'node:crypto'
-const groups = {'magnum-admin-ux':'ux-1-admin','magnum-hr-ux':'ux-2-hr','magnum-calendar-ux':'ux-3-calendar','magnum-platform':'7a-3b-platform','magnum-signup':'6a-2b-signup','magnum-setup':'7a-3-setup','magnum-staff-onboarding':'7a-4-staff','magnum-catalog-onboarding':'7a-5a-catalog'}
+const groups = {'magnum-branding-onboarding':'7a-5b-branding','magnum-admin-ux':'ux-1-admin','magnum-hr-ux':'ux-2-hr','magnum-calendar-ux':'ux-3-calendar','magnum-platform':'7a-3b-platform','magnum-signup':'6a-2b-signup','magnum-setup':'7a-3-setup','magnum-staff-onboarding':'7a-4-staff','magnum-catalog-onboarding':'7a-5a-catalog'}
 export function syncScreenshots({root = process.env.MAGNUM_SCREENSHOT_ARCHIVE, source = '/private/tmp', since = 0} = {}) {
   if (!root && process.env.CI) return {skipped:true}
   root ||= join(homedir(), 'projects', 'Magnum-Screenshots')
@@ -17,7 +17,7 @@ export function syncScreenshots({root = process.env.MAGNUM_SCREENSHOT_ARCHIVE, s
       if (!name.endsWith('.png')) continue
       const file = join(path,name), info = statSync(file)
       if (!info.isFile() || info.mtimeMs < since) continue
-      const area = folder.includes('catalog') ? 'services-pricing' : folder.includes('staff') || folder === 'magnum-setup' ? 'onboarding-setup' : folder.includes('calendar') ? 'calendar' : folder.includes('hr') ? 'employees-hr' : folder.includes('admin') ? 'admin' : folder.includes('signup') ? 'signup' : name.startsWith('setup') ? 'onboarding-setup' : name.startsWith('admin') ? 'admin' : name.startsWith('signup') ? 'signup' : 'platform'
+      const area = folder.includes('branding') ? 'onboarding-setup' : folder.includes('catalog') ? 'services-pricing' : folder.includes('staff') || folder === 'magnum-setup' ? 'onboarding-setup' : folder.includes('calendar') ? 'calendar' : folder.includes('hr') ? 'employees-hr' : folder.includes('admin') ? 'admin' : folder.includes('signup') ? 'signup' : name.startsWith('setup') ? 'onboarding-setup' : name.startsWith('admin') ? 'admin' : name.startsWith('signup') ? 'signup' : 'platform'
       for (const dest of [join(root,milestone,run,name), join(root,'latest',area,`${milestone}-${basename(name)}`)]) {
         if (dest.includes('/latest/') && existsSync(dest) && statSync(dest).mtimeMs > info.mtimeMs) continue
         mkdirSync(join(dest,'..'),{recursive:true});copyFileSync(file,dest);utimesSync(dest,info.atime,info.mtime)

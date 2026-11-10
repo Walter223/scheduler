@@ -112,6 +112,15 @@ defmodule SchedulerApi.BusinessOnboardingTest do
             "operating_model" => "in_shop"
           }
         ],
+        "branding" => %{
+          "display_name" => "Fictional",
+          "contact_email" => "public@example.invalid",
+          "contact_phone" => "+1 555 010 1234",
+          "primary_color" => "#112233",
+          "secondary_color" => "#ddeeff",
+          "accent_color" => "#445566",
+          "preset" => "modern"
+        },
         "catalog" => %{
           "version" => 1,
           "currency" => "USD",

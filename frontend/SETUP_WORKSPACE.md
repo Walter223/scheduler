@@ -88,3 +88,23 @@ reviews without applying catalog records. Existing role-denial tests remain acti
 ## Screenshot archive
 
 Successful real-Keycloak runs copy intentional captures to `~/projects/Magnum-Screenshots/` with milestone/run folders and `latest/<area>` copies. Override with `MAGNUM_SCREENSHOT_ARCHIVE`; CI skips unless explicitly configured. Originals stay in `/private/tmp`. Sync existing captures with `node frontend/scripts/archive-screenshots.mjs` from the repository root. Archive failures never fail tests; failure artifacts/traces/videos and visual baselines are unchanged. Open the archive with `open ~/projects/Magnum-Screenshots`.
+
+## Branding drafts — 7A-5B
+
+Branding accepts display_name (255 bytes), optional tagline (200) and description
+(2000), contact_email (254), contact_phone (7–15 digits, optional leading + and
+spacing/parentheses/hyphens), primary_color/secondary_color/accent_color (six-digit
+hex) and preset (modern/premium/minimal). Unknown fields and asset URLs fail.
+Partial valid drafts can be saved; Review requires every field except optional
+text. readiness.branding_configured is server-derived. Existing revisions, receipts,
+Owner/session checks and metadata-only atomic audits apply. No migration is needed.
+
+The scoped preview uses escaped React text, validated CSS colors and fictional
+service cards with no booking links or availability. Mobile/desktop preview modes
+are illustrative. Logo is a placeholder, never an arbitrary URL or upload. Future
+uploads require authorized tenant-owned storage, bounded size/type validation,
+decoding/re-encoding, malware checks, safe serving and audited asset references.
+Custom palette contrast requires review before publication. No live website or
+platform identity changes. Screenshots: /private/tmp/magnum-branding-onboarding/
+with preset-{1440,1024,768,390,320}.png, validation.png, mobile-preview.png and
+review-320.png; successful acceptance runs archive these automatically.

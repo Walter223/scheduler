@@ -17,7 +17,8 @@ defmodule SchedulerApi.BusinessOnboarding.Validation do
       end) and
       references?(p) and
       SchedulerApi.BusinessOnboarding.StaffValidation.valid?(p["employees"], p["locations"]) and
-      SchedulerApi.BusinessOnboarding.CatalogValidation.valid?(p) and branding?(p["branding"])
+      SchedulerApi.BusinessOnboarding.CatalogValidation.valid?(p) and
+      SchedulerApi.BusinessOnboarding.BrandingValidation.valid?(p["branding"])
   end
 
   def valid?(_, _), do: false
@@ -100,13 +101,6 @@ defmodule SchedulerApi.BusinessOnboarding.Validation do
       end
     )
   end
-
-  defp branding?(b),
-    do:
-      keys?(b, ~w(display_name primary_color), []) and optional_text?(b, "display_name", 255) and
-        (not Map.has_key?(b, "primary_color") or
-           (is_binary(b["primary_color"]) and
-              Regex.match?(~r/^#[0-9a-fA-F]{6}$/, b["primary_color"])))
 
   defp keys?(m, allowed, required),
     do:
