@@ -14,7 +14,7 @@ test('platform, signup and customer website have separate responsive identities'
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
     await page.screenshot({path:`${folder}/platform-${width}.png`,fullPage:true})
     await page.goto('/signup')
-    await expect(page.getByRole('button',{name:'Continue to verification'})).toBeVisible()
+    await expect(page.getByRole('button',{name:'I already have an account'})).toBeVisible()
     await page.screenshot({path:`${folder}/signup-${width}.png`,fullPage:true})
   }
   for(const width of [1440,390]){

@@ -22,12 +22,13 @@ export default function SignupPage() {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const businessEdited = useRef(false), shopEdited = useRef(false)
+  const failedAttempt = useRef(new URLSearchParams(window.location.search).has('auth_error'))
   const pending = useRef(false)
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
     const controller = new AbortController()
-    const failed = new URLSearchParams(window.location.search).has('auth_error')
+    const failed = failedAttempt.current
     const url = new URL(window.location.href)
     url.searchParams.delete('auth_error')
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
@@ -35,7 +36,7 @@ export default function SignupPage() {
       if (response.status === 403) {
         if (!controller.signal.aborted) {
           setPhase('verify')
-          setMessage(failed ? 'Verification was canceled or could not be completed. Please try again.' : 'Business-creation verification is missing, expired or could not be confirmed. Your ordinary Magnum sign-in is separate. Choose Continue to verification to restart signup and return here. Nothing is created until you review and confirm.')
+          setMessage(failed ? 'Verification was canceled or could not be completed. Choose an account option below to try again.' : '')
         }
         return
       }
@@ -47,7 +48,7 @@ export default function SignupPage() {
     }).catch(() => {
       if (!controller.signal.aborted) {
         setPhase('verify')
-        setMessage(failed ? 'Verification was canceled or could not be completed. Please try again.' : 'Signup verification could not be checked. Check your connection and try Continue to verification again.')
+        setMessage(failed ? 'Verification was canceled or could not be completed. Please try again.' : 'Signup verification could not be checked. Check your connection and try an account option again.')
       }
     })
     return () => { alive.current = false; controller.abort() }
@@ -90,7 +91,7 @@ export default function SignupPage() {
     <p>Set up your company on the Magnum platform. Your business and customer booking stay independent.</p>
     {message && <p role="alert" className="signup-message">{message}</p>}
     {phase === 'loading' && <p role="status">Checking signup verification…</p>}
-    {phase === 'verify' && <><h2>First, verify your identity</h2><p>Continue to Keycloak to sign in with a verified account. If you need an account, follow the registration options provided there. No business access is granted until setup succeeds.</p><button disabled={busy} onClick={()=>verify()}>{busy ? 'Connecting…' : 'Continue to verification'}</button><button disabled={busy} onClick={()=>verify(true)}>Create Account in Keycloak</button></>}
+    {phase === 'verify' && <><h2>Create an account or sign in</h2><p>Keycloak securely handles your password and verifies your email. After you confirm your identity, you can enter your business details here. No business is created by signing in.</p><button disabled={busy} onClick={()=>verify()}>{busy ? 'Connecting…' : 'I already have an account'}</button><button disabled={busy} onClick={()=>verify(true)}>Create an account</button></>}
     {phase === 'form' && <form onSubmit={event => { event.preventDefault(); setMessage(''); setPhase('review') }}>
       <fieldset><legend>Your business</legend>
         <label>Business name<input required maxLength={255} value={details.business.name} onChange={e => setDetails({ ...details, business: { ...details.business, name: e.target.value, ...(!businessEdited.current?{slug:identifier(e.target.value)}:{}) } })} /></label>

@@ -12,9 +12,9 @@ for (const kind of ['pending', 'owner']) test(`real ${kind} signup, Owner access
   if (kind === 'owner') { await new AdminPage(page).login(identity); await expect(page.getByText('Signed in as E2E',{exact:true})).toBeVisible() }
   await page.goto('/platform')
   await page.getByRole('link',{name:'Create a Business',exact:true}).click()
-  await expect(page.getByRole('button', {name: 'Continue to verification'})).toBeVisible()
+  await expect(page.getByRole('button', {name: 'I already have an account'})).toBeVisible()
   if (kind === 'pending') {await page.screenshot({fullPage: true, path: `${folder}/entry.png`});await page.setViewportSize({width:390,height:1000});await page.screenshot({fullPage:true,path:`${folder}/entry-390.png`});await page.setViewportSize({width:1440,height:1000})}
-  await page.getByRole('button', {name: 'Continue to verification'}).click()
+  await page.getByRole('button', {name: 'I already have an account'}).click()
   if(kind === 'pending'){
   await page.getByRole('textbox', {name: /email|username/i}).fill(identity.username)
   await page.getByLabel('Password', {exact: true}).fill(identity.password)
@@ -25,8 +25,8 @@ for (const kind of ['pending', 'owner']) test(`real ${kind} signup, Owner access
     const proof = (await context.cookies()).find(cookie => cookie.name === 'magnum_onboarding_dev')!
     await context.addCookies([{...proof, expires: Math.floor(Date.now() / 1000) - 1}])
     await page.reload()
-    await expect(page.getByRole('button', {name: 'Continue to verification'})).toBeVisible()
-    await page.getByRole('button', {name: 'Continue to verification'}).click()
+    await expect(page.getByRole('button', {name: 'I already have an account'})).toBeVisible()
+    await page.getByRole('button', {name: 'I already have an account'}).click()
     await expect(page.getByLabel('Business name')).toBeVisible()
   }
   const isolated = await browser.newContext()

@@ -5,7 +5,10 @@ const {users,run_id}=JSON.parse(readFileSync(process.env.BFF_E2E_FIXTURE!,'utf8'
 test('fresh browser registration stays in Keycloak; verified pending signup creates its own tenant',async({page})=>{
  const identity=users.find((u:{kind:string})=>u.kind==='registration')
  await page.goto('/platform');await page.getByRole('link',{name:'Create a Business',exact:true}).click()
- await page.getByRole('button',{name:'Create Account in Keycloak'}).click()
+ mkdirSync('/private/tmp/magnum-signup',{recursive:true})
+ await expect(page.getByRole('alert')).toHaveCount(0)
+ await page.screenshot({path:'/private/tmp/magnum-signup/signup-account-choices.png',fullPage:true})
+ await page.getByRole('button',{name:'Create an account'}).click()
  await expect(page).toHaveURL(/auth\.magnum\.test/)
  mkdirSync('/private/tmp/magnum-signup',{recursive:true})
  for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`/private/tmp/magnum-signup/keycloak-registration-entry-${width}.png`,fullPage:true})}
@@ -14,6 +17,7 @@ test('fresh browser registration stays in Keycloak; verified pending signup crea
  await page.getByLabel('Email',{exact:false}).fill(identity.email)
  await page.getByRole('button',{name:'Register',exact:true}).click()
  await expect(page.getByText(/verify your email|email verification|verification link/i).first()).toBeVisible()
+ await page.screenshot({path:'/private/tmp/magnum-signup/keycloak-email-verification.png',fullPage:true})
  expect(await page.context().cookies('http://localhost:5174')).not.toEqual(expect.arrayContaining([expect.objectContaining({name:'magnum_onboarding_dev'})]))
  // Read only the exact disposable recipient from local Mailpit; follow the real one-time email action in Keycloak.
  execFileSync('python3',['../scripts/auth_registration_fixture.py'],{env:process.env,stdio:'pipe'})

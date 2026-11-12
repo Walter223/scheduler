@@ -40,10 +40,11 @@ See [platform routes](PLATFORM_ROUTES.md) for the dedicated Setup/operations nav
 Signup now supports an explicit Create Account action via Keycloak's documented
 OIDC `prompt=create` extension. It uses the same signup-purpose transaction,
 nonce/state/browser binding, code flow and PKCE. Normal login never adds that hint.
-Passwords stay entirely in Keycloak. The existing development `magnum` realm has
-registrationAllowed=false: it must be explicitly reviewed/enabled by its operator
-before new-user registration is available there. No runtime realm setting is
-silently reconciled or changed by this repair.
+Passwords stay entirely in Keycloak. The local development `magnum` realm was
+explicitly backed up and registration enabled with Owner authorization. Email
+verification remains required and local Mailpit captures verification messages.
+Run `python3 scripts/dev-signup-health.py` from the repository root before manual
+acceptance; passing disposable-realm tests alone does not prove local readiness.
 
 Completed proofs can return a minimal confirmed business name/ID and first-shop ID
 from GET /auth/signup, allowing refresh to restore success without a new tenant or
@@ -105,7 +106,7 @@ the browser has no valid onboarding proof/binding pair. An ordinary authenticate
 session or temporary `magnum_login_dev` OIDC binding is not that proof. Status
 reads do not consume it; successful business provisioning does.
 
-Open http://localhost:5173/signup and choose Continue to verification to explicitly
+Open http://localhost:5173/signup and choose I already have an account to explicitly
 restart signup, complete Keycloak, and return to the business form. Keep localhost
 consistent; host-only cookies do not transfer to 127.0.0.1. Avoid starting competing
 OIDC attempts in other tabs: the newest attempt replaces the temporary binding.
@@ -116,3 +117,11 @@ OIDC. React StrictMode can abort its first status fetch, leaving an unreadable
 response body in browser tools; inspect the completed request. Never share cookie
 values or callback query strings. Focused real-provider recovery coverage:
 `npm run test:auth -- --spec zzzzzz-signup-recovery.spec.ts`.
+
+Normal first visits show account choices without an expired-proof alert. Initial
+403 status is an anonymous identity gate, not a failed signup; failed callbacks
+and rejected submissions still show explicit recovery. The new missing-cookie
+error is signup_verification_required (403), while the frontend also accepts the
+legacy first-visit response so the running development backend needs no restart.
+The readiness check fails if registration is disabled; disabled-realm detection
+is infrastructure coverage, not a claim of an in-app capability-discovery UI.

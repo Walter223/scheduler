@@ -9,7 +9,7 @@ test('authenticated Owner creates an independent company without leaving signup 
  const before=await (await page.request.get('/api/admin/context')).json()
  await page.goto('/platform')
  await page.getByRole('link',{name:'Create a Business',exact:true}).click()
- await page.getByRole('button',{name:'Continue to verification'}).click()
+ await page.getByRole('button',{name:'I already have an account'}).click()
  await page.getByLabel('Business name',{exact:true}).fill('Golden Independent Studio')
  await page.getByLabel('Booking website address',{exact:true}).fill(`${run_id}-golden`)
  await page.getByLabel('Shop name',{exact:true}).fill('Golden Initial Shop')

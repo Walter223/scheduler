@@ -14,7 +14,7 @@ async function fill() {
 test('missing proof offers separate verification and normal employee entry', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 403 })))
   show()
-  expect(await screen.findByRole('button', { name: 'Continue to verification' })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: 'I already have an account' })).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/admin')
 })
 test('review, exact CSRF payload, duplicate protection and confirmed success', async () => {
@@ -65,16 +65,23 @@ test('help disclosure has an explicit close action and no submit side effect',as
 test('missing signup verification explains restart without automatically initiating OIDC',async()=>{
  const fetcher=vi.fn(async()=>new Response(JSON.stringify({error:'signup_unavailable'}),{status:403,headers:{'Content-Type':'application/json'}}))
  vi.stubGlobal('fetch',fetcher);show()
- await screen.findByText(/Your ordinary Magnum sign-in is separate/)
+ await screen.findByRole('button',{name:'I already have an account'})
  expect(fetcher.mock.calls).toHaveLength(1)
  expect(screen.queryByLabelText('Business name')).toBeNull()
- expect(screen.getByRole('button',{name:'Continue to verification'})).toBeTruthy()
+ expect(screen.getByRole('button',{name:'I already have an account'})).toBeTruthy()
 })
 
 test('StrictMode repeats only read-only status requests and never initiates OIDC automatically',async()=>{
  const calls:{url:string;method:string}[]=[]
  vi.stubGlobal('fetch',vi.fn(async(url:string,opts?:RequestInit)=>{calls.push({url,method:opts?.method || 'GET'});return new Response(JSON.stringify({error:'signup_unavailable'}),{status:403})}))
  render(<StrictMode><MemoryRouter><SignupPage/></MemoryRouter></StrictMode>)
- await screen.findByText(/Your ordinary Magnum sign-in is separate/)
+ await screen.findByRole('button',{name:'I already have an account'})
  expect(calls).toEqual([{url:'/auth/signup',method:'GET'},{url:'/auth/signup',method:'GET'}])
+})
+
+test('normal first visit offers account choices without a missing-proof alert',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>Response.json({error:'signup_verification_required'},{status:403})))
+ show();await screen.findByRole('button',{name:'Create an account'})
+ expect(screen.getByRole('button',{name:'I already have an account'})).toBeTruthy()
+ expect(screen.queryByRole('alert')).toBeNull()
 })

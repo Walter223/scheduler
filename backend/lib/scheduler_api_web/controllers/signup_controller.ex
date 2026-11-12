@@ -64,7 +64,14 @@ defmodule SchedulerApiWeb.SignupController do
     if params != %{} do
       fail(conn, :invalid_input)
     else
-      case Onboarding.status(conn.req_cookies[cookie_name()], conn.req_cookies[binding_name()]) do
+      case if(is_nil(conn.req_cookies[cookie_name()]),
+             do: {:error, :signup_verification_required},
+             else:
+               Onboarding.status(
+                 conn.req_cookies[cookie_name()],
+                 conn.req_cookies[binding_name()]
+               )
+           ) do
         {:ok, result} -> json(conn, result)
         {:error, error} -> fail(conn, error)
       end
@@ -127,6 +134,7 @@ defmodule SchedulerApiWeb.SignupController do
         :invalid_origin -> {403, "forbidden"}
         :invalid_csrf -> {403, "forbidden"}
         :invalid_input -> {422, "invalid_input"}
+        :signup_verification_required -> {403, "signup_verification_required"}
         :slug_unavailable -> {409, "signup_conflict"}
         :replayed_proof -> {409, "signup_conflict"}
         :rate_limited -> {429, "try_later"}

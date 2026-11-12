@@ -182,7 +182,7 @@ these are identity-server internals, not Magnum authorization.
 ## Password, MFA and step-up baseline
 
 Active now: minimum 15 / maximum 128 characters, long passphrases, not-equal-to
-username/email checks, email verification enabled, self-registration disabled,
+username/email checks, email verification enabled, local self-registration enabled (email verification required),
 password reset available, temporary brute-force delays after five failures.
 There are no composition requirements, forced periodic expiration or password
 history requirement. Keep Keycloak's default supported password hashing.
@@ -360,3 +360,62 @@ opaque cookies, CSRF, local logout, pending-account behavior and the isolated
 `npm run test:auth` real-login workflow. Staff MFA remains unenforced and the
 unauthorized admin endpoint remains development-only. Keycloak authenticates
 identity; Phoenix authorizes Magnum access.
+
+
+### Local business signup readiness
+
+Run `PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH" python3 scripts/dev-signup-health.py`
+before manual signup. This read-only check validates the actual local realm (not
+a disposable acceptance realm), required verification, local Mailpit SMTP, client
+contract, Phoenix/Vite, launcher schema checks and routes. Isolated test success
+does not establish development readiness. Mailpit at http://localhost:8025 captures
+verification emails locally; no external email delivery is configured.
+
+Open http://localhost:5173/platform → Create a Business. Choose Create an account
+for a new Keycloak identity, or I already have an account for existing users.
+Complete the required email action using local Mailpit, then return through the
+callback to the business form. After confirmed named success, choose Sign in to
+Magnum for ordinary Owner access and Resume Setup. No password passes through React.
+An existing active Owner may create one independent company per day. Ordinary
+login still denies pending users; activation occurs only with successful signup.
+
+The authorized local realm registration change has a private configuration backup
+under `.local/backups/keycloak-magnum-signup-20261112T010653Z.json` (mode 0600).
+To roll back only that flag, use supported local Keycloak administration to set
+registrationAllowed to the backup's value; do not import/reset the realm or change
+users/clients. Source realm JSON is for new installations; existing realms require
+explicit, narrowly scoped reconciliation. No server restart is needed for this flag.
+
+### Actual local SMTP verification checkpoint
+
+The live local `magnum` realm was inspected through the supported administration
+API: `smtpServer` is configured, registration is enabled and `verifyEmail=true`.
+Select **magnum**, rather than master or an isolated acceptance realm, when
+checking Realm settings → Email in the local Administration Console.
+
+Keycloak uses `auth-mail:1025` (Docker DNS, not localhost), sender
+`no-reply@magnum.test`, display name `Magnum Local Development`. SMTP auth, SSL and
+STARTTLS are false only for this local Mailpit sink. Both services share the
+`auth` internal and `auth-local` bridges. The inbox binds to 127.0.0.1:8025;
+SMTP is container-only and is not published to the host. Realm settings persist
+in the existing Keycloak PostgreSQL volume; source defaults remain in
+`infra/auth/magnum-realm.json`. Ordinary container recreation does not reconcile
+an existing realm or reset its settings.
+
+Delivery was verified in this actual realm with a uniquely owned disposable user:
+Keycloak's supported send-verify-email operation delivered to Mailpit, then an
+actual browser followed the action link and persisted emailVerified=true. Required
+profile fields were supplied for the final check. No administrative verification
+override, password reset or Magnum activation was used. Only owned test users and
+messages were removed afterward; an empty inbox does not negate the delivery result.
+
+To start only Mailpit next time (from the repository root):
+
+```sh
+docker compose --project-name magnum-auth-dev --env-file infra/auth/.env --profile auth up -d --no-deps auth-mail
+```
+
+Open http://localhost:8025. Request verification through the real signup UI and
+follow **your own** captured email's action link; it is a credential and must not be
+shared in logs or screenshots. Local Mailpit captures mail rather than delivering
+it externally. No production SMTP configuration or external provider is needed.

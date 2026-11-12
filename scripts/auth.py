@@ -36,7 +36,7 @@ def check_contract(realm):
     require(not realm.get("users") and not realm.get("groups") and not realm.get("roles"),
             "No users, groups or Magnum authorization roles belong in this configuration")
     require(realm["verifyEmail"] and realm["bruteForceProtected"], "Email/brute-force baseline missing")
-    require(not realm["registrationAllowed"], "Self-registration must stay disabled")
+    require(realm["registrationAllowed"], "Local signup requires self-registration")
     require(realm["passwordPolicy"] ==
             "length(15) and maxLength(128) and notUsername(undefined) and notEmail(undefined)",
             "Password baseline differs")
