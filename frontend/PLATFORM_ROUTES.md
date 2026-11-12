@@ -53,3 +53,10 @@ no production hostname or new OIDC callbacks are invented here.
 Verification uses existing isolated auth fixtures and cleanup. Screenshots live in
 `/private/tmp/magnum-platform/`: platform/signup/setup at 1440,1024,768,390,320;
 detailing-home at 1440/390; Admin resume at 1440/390 and management return at 1440.
+
+Signup recovery keeps successful creation on /signup, including refresh while the
+browser-bound proof remains valid. The user explicitly starts ordinary login only
+after seeing the confirmed company name. Neither the existing Admin session nor
+frontend business selection determines a signup owner or changes OIDC purpose.
+See SIGNUP.md for isolated registration acceptance and the development realm's
+explicit registration-policy prerequisite.

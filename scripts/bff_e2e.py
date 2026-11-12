@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Opt-in real Keycloak browser tests; isolated PostgreSQL DB and temporary owned identities."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,11 @@ def check_ports():
 
 
 def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--spec', action='append', default=[], help='Focused auth spec basename; full fixture outcome verification runs only for the complete suite')
+    args = parser.parse_args()
+    for name in args.spec:
+        auth.require(Path(name).name == name and name.endswith('.spec.ts') and (auth.ROOT/'frontend/auth-e2e'/name).is_file(), 'Invalid focused auth spec')
     check_ports()  # Refuse before Docker, Keycloak or database operations.
     auth.check_reset_ownership()  # Inspection only; never calls reset/down.
     auth.check_source()
@@ -38,11 +44,12 @@ def run():
     processes = []
     owned_names = []
     seeded = False
+    realm_created = False
     control_stop = threading.Event()
     control_thread = None
     with tempfile.TemporaryDirectory(prefix="magnum-bff-e2e-") as directory:
         run_id = "magnum-bff-e2e-" + uuid.uuid4().hex
-        fixture = {"run_id": run_id, "users": []}
+        fixture = {"run_id": run_id, "issuer": "http://auth.magnum.test:8080/realms/" + run_id, "users": []}
         client_secret = secrets.token_urlsafe(48)
         path = Path(directory) / "fixtures.json"
         env = {**os.environ, "MIX_ENV": "test", "MIX_TEST_PARTITION": "_auth_e2e",
@@ -75,8 +82,12 @@ def run():
                           webOrigins=["http://localhost:5174"])
             client["attributes"]["post.logout.redirect.uris"] = "http://localhost:5174/"
             client["attributes"]["id.token.signed.response.alg"] = "RS256"
-            auth.admin_write("create", "realms/magnum/clients", client)
-            live, = auth.admin_get("realms/magnum/clients?clientId=" + run_id)
+            realm = json.loads((auth.ROOT / "infra/auth/magnum-realm.json").read_text())
+            realm.update(realm=run_id, displayName="Isolated Magnum acceptance", registrationAllowed=True, requiredCredentials=["password"],
+                         clients=[client], attributes={"magnum.e2e.owner": run_id})
+            auth.admin_write("create", "realms", realm)
+            realm_created = True
+            live, = auth.admin_get("realms/" + run_id + "/clients?clientId=" + run_id)
             auth.require(len(live) == 1 and live[0]["clientId"] == run_id and
                          live[0]["redirectUris"] == client["redirectUris"] and
                          live[0]["webOrigins"] == client["webOrigins"] and
@@ -86,18 +97,21 @@ def run():
                          "Isolated client contract mismatch")
             mix("ecto.create", "--quiet")
             mix("ecto.migrate", "--quiet")
-            for kind in ("active", "pending", "owner", "manager", "shop_manager", "employee", "mixed", "multi_owner"):
+            for kind in ("active", "pending", "owner", "manager", "shop_manager", "employee", "mixed", "multi_owner", "registration"):
                 username = run_id + "-" + kind
                 password = secrets.token_urlsafe(32)
                 email = username + "@example.invalid"
                 username = email  # Realm registrationEmailAsUsername is enabled.
                 owned_names.append(username)
-                auth.admin_write("create", "realms/magnum/users", {
+                if kind == "registration":
+                    fixture["users"].append({"kind":kind,"username":username,"password":password,"email":email,"subject":None})
+                    continue
+                auth.admin_write("create", "realms/" + run_id + "/users", {
                     "username": username, "email": email, "emailVerified": True, "enabled": True,
                     "firstName": "E2E", "lastName": kind.title(), "requiredActions": [],
                     "credentials": [{"type": "password", "value": password, "temporary": False}],
                 })
-                users, = auth.admin_get("realms/magnum/users?username=" + username + "&exact=true")
+                users, = auth.admin_get("realms/" + run_id + "/users?username=" + username + "&exact=true")
                 auth.require(len(users) == 1 and users[0]["username"] == username, "Owned identity not found")
                 fixture["users"].append({"kind": kind, "username": username, "password": password,
                                          "email": email, "subject": users[0]["id"]})
@@ -154,11 +168,15 @@ def run():
                     control.with_suffix(".response").write_text(json.dumps(response))
             control_thread = threading.Thread(target=control_backend, daemon=True)
             control_thread.start()
-            result = subprocess.run(["npx", "playwright", "test", "--config", "playwright.auth.config.ts"],
+            result = subprocess.run(["npx", "playwright", "test", "--config", "playwright.auth.config.ts", *args.spec],
                                     cwd=auth.ROOT / "frontend", env=env)
             auth.require(result.returncode == 0, "Real Keycloak browser suite failed")
-            mix("run", "--no-start", "scripts/auth_e2e.exs", "verify")
-            print("PASS: real signed-token login, pending denial, role-scoped Admin acceptance, expiry and local logout")
+            if not args.spec:
+                mix("run", "--no-start", "scripts/auth_e2e.exs", "verify")
+            else:
+                print("PASS: focused browser run; full-suite fixture outcome verification deferred to unfiltered test:auth")
+            if not args.spec:
+                print("PASS: real signed-token login, pending denial, role-scoped Admin acceptance, expiry and local logout")
         finally:
             control_stop.set()
             if control_thread:
@@ -169,26 +187,39 @@ def run():
                     process.wait(timeout=15)
             try:
                 if seeded:
+                    current = json.loads(path.read_text())
+                    for identity in current["users"]:
+                        if not identity.get("subject"):
+                            recovered, = auth.admin_get("realms/" + run_id + "/users?username="+identity["username"]+"&exact=true")
+                            auth.require(len(recovered) <= 1, "Ambiguous owned registration identity")
+                            if recovered: identity["subject"] = recovered[0]["id"]
+                    path.write_text(json.dumps(current));path.chmod(0o600)
                     mix("run", "--no-start", "scripts/auth_e2e.exs", "cleanup")
             finally:
-                for username in owned_names:
-                    users, = auth.admin_get("realms/magnum/users?username=" + username + "&exact=true")
-                    if not users:
-                        continue
-                    auth.require(len(users) == 1, "Ambiguous fixture ownership")
-                    user = users[0]
-                    user_id = user["id"]
-                    auth.require(user["username"] == username and username.startswith(run_id),
-                                 "Identity ownership changed; refusing deletion")
-                    auth.admin_write("delete", "realms/magnum/users/" + user_id)
-                owned_clients, = auth.admin_get("realms/magnum/clients?clientId=" + run_id)
-                for owned in owned_clients:
-                    auth.require(owned["clientId"] == run_id and owned["name"] == run_id,
-                                 "Client ownership changed; refusing deletion")
-                    auth.admin_write("delete", "realms/magnum/clients/" + owned["id"])
-                remaining, = auth.admin_get("realms/magnum/clients?clientId=" + run_id)
-                auth.require(not remaining, "Owned client cleanup incomplete")
-            print("PASS: temporary Keycloak identities/client and isolated account/session/login fixtures cleaned")
+                if realm_created:
+                    for username in owned_names:
+                        users, = auth.admin_get("realms/" + run_id + "/users?username=" + username + "&exact=true")
+                        if not users:
+                            continue
+                        auth.require(len(users) == 1, "Ambiguous fixture ownership")
+                        user = users[0]
+                        user_id = user["id"]
+                        auth.require(user["username"] == username and username.startswith(run_id),
+                                     "Identity ownership changed; refusing deletion")
+                        auth.admin_write("delete", "realms/" + run_id + "/users/" + user_id)
+                    owned_clients, = auth.admin_get("realms/" + run_id + "/clients?clientId=" + run_id)
+                    for owned in owned_clients:
+                        auth.require(owned["clientId"] == run_id and owned["name"] == run_id,
+                                     "Client ownership changed; refusing deletion")
+                        auth.admin_write("delete", "realms/" + run_id + "/clients/" + owned["id"])
+                    remaining, = auth.admin_get("realms/" + run_id + "/clients?clientId=" + run_id)
+                    auth.require(not remaining, "Owned client cleanup incomplete")
+                    mail_cleanup = subprocess.run([sys.executable,str(auth.ROOT/'scripts/auth_registration_fixture.py'),'--cleanup'],env=env,capture_output=True)
+                    owned_realm, = auth.admin_get("realms/" + run_id)
+                    auth.require(owned_realm["realm"] == run_id and owned_realm.get("attributes", {}).get("magnum.e2e.owner") == run_id, "Realm ownership changed")
+                    auth.admin_write("delete", "realms/" + run_id)
+                    auth.require(mail_cleanup.returncode == 0, "Owned registration mail cleanup failed")
+            print("PASS: temporary Keycloak realm/identities/client and isolated account/session/login fixtures cleaned")
 
 
 if __name__ == "__main__":

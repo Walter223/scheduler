@@ -195,3 +195,19 @@ See [frontend signup verification](../frontend/SIGNUP.md).
 [Business onboarding drafts](BUSINESS_ONBOARDING.md) provide an Owner-only API to
 begin, save and resume proposed setup after ordinary login. Draft completion is
 separate from provisioning, domain application and publication; it grants nothing.
+
+### Signup recovery and registration entry
+
+Completed proof status now returns only confirmed business ID/name and shop ID
+within the original proof lifetime, after browser-binding and live-account checks.
+It never grants access or reactivates memberships. Creation retries still bind the
+exact original payload and return the same committed IDs; no expiry is extended.
+Missing CSRF headers receive 403 for otherwise well-formed submissions. Timezone
+suggestions expose the same read-only PostgreSQL catalog used by validation.
+
+The signup login adapter accepts only {} or {mode: "register"}; the latter requests
+Keycloak prompt=create through OIDCC's supported URL extension. Ordinary login
+retains its own purpose, exact /admin destination and existing protections.
+Registration requires an operator-approved provider realm policy; source/live
+magnum registration remains disabled, not silently changed by tests. No migration
+or production activation-policy expansion is introduced.

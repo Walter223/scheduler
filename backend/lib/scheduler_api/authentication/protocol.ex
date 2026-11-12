@@ -8,7 +8,7 @@ defmodule SchedulerApi.Authentication.Protocol do
   alias SchedulerApi.Authentication
   alias SchedulerApi.Authentication.{Config, ConsumedLogin, Credential, LoginAttempt}
 
-  def authorization_url(%LoginAttempt{} = attempt, %Config{} = config, context) do
+  def authorization_url(%LoginAttempt{} = attempt, %Config{} = config, context, opts \\ []) do
     transaction = attempt.transaction
 
     with :ok <- matches?(transaction, config),
@@ -23,6 +23,8 @@ defmodule SchedulerApi.Authentication.Protocol do
              require_pkce: true,
              preferred_auth_methods: [:client_secret_basic],
              request_opts: %{timeout: 5_000},
+             url_extension:
+               if(Keyword.get(opts, :register, false), do: [{"prompt", "create"}], else: []),
              response_mode: "query"
            }) do
         {:ok, url} -> {:ok, IO.iodata_to_binary(url)}

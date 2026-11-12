@@ -397,6 +397,51 @@ defmodule SchedulerApiWeb.AuthControllerTest do
     assert redirected_to(get(build_conn(), "/auth/login")) =~ "auth_error=provider_unavailable"
   end
 
+  test "signup cancellation consumes its purpose-bound transaction and returns a clean signup error",
+       _c do
+    origin = BrowserConfig.current().origin
+    start = build_conn() |> put_req_header("origin", origin) |> post("/auth/signup/login", %{})
+    params = start |> redirected_to() |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+    denied =
+      start
+      |> recycle()
+      |> get("/auth/callback", %{
+        "state" => params["state"],
+        "error" => "access_denied",
+        "error_description" => "must not echo"
+      })
+
+    assert redirected_to(denied) == origin <> "/signup?auth_error=login_failed"
+    assert Repo.aggregate(WebSession, :count) == 0
+  end
+
+  test "registration hint is signup-only and timezone suggestions use supported database identifiers",
+       _c do
+    conn =
+      build_conn()
+      |> put_req_header("origin", BrowserConfig.current().origin)
+      |> post("/auth/signup/login", %{"mode" => "register"})
+
+    params = conn |> redirected_to() |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert params["prompt"] == "create"
+    {:ok, hash} = Credential.hash(params["state"])
+    assert Repo.get_by!(LoginTransaction, state_hash: hash).purpose == :signup
+
+    assert "America/Denver" in json_response(get(build_conn(), "/auth/signup/timezones"), 200)[
+             "timezones"
+           ]
+
+    normal =
+      get(build_conn(), "/auth/login")
+      |> redirected_to()
+      |> URI.parse()
+      |> Map.fetch!(:query)
+      |> URI.decode_query()
+
+    refute Map.has_key?(normal, "prompt")
+  end
+
   test "signup signed callback issues only proof and protects HTTP completion", c do
     origin = BrowserConfig.current().origin
     assert post(build_conn(), "/auth/signup/login", %{}).status == 403
@@ -435,6 +480,11 @@ defmodule SchedulerApiWeb.AuthControllerTest do
       |> post("/auth/signup/business", attrs)
 
     assert denied.status == 403
+
+    missing_csrf =
+      cb |> recycle() |> put_req_header("origin", origin) |> post("/auth/signup/business", attrs)
+
+    assert missing_csrf.status == 403
 
     for injected <- [
           Map.put(attrs, :owner_id, 1),

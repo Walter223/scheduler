@@ -32,10 +32,10 @@ defmodule SchedulerApiWeb.SignupController do
   end
 
   def login(conn, params) do
-    if params != %{} do
+    if params not in [%{}, %{"mode" => "register"}] do
       fail(conn, :invalid_input)
     else
-      case Browser.begin_login(:signup) do
+      case Browser.begin_login(:signup, params == %{"mode" => "register"}) do
         {:ok, attempt, url} ->
           conn = BrowserSession.put_binding(conn, Credential.reveal(attempt.browser_binding))
 
@@ -46,6 +46,17 @@ defmodule SchedulerApiWeb.SignupController do
         _ ->
           fail(conn, :operation_unavailable)
       end
+    end
+  end
+
+  def timezones(conn, params) do
+    if params == %{} do
+      case Onboarding.timezones() do
+        {:ok, zones} -> json(conn, %{timezones: zones})
+        _ -> fail(conn, :operation_unavailable)
+      end
+    else
+      fail(conn, :invalid_input)
     end
   end
 
@@ -64,7 +75,7 @@ defmodule SchedulerApiWeb.SignupController do
     with %{"business" => b, "shop" => s} when map_size(params) == 2 <- params,
          %{"name" => bn, "slug" => bs} when map_size(b) == 2 <- b,
          %{"name" => sn, "slug" => ss, "timezone" => tz} when map_size(s) == 3 <- s,
-         [csrf] <- get_req_header(conn, "x-csrf-token"),
+         {:ok, csrf} <- csrf_header(conn),
          {:ok, result} <-
            Onboarding.complete(
              conn.req_cookies[cookie_name()],
@@ -73,10 +84,17 @@ defmodule SchedulerApiWeb.SignupController do
              %{business: %{name: bn, slug: bs}, shop: %{name: sn, slug: ss, timezone: tz}}
            ) do
       # Retain the expiring proof cookie for safe identical retries. No session is issued.
-      json(conn, %{data: Map.take(result, ["business_id", "shop_id"])})
+      json(conn, %{data: Map.take(result, ["business_id", "shop_id", "business_name"])})
     else
       {:error, reason} -> fail(conn, reason)
       _ -> fail(conn, :invalid_input)
+    end
+  end
+
+  defp csrf_header(conn) do
+    case get_req_header(conn, "x-csrf-token") do
+      [csrf] -> {:ok, csrf}
+      _ -> {:error, :invalid_csrf}
     end
   end
 

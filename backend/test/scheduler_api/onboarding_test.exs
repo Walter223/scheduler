@@ -43,6 +43,35 @@ defmodule SchedulerApi.OnboardingTest do
     assert SchedulerApi.Organizations.default_business!().id != r["business_id"]
   end
 
+  test "completed proof status restores only confirmed company metadata within its lifetime", c do
+    assert {:ok, result} = complete(c)
+
+    assert {:ok, %{completed: true, data: data}} =
+             Onboarding.status(c.token, c.binding, now: @now)
+
+    assert data == Map.take(result, ["business_id", "shop_id", "business_name"])
+    assert data["business_name"] == c.attrs.business.name
+
+    assert {:error, :invalid_proof} =
+             Onboarding.status(c.token, c.binding, now: DateTime.add(@now, 600))
+  end
+
+  test "status reads do not consume proof or change browser binding", c do
+    before = Repo.one!(Proof)
+
+    for _ <- 1..3 do
+      assert {:ok, %{csrf_token: _}} = Onboarding.status(c.token, c.binding, now: @now)
+    end
+
+    assert Repo.one!(Proof) == before
+    assert {:error, :invalid_proof} = Onboarding.status(nil, c.binding, now: @now)
+
+    assert {:error, :invalid_proof} =
+             Onboarding.status(c.token, Credential.reveal(Credential.generate()), now: @now)
+
+    assert Repo.one!(Proof) == before
+  end
+
   test "active identity can create a new tenant without duplicate activation", c do
     {:ok, _} = Accounts.set_user_status(c.user, :active)
     {:ok, r} = complete(c)

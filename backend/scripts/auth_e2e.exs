@@ -8,6 +8,9 @@ end
 [command] = System.argv()
 fixture = System.fetch_env!("BFF_E2E_FIXTURE") |> File.read!() |> Jason.decode!()
 
+issuer = fixture["issuer"] || "http://auth.magnum.test:8080/realms/magnum"
+unless issuer in ["http://auth.magnum.test:8080/realms/magnum", "http://auth.magnum.test:8080/realms/" <> fixture["run_id"]], do: raise("Invalid owned issuer")
+
 unless Regex.match?(~r/^magnum-bff-e2e-[0-9a-f]{32}$/, fixture["run_id"]) and
          Enum.all?(fixture["users"], &String.starts_with?(&1["username"], fixture["run_id"])),
        do: raise("Invalid owned auth fixture")
@@ -20,7 +23,7 @@ if command == "server" do
   unless client_id == fixture["run_id"], do: raise("Invalid owned test client")
 
   provider = %SchedulerApi.Authentication.Config{
-    issuer: "http://auth.magnum.test:8080/realms/magnum",
+    issuer: issuer,
     callback_url: "http://localhost:5174/auth/callback",
     client_id: client_id,
     client_secret: System.fetch_env!("MAGNUM_WEB_CLIENT_SECRET"),
@@ -80,10 +83,10 @@ case command do
           })
         end
 
-      for identity <- fixture["users"], identity["kind"] != "pending" do
+      for identity <- fixture["users"], identity["kind"] not in ["pending", "registration"] do
         {:ok, user} =
           Accounts.sync_verified_identity(%VerifiedIdentity{
-            issuer: "http://auth.magnum.test:8080/realms/magnum",
+            issuer: issuer,
             subject: identity["subject"],
             email: identity["email"],
             email_verified: true,
@@ -319,18 +322,34 @@ case command do
 
     IO.puts("AUTH_E2E_SEEDED")
 
+  action when action in ["suspend_signup_owner", "restore_signup_owner"] ->
+    identity = Enum.find(fixture["users"], &(&1["kind"] == "owner"))
+    user = Repo.get_by!(User, keycloak_subject: identity["subject"])
+    {:ok, _} = Accounts.set_user_status(user, if(action == "suspend_signup_owner", do: :suspended, else: :active))
+    IO.puts("OWNED_SIGNUP_STATE_CHANGED")
+
   "verify" ->
     subjects = Enum.map(fixture["users"], & &1["subject"])
     users = Repo.all(from u in User, where: u.keycloak_subject in ^subjects)
 
     signup_audits = Repo.all(from e in SchedulerApi.Authorization.AuditEvent,
       where: e.source == :self_service_signup and e.target_user_id in ^Enum.map(users, & &1.id))
-    expected = if signup_audits == [], do: List.duplicate(:active, 7) ++ [:pending], else: List.duplicate(:active, 8)
+    expected = if signup_audits == [], do: List.duplicate(:active, 7) ++ [:pending], else: List.duplicate(:active, length(fixture["users"]))
     unless Enum.sort(Enum.map(users, & &1.status)) == expected,
       do: raise("Expected precise account lifecycle outcomes")
     if signup_audits != [] do
-      unless length(signup_audits) == 2 and Enum.count(signup_audits, & &1.activated_pending_account) == 1,
+      unless length(signup_audits) == 3 and Enum.count(signup_audits, & &1.activated_pending_account) == 2,
         do: raise("Expected one pending and one active signup audit")
+    end
+
+    for audit <- signup_audits do
+      shop = Repo.get!(SchedulerApi.Organizations.Shop, audit.shop_id)
+      unless shop.business_id == audit.business_id, do: raise("Signup shop ownership mismatch")
+      member = Repo.get_by!(SchedulerApi.Organizations.BusinessMembership, business_id: audit.business_id, user_id: audit.target_user_id)
+      grant = Repo.get_by!(SchedulerApi.Organizations.RoleAssignment, membership_id: member.id, role: :business_owner, status: :active)
+      unless grant.business_id == shop.business_id and is_nil(grant.shop_id), do: raise("Signup grant scope mismatch")
+      proof = Repo.one!(from p in SchedulerApi.Provisioning.Onboarding.Proof, where: p.user_id == ^audit.target_user_id and not is_nil(p.consumed_at))
+      unless proof.result["business_id"] == shop.business_id and proof.result["shop_id"] == shop.id, do: raise("Signup receipt mismatch")
     end
 
     expired_identity = Enum.find(fixture["users"], &(&1["kind"] == "shop_manager"))
@@ -430,7 +449,7 @@ case command do
       Repo.all(
         from u in User,
           where:
-            u.keycloak_issuer == "http://auth.magnum.test:8080/realms/magnum" and
+            u.keycloak_issuer == ^issuer and
               u.keycloak_subject in ^subjects,
           select: u.id
       )
@@ -550,7 +569,7 @@ case command do
     if action == "check_seed" do
       unless Repo.aggregate(User, :count) == 7, do: raise("Fixture users missing")
 
-      for identity <- fixture["users"], identity["kind"] != "pending" do
+      for identity <- fixture["users"], identity["kind"] not in ["pending", "registration"] do
         user = Repo.get_by!(User, keycloak_subject: identity["subject"])
 
         expected =
@@ -571,7 +590,7 @@ case command do
 
       user =
         Repo.get_by!(User,
-          keycloak_issuer: "http://auth.magnum.test:8080/realms/magnum",
+          keycloak_issuer: issuer,
           keycloak_subject: identity["subject"]
         )
 
@@ -589,7 +608,7 @@ case command do
 
         actor =
           Repo.get_by!(User,
-            keycloak_issuer: "http://auth.magnum.test:8080/realms/magnum",
+            keycloak_issuer: issuer,
             keycloak_subject: actor_identity["subject"]
           )
 

@@ -4,10 +4,11 @@ defmodule SchedulerApi.Authentication.Browser do
   alias SchedulerApi.Authentication.{Protocol, Provider}
   import Ecto.Query
 
-  def begin_login(purpose \\ :login) do
-    with {:ok, config, context} <- provider_context(),
+  def begin_login(purpose \\ :login, register \\ false) do
+    with true <- is_boolean(register) and (not register or purpose == :signup),
+         {:ok, config, context} <- provider_context(),
          {:ok, attempt} <- Authentication.create_login_transaction(config, purpose: purpose),
-         {:ok, url} <- Protocol.authorization_url(attempt, config, context) do
+         {:ok, url} <- Protocol.authorization_url(attempt, config, context, register: register) do
       {:ok, attempt, url}
     end
   end

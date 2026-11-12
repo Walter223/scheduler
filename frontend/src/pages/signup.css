@@ -17,3 +17,11 @@
 .signup-message { padding: .8rem; border: 1px solid #b99562; border-radius: .4rem; }
 .signup-panel { text-align: left; }
 .signup-panel h1, .signup-panel h2, .signup-panel legend { color: #e9edf5; }
+.signup-field-heading { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:1rem; }
+.signup-field-heading label { margin:0; }
+.signup-panel .field-help { min-width:0; max-width:100%; }
+.signup-panel .field-help[open] { flex:1 1 100%; }
+.signup-panel .field-help summary { cursor:pointer; display:inline-block; border:1px solid #566479; border-radius:50%; width:28px; line-height:28px; text-align:center; color:#a4eef5; }
+.signup-panel .field-help [role=note] { margin:8px 0; padding:12px; border:1px solid #566479; border-radius:6px; overflow-wrap:anywhere; }
+.signup-panel .field-help button { display:block; margin-top:8px; }
+.signup-panel > button { margin:8px; }

@@ -56,8 +56,15 @@ defmodule SchedulerApi.Provisioning.Onboarding do
       proof = proof!(token, binding, opts)
       lock_user!(proof.user_id)
       ensure_current!(proof, opts)
-      if proof.consumed_at, do: Repo.rollback(:invalid_proof)
-      %{csrf_token: SessionCSRF.masked_token(proof.csrf_state)}
+
+      if proof.consumed_at do
+        %{
+          completed: true,
+          data: Map.take(completion(proof.result), ["business_id", "shop_id", "business_name"])
+        }
+      else
+        %{csrf_token: SessionCSRF.masked_token(proof.csrf_state)}
+      end
     end)
   end
 
@@ -76,7 +83,7 @@ defmodule SchedulerApi.Provisioning.Onboarding do
 
       if proof.consumed_at do
         if proof.request_hash != request_hash, do: Repo.rollback(:replayed_proof)
-        proof.result
+        completion(proof.result)
       else
         {:ok, now} = Authentication.now(opts)
         limit!(:creation, to_string(user.id), 1, 86400, now)
@@ -93,9 +100,18 @@ defmodule SchedulerApi.Provisioning.Onboarding do
           log: false
         )
 
-        result
+        completion(result)
       end
     end)
+  end
+
+  defp completion(result) do
+    business = Repo.get!(SchedulerApi.Organizations.Business, result["business_id"], log: false)
+    Map.put(result, "business_name", business.name)
+  end
+
+  def timezones do
+    safe(fn -> Repo.all(from z in "pg_timezone_names", order_by: z.name, select: z.name) end)
   end
 
   # Independent HTTP attempt budget commits even if subsequent validation/provisioning fails.
