@@ -97,7 +97,7 @@ def run():
                          "Isolated client contract mismatch")
             mix("ecto.create", "--quiet")
             mix("ecto.migrate", "--quiet")
-            for kind in ("active", "pending", "owner", "manager", "shop_manager", "employee", "mixed", "multi_owner", "registration"):
+            for kind in ("active", "pending", "owner", "manager", "shop_manager", "employee", "mixed", "multi_owner", "golden_owner", "registration"):
                 username = run_id + "-" + kind
                 password = secrets.token_urlsafe(32)
                 email = username + "@example.invalid"
@@ -120,6 +120,8 @@ def run():
                 json.dump(fixture, stream)
             mix("run", "--no-start", "scripts/auth_e2e.exs", "seed")
             seeded = True
+            if set(args.spec) == {"zzzzz-registration.spec.ts", "zzzzzzz-company-golden.spec.ts"}:
+                mix("run", "--no-start", "scripts/auth_e2e.exs", "snapshot_signup_golden")
             backend, ready = spawn(["mix", "run", "--no-start", "scripts/auth_e2e.exs", "server"], auth.ROOT / "backend")
             try:
                 ready.get(timeout=60)
@@ -171,6 +173,9 @@ def run():
             result = subprocess.run(["npx", "playwright", "test", "--config", "playwright.auth.config.ts", *args.spec],
                                     cwd=auth.ROOT / "frontend", env=env)
             auth.require(result.returncode == 0, "Real Keycloak browser suite failed")
+            if set(args.spec) == {"zzzzz-registration.spec.ts", "zzzzzzz-company-golden.spec.ts"}:
+                mix("run", "--no-start", "scripts/auth_e2e.exs", "verify_signup_golden")
+                print("PASS: golden receipts, shops, memberships, grants, audits and unchanged original tenants")
             if not args.spec:
                 mix("run", "--no-start", "scripts/auth_e2e.exs", "verify")
             else:

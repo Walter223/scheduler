@@ -82,3 +82,49 @@ share callback query strings, cookies, tokens, headers or credentials. Distingui
 Review business from the final Create business action. Creating a company in the
 actual development database still needs separate explicit authorization. No actual
 Owner login or real company creation was performed by the agent.
+
+## Uninterrupted company acceptance (P0)
+
+Run both golden paths in a fresh isolated environment:
+
+```sh
+cd frontend
+npm run test:auth -- --spec zzzzz-registration.spec.ts --spec zzzzzzz-company-golden.spec.ts
+```
+
+These tests use real platform links, Keycloak registration/email verification/password
+setup or existing-Owner SSO, browser-bound callback proofs, form submission, named
+success, refresh, ordinary login, Admin business selection and Begin setup. No
+signup API mocking or proof injection occurs in these golden paths. The new Owner
+has exactly their new business; the existing Owner retains prior business context.
+The focused runner checks PostgreSQL audits, consumed receipts, one initial shop,
+active membership and one business-wide Owner grant. It compares original tenant,
+shop, membership, grant and appointment rows against a pre-journey snapshot.
+
+The full `npm run test:auth` additionally exercises slug conflicts, invalid timezone,
+CSRF/origin rejection, duplicate submission/replay, history navigation, missing
+proof/restart, suspended identity, session expiry/revocation and simulated provider/
+backend outages. Some negative assertions use browser request APIs or explicit
+fixture state changes; they are not part of the uninterrupted golden paths.
+Simultaneous first consumption is covered by independent backend connections.
+A genuinely simultaneous multi-tab Keycloak callback race remains separate from
+these sequential journeys and is not claimed as covered.
+
+On golden-path failure, diagnostics attach a sanitized method/path/status network
+trace and an application-origin screenshot with inputs masked. Raw browser traces
+are intentionally disabled because they retain OIDC credentials and callback URLs.
+Successful intentional captures are copied by the existing screenshot reporter to
+Magnum-Screenshots/6a-2b-signup/<run>/ (golden-new-success.png,
+golden-new-setup.png, golden-existing-success.png, golden-existing-setup.png).
+The owner's personal development login/company creation is not exercised.
+
+Acceptance checkpoint: both uninterrupted journeys passed in three clean focused
+runs (2/2 each), followed by a final full real-Keycloak run (40/40). Initial harness
+failures were corrected: Setup requires explicit Begin setup; sharing the existing
+signup Owner between tests correctly hit the one-company-per-day limit. A separate
+`golden_owner` fixture now prevents that collision without weakening limits. Final
+full-suite database assertions and owned cleanup passed. Lint, production build,
+Python syntax and diff checks passed. No production application changes or migrations
+were needed. Simultaneous multi-tab callbacks and expiration of an ordinary session
+specifically during an unfinished signup remain explicit browser coverage gaps;
+missing-proof recovery and Admin session expiration are tested separately.

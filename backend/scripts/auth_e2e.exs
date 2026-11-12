@@ -56,6 +56,15 @@ alias SchedulerApi.{Accounts, Repo}
 alias SchedulerApi.Accounts.{User, VerifiedIdentity, WebSession}
 alias SchedulerApi.Authentication.LoginTransaction
 
+golden_snapshot = fn ->
+  ids = Repo.all(from b in SchedulerApi.Organizations.Business, where: b.slug in ^[fixture["run_id"] <> "-a", fixture["run_id"] <> "-b"], select: b.id)
+  for table <- ["businesses", "shops", "business_memberships", "role_assignments", "appointments"] do
+    column = if table == "businesses", do: "id", else: "business_id"
+    %{rows: rows} = Repo.query!("SELECT to_jsonb(t) FROM " <> table <> " t WHERE " <> column <> " = ANY($1) ORDER BY id", [ids])
+    {table, rows}
+  end
+end
+
 case command do
   "seed" ->
     # Never overwrite a database containing other identities or login attempts.
@@ -98,7 +107,7 @@ case command do
 
         roles =
           case identity["kind"] do
-            "owner" -> [{a, :business_owner}]
+            k when k in ["owner", "golden_owner"] -> [{a, :business_owner}]
             "manager" -> [{a, :business_manager}]
             "shop_manager" -> [{a, :shop_manager}]
             "employee" -> [{a, :employee}]
@@ -328,18 +337,44 @@ case command do
     {:ok, _} = Accounts.set_user_status(user, if(action == "suspend_signup_owner", do: :suspended, else: :active))
     IO.puts("OWNED_SIGNUP_STATE_CHANGED")
 
+  "snapshot_signup_golden" ->
+    File.write!(System.fetch_env!("BFF_E2E_FIXTURE") <> ".baseline", :erlang.term_to_binary(golden_snapshot.()))
+
+  "verify_signup_golden" ->
+    unless File.read!(System.fetch_env!("BFF_E2E_FIXTURE") <> ".baseline") == :erlang.term_to_binary(golden_snapshot.()),
+      do: raise("Unrelated original tenant records changed")
+    File.rm!(System.fetch_env!("BFF_E2E_FIXTURE") <> ".baseline")
+    for kind <- ["golden_owner", "registration"] do
+      identity = Enum.find(fixture["users"], &(&1["kind"] == kind))
+      user = Repo.get_by!(User, keycloak_subject: identity["subject"], keycloak_issuer: issuer)
+      audits = Repo.all(from e in SchedulerApi.Authorization.AuditEvent,
+        where: e.source == :self_service_signup and e.target_user_id == ^user.id)
+      unless length(audits) == 1, do: raise("Expected exactly one golden signup")
+      [audit] = audits
+      unless Repo.aggregate(from(s in SchedulerApi.Organizations.Shop, where: s.business_id == ^audit.business_id), :count) == 1,
+        do: raise("Expected exactly one initial shop")
+      member = Repo.get_by!(SchedulerApi.Organizations.BusinessMembership, user_id: user.id, business_id: audit.business_id, status: :active)
+      grants = Repo.all(from r in SchedulerApi.Organizations.RoleAssignment, where: r.membership_id == ^member.id)
+      unless length(grants) == 1 and hd(grants).role == :business_owner and hd(grants).status == :active and is_nil(hd(grants).shop_id),
+        do: raise("Invalid initial Owner grant")
+      proof = Repo.one!(from p in SchedulerApi.Provisioning.Onboarding.Proof, where: p.user_id == ^user.id and not is_nil(p.consumed_at))
+      unless proof.result["business_id"] == audit.business_id and proof.result["shop_id"] == audit.shop_id,
+        do: raise("Invalid durable receipt")
+    end
+    IO.puts("PASS: both golden signup database invariants")
+
   "verify" ->
     subjects = Enum.map(fixture["users"], & &1["subject"])
     users = Repo.all(from u in User, where: u.keycloak_subject in ^subjects)
 
     signup_audits = Repo.all(from e in SchedulerApi.Authorization.AuditEvent,
       where: e.source == :self_service_signup and e.target_user_id in ^Enum.map(users, & &1.id))
-    expected = if signup_audits == [], do: List.duplicate(:active, 7) ++ [:pending], else: List.duplicate(:active, length(fixture["users"]))
+    expected = if signup_audits == [], do: List.duplicate(:active, 8) ++ [:pending], else: List.duplicate(:active, length(fixture["users"]))
     unless Enum.sort(Enum.map(users, & &1.status)) == expected,
       do: raise("Expected precise account lifecycle outcomes")
     if signup_audits != [] do
-      unless length(signup_audits) == 3 and Enum.count(signup_audits, & &1.activated_pending_account) == 2,
-        do: raise("Expected one pending and one active signup audit")
+      unless length(signup_audits) == 4 and Enum.count(signup_audits, & &1.activated_pending_account) == 2,
+        do: raise("Expected two pending activations and two active-user signup audits")
     end
 
     for audit <- signup_audits do
@@ -348,7 +383,7 @@ case command do
       member = Repo.get_by!(SchedulerApi.Organizations.BusinessMembership, business_id: audit.business_id, user_id: audit.target_user_id)
       grant = Repo.get_by!(SchedulerApi.Organizations.RoleAssignment, membership_id: member.id, role: :business_owner, status: :active)
       unless grant.business_id == shop.business_id and is_nil(grant.shop_id), do: raise("Signup grant scope mismatch")
-      proof = Repo.one!(from p in SchedulerApi.Provisioning.Onboarding.Proof, where: p.user_id == ^audit.target_user_id and not is_nil(p.consumed_at))
+      proof = Repo.one!(from p in SchedulerApi.Provisioning.Onboarding.Proof, where: p.user_id == ^audit.target_user_id and not is_nil(p.consumed_at) and fragment("?->>'business_id'", p.result) == ^to_string(audit.business_id))
       unless proof.result["business_id"] == shop.business_id and proof.result["shop_id"] == shop.id, do: raise("Signup receipt mismatch")
     end
 
@@ -392,7 +427,7 @@ case command do
            ) == 0,
            do: raise("Rehire restored old shop assignments")
 
-    unless Repo.aggregate(SchedulerApi.Organizations.RoleAssignment, :count) == 10 + length(signup_audits),
+    unless Repo.aggregate(SchedulerApi.Organizations.RoleAssignment, :count) == 11 + length(signup_audits),
       do: raise("Classification edits must not create role grants")
 
     IO.puts("AUTH_E2E_VERIFIED")
@@ -567,7 +602,7 @@ case command do
 
   action when action in ["revoke_mixed", "expire_shop_manager", "check_seed"] ->
     if action == "check_seed" do
-      unless Repo.aggregate(User, :count) == 7, do: raise("Fixture users missing")
+      unless Repo.aggregate(User, :count) == 8, do: raise("Fixture users missing")
 
       for identity <- fixture["users"], identity["kind"] not in ["pending", "registration"] do
         user = Repo.get_by!(User, keycloak_subject: identity["subject"])

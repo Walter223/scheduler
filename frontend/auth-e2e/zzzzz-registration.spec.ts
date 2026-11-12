@@ -1,6 +1,6 @@
 import {readFileSync,mkdirSync} from 'node:fs'
 import {execFileSync} from 'node:child_process'
-import {test,expect} from '@playwright/test'
+import {test,expect} from './helpers/signup-test'
 const {users,run_id}=JSON.parse(readFileSync(process.env.BFF_E2E_FIXTURE!,'utf8'))
 test('fresh browser registration stays in Keycloak; verified pending signup creates its own tenant',async({page})=>{
  const identity=users.find((u:{kind:string})=>u.kind==='registration')
@@ -41,6 +41,7 @@ test('fresh browser registration stays in Keycloak; verified pending signup crea
  expect(names).toEqual(['Registered Fictional Studio'])
  const businesses=await page.evaluate(async()=>((await (await fetch('/api/admin/context')).json()).businesses))
  await page.goto(`/setup/${businesses[0].id}`)
+ await page.getByRole('button',{name:'Begin setup',exact:true}).click()
  await expect(page.getByRole('region',{name:'Business setup'}).getByRole('button',{name:'Configure Initial shop',exact:true})).toBeVisible()
  await page.screenshot({path:'/private/tmp/magnum-signup/golden-new-setup.png',fullPage:true})
  await page.goto('/admin')
