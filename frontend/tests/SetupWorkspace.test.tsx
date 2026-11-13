@@ -9,7 +9,7 @@ test('loads existing shop without duplicating it and leaves planned areas honest
   fireEvent.click(screen.getByRole('button',{name:'Configure Main'}))
   expect((screen.getByRole('button',{name:'Configure Main'}) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button',{name:'Locations'}))
-  expect(screen.getByLabelText('Shop name')).toBeTruthy()
+  expect(screen.getByLabelText('Location name')).toBeTruthy()
   fireEvent.click(screen.getByRole('button',{name:'Branding'}))
   expect(screen.getByLabelText('Business display name')).toBeTruthy()
 })

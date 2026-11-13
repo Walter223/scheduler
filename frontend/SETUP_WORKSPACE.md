@@ -19,14 +19,10 @@ abort requests; late responses are ignored. Normal focus-based revalidation keep
 the component mounted when authorized context remains valid. Nothing is stored
 in browser storage. Leaving without Save loses only explicitly marked unsaved edits.
 
-Business, Locations, Staff, Services, Branding and Review are navigation views,
-not invented completion percentages. The saved backend workflow/revision is shown.
-Locations may advance only through the backend validation endpoint. Staff and Services editors are described below;
-Branding editing remains planned; existing proposal values are preserved.
-Review shows proposal counts, location/mobile details and missing fields, with
-unpublished/unapplied warnings. It never enables invitations, mobile booking,
-catalog publishing, AI operations or public booking. There is no Complete/Publish
-control because the remaining configuration editors/application workflows are absent.
+Business, Locations, Staff, Services, Branding and Review use the shared persisted
+progress/navigation mapping. Viewing is separate from completion; only authorized
+saved checkpoints count. See [UX-B1 progress contract](ONBOARDING_PROGRESS.md) for
+percentages, the empty-team skip, readiness handling and Review confirmation.
 
 Tests use disposable real-Keycloak role fixtures and the existing isolated runner,
 including owned draft cleanup. Screenshots: `/private/tmp/magnum-setup/overview.png`,
@@ -142,3 +138,8 @@ focus preserves mounted workspace; business/access changes clear private state.
 Screenshots: /private/tmp/magnum-guided-onboarding/proposal-{1440,1024,768,390,320}.png;
 successful real-provider runs copy them to the permanent 7b-1-guide archive.
 Development migration requires explicit approval and has not been applied.
+
+The Locations editor now uses the [UX-C1 First Location experience](FIRST_LOCATION.md):
+plain-English service-mode cards, conditional mobile planning, an existing first-shop
+reference, inline validation and explicit draft-only saves. It does not create a
+second first shop or alter operational booking configuration.

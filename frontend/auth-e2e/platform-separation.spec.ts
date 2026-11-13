@@ -50,10 +50,10 @@ test('real multi-business Owner resumes dedicated Setup, preserves selection and
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
     await page.screenshot({path:`${folder}/setup-${width}.png`,fullPage:true})
   }
-  await page.getByLabel('Business',{exact:true}).selectOption(second)
+  await page.getByRole('combobox',{name:'Business',exact:true}).selectOption(second)
   await expect(page).toHaveURL(`/setup/${second}`)
   await expect(page.getByText('Begin setup to save private proposals for this business.')).toBeVisible()
-  await page.getByLabel('Business',{exact:true}).selectOption(first)
+  await page.getByRole('combobox',{name:'Business',exact:true}).selectOption(first)
   await expect(page.getByText('Saved setup loaded.')).toBeVisible()
   await page.getByRole('link',{name:'Open management workspace'}).click()
   await page.setViewportSize({width:1440,height:1000})

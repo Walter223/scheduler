@@ -1,0 +1,24 @@
+/* Reuses Magnum Detailing navigation.css's cyan/pink neon line and animated width.
+   Scoped tokens leave public navigation and booking visuals unchanged. */
+.admin-shell .onboarding-navigation { --wizard-cyan:#00eaff; --wizard-pink:#ff2aa1; background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:12px; padding:20px; margin:16px 0 24px; }
+.admin-shell .onboarding-progress-heading { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.admin-shell .onboarding-progress-heading h2 { margin:4px 0 16px;font-size:1.15rem; }
+.admin-shell .onboarding-progress-heading>span { font-size:1.5rem;font-weight:700;color:var(--admin-accent); }
+.admin-shell .onboarding-eyebrow { margin:0;font-size:.7rem;letter-spacing:.12em;color:var(--admin-muted); }
+.admin-shell .onboarding-track { height:6px;background:#080d16;border-radius:9px;overflow:hidden; }
+.admin-shell .onboarding-track>span { display:block;height:100%;background:linear-gradient(90deg,var(--wizard-cyan),var(--wizard-pink));box-shadow:0 0 8px #00eaff,0 0 12px #ff2aa1;transition:width .35s ease;border-radius:inherit; }
+.admin-shell .onboarding-announcement,.admin-shell .onboarding-context { color:var(--admin-muted);font-size:.8rem;line-height:1.5; }
+.admin-shell .onboarding-navigation nav { margin:16px 0;display:block; }
+.admin-shell .onboarding-navigation ol { display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:0;margin:0;list-style:none; }
+.admin-shell .onboarding-navigation li { min-width:0; }
+.admin-shell .onboarding-navigation button { display:flex;align-items:center;gap:8px;width:100%;min-height:64px;padding:10px;text-align:left;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--admin-text);font:inherit;font-size:.8rem;cursor:pointer; }
+.admin-shell .onboarding-navigation button:hover { background:var(--admin-raised); }
+.admin-shell .onboarding-navigation button[aria-current=step] { border-color:var(--admin-accent);background:#16303c; }
+.admin-shell .onboarding-navigation button:focus-visible { outline:3px solid var(--admin-purple);outline-offset:3px; }
+.admin-shell .onboarding-step-icon { display:grid;place-items:center;flex:0 0 24px;height:24px;border:1px solid var(--admin-border);border-radius:50%; }
+.admin-shell [data-status=complete] .onboarding-step-icon { background:#10343b;color:var(--wizard-cyan);border-color:var(--admin-accent); }
+.admin-shell [data-status=current] .onboarding-step-icon { border-color:var(--admin-purple); }
+.admin-shell .onboarding-navigation small { display:block;margin-top:4px;font-size:.65rem;line-height:1.35;color:var(--admin-muted); }
+@media(max-width:1000px){.admin-shell .onboarding-navigation ol{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:480px){.admin-shell .onboarding-navigation{padding:14px}.admin-shell .onboarding-navigation ol{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.admin-shell .onboarding-navigation button{min-height:56px;padding:6px;font-size:.75rem}.admin-shell .onboarding-navigation small{font-size:.65rem}}
+@media(prefers-reduced-motion:reduce){.admin-shell .onboarding-track>span{transition:none}}
